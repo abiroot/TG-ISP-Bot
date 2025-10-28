@@ -1,0 +1,30 @@
+dist/*
+node_modules
+.env
+.env.local
+
+*_sessions
+*tokens
+.wwebjs*
+
+*.log
+*qr.png
+
+# ngrok
+.ngrok2
+ngrok.yml
+
+# Temporary media files
+temp/
+
+# Docker
+.docker/
+docker-compose.override.yml
+
+# Database backups
+backups/
+
+# Testing
+coverage/
+.nyc_output/
+.DS_Store

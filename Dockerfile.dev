@@ -1,0 +1,28 @@
+FROM node:21-alpine3.18
+
+WORKDIR /app
+
+# Install pnpm
+RUN corepack enable && corepack prepare pnpm@latest --activate
+ENV PNPM_HOME=/usr/local/bin
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml ./
+
+# Install ALL dependencies (including dev dependencies for development)
+RUN apk add --no-cache --virtual .gyp \
+        python3 \
+        make \
+        g++ \
+    && apk add --no-cache git \
+    && pnpm install \
+    && apk del .gyp
+
+# Copy source code (volume will override this in docker-compose)
+COPY . .
+
+# Expose port
+EXPOSE 3009
+
+# Development command (will be overridden by docker-compose)
+CMD ["pnpm", "run", "dev:simple"]
