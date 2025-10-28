@@ -46,6 +46,7 @@ export interface UserInfo {
     online: boolean
     active: boolean
     blocked: boolean
+    fupMode: string      // Added in new API structure
     userUpTime: string
     accountTypeName: string
     basicSpeedUp: number
@@ -198,8 +199,17 @@ export class IspApiService {
                 return null
             }
 
-            const userInfo: UserInfo = JSON.parse(responseText)
-            logger.debug({ mobile: cleanMobile, userId: userInfo.id }, 'Successfully retrieved user info')
+            // Parse the JSON response - API now returns an array of users
+            const usersArray: UserInfo[] = JSON.parse(responseText)
+
+            if (!Array.isArray(usersArray) || usersArray.length === 0) {
+                logger.debug({ mobile: cleanMobile }, 'No users found in ISP system response')
+                return null
+            }
+
+            // Take the first user from the array (most likely to be the exact match)
+            const userInfo = usersArray[0]
+            logger.debug({ mobile: cleanMobile, userId: userInfo.id, totalResults: usersArray.length }, 'Successfully retrieved user info')
 
             return userInfo
         } catch (error) {
@@ -347,7 +357,8 @@ export class IspApiService {
                 result += '\n📈 Sample Response Times:\n'
                 pingTimes.slice(0, 3).forEach((line, index) => {
                     // Extract just the time value from each ping line
-                    const timeMatch = line.match(/(\d+ms\d+µs)/)
+                    // Handle both µs and us formats
+                    const timeMatch = line.match(/(\d+ms\d+[µu]s)/)
                     if (timeMatch) {
                         result += `  ${index + 1}. ${timeMatch[1]}\n`
                     }
@@ -428,8 +439,8 @@ ${formatApUsers(userInfo.accessPointUsers)}
 
 💰 **Billing Information**
 │ • Base Price: $${userInfo.accountPrice.toFixed(2)}
-${userInfo.realIpPrice ? `│ • Real IP: $${userInfo.realIpPrice.toFixed(2)}` : ''}
-${userInfo.iptvPrice ? `│ • IPTV: $${userInfo.iptvPrice.toFixed(2)}` : ''}
+│ • Real IP: $${(userInfo.realIpPrice || 0).toFixed(2)}
+│ • IPTV: $${(userInfo.iptvPrice || 0).toFixed(2)}
 │ • Subtotal: $${(userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2)}
 │ • Discount: ${userInfo.discount}%
 │ • **Monthly Total:** $${((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - userInfo.discount / 100)).toFixed(2)}
@@ -466,10 +477,61 @@ ${formatDetailedPing(userInfo.pingResult)}
      * Search for users by name or partial mobile number
      */
     async searchUsers(query: string): Promise<UserInfo[]> {
-        // Note: This would need to be implemented based on available ISP API endpoints
-        // For now, we'll return empty array as placeholder
-        logger.warn({ query }, 'User search not yet implemented in ISP API')
-        return []
+        try {
+            const token = await this.authenticate()
+
+            logger.debug({ query }, 'Searching for users in ISP API')
+
+            // For now, we'll try the same endpoint but handle multiple results
+            // In the future, this might be a dedicated search endpoint
+            const response = await fetch(
+                `${this.baseUrl}/api/user-info?mobile=${encodeURIComponent(query)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+
+            if (response.status === 404) {
+                logger.debug({ query }, 'No users found in ISP system')
+                return []
+            }
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                logger.error({
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText,
+                    query
+                }, 'ISP API user search request failed')
+                throw new Error(`User search request failed: ${response.status} ${response.statusText}`)
+            }
+
+            const responseText = await response.text()
+            if (!responseText.trim()) {
+                logger.warn({ query }, 'ISP API returned empty response for search')
+                return []
+            }
+
+            // API returns an array of users
+            const usersArray: UserInfo[] = JSON.parse(responseText)
+
+            if (!Array.isArray(usersArray)) {
+                logger.warn({ query, responseType: typeof usersArray }, 'ISP API returned non-array response for search')
+                return []
+            }
+
+            logger.debug({ query, resultCount: usersArray.length }, 'Successfully searched users in ISP API')
+            return usersArray
+
+        } catch (error) {
+            logger.error({ err: error, query }, 'Failed to search users in ISP API')
+            throw new Error('Failed to search users in ISP system')
+        }
     }
 
     /**

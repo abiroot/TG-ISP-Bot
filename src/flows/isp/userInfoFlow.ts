@@ -86,7 +86,7 @@ export const userInfoFlow = addKeyword<Provider, Database>('EVENT_USER_INFO_DETE
                     response_type: 'user_info_success',
                     phone_number: phoneNumber,
                     user_id: userInfo.id,
-                    user_name: userInfo.name
+                    user_name: `${userInfo.firstName} ${userInfo.lastName}`
                 })
 
                 flowLogger.info({ from: ctx.from, userId: userInfo.id }, 'User information retrieved successfully')

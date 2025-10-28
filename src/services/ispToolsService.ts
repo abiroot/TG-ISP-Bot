@@ -309,9 +309,15 @@ export const ispTools = {
 • Last Login: ${userInfo.lastLogin ? new Date(userInfo.lastLogin).toLocaleString() : 'Never'}
 
 💵 *Pricing Summary:*
-• Monthly Cost: $${userInfo.accountPrice}
-• Discount Applied: ${userInfo.discount}%
-• Effective Cost: $${(userInfo.accountPrice * (1 - userInfo.discount / 100)).toFixed(2)}`
+• Base Price: $${userInfo.accountPrice.toFixed(2)}
+• Real IP: $${(userInfo.realIpPrice || 0).toFixed(2)}
+• IPTV: $${(userInfo.iptvPrice || 0).toFixed(2)}
+• Subtotal: $${(userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2)}
+• Discount: ${userInfo.discount}%
+• **Monthly Total:** $${((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - userInfo.discount / 100)).toFixed(2)}`
+
+                const subtotal = userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)
+                const totalPrice = subtotal * (1 - userInfo.discount / 100)
 
                 return {
                     success: true,
@@ -319,8 +325,11 @@ export const ispTools = {
                     found: true,
                     billing: {
                         accountPrice: userInfo.accountPrice,
+                        realIpPrice: userInfo.realIpPrice || 0,
+                        iptvPrice: userInfo.iptvPrice || 0,
+                        subtotal,
                         discount: userInfo.discount,
-                        effectivePrice: userInfo.accountPrice * (1 - userInfo.discount / 100),
+                        totalPrice,
                         expiryDate: userInfo.expiryAccount,
                         daysUntilExpiry,
                         isExpired,
