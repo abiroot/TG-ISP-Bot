@@ -30,6 +30,7 @@ export { firstTimeUserFlow } from './personality/firstTimeFlow'
 
 // ISP Support flows (user information lookup with ISP API integration)
 export { userInfoFlow, manualPhoneEntryFlow } from './isp'
+export { mikrotikMonitorFlow, mikrotikUsersFlow } from './isp/mikrotikMonitorFlow'
 
 // Media flows (voice notes, images, videos)
 export { voiceNoteFlow } from './media/voiceFlow'
@@ -37,7 +38,6 @@ export { mediaFlow } from './media/imageFlow'
 
 // Test flows (for development and testing)
 export { pingFlow } from './test'
-export { mikrotikMonitorFlow, mikrotikUsersFlow } from './test/mikrotikTestFlow'
 
 // Welcome flow (catch-all using EVENTS.WELCOME with Langchain intent classification)
 export { welcomeFlow } from './ai/chatFlow'

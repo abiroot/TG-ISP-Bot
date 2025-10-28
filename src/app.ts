@@ -105,6 +105,8 @@ async function main() {
         // ISP Support flows (user information lookup with ISP API integration)
         userInfoFlow,
         manualPhoneEntryFlow,
+        mikrotikMonitorFlow,
+        mikrotikUsersFlow,
 
         // Media flows (MUST be before welcome flow to catch media events)
         voiceNoteFlow,
@@ -112,8 +114,6 @@ async function main() {
 
         // Test flows (for development and testing)
         pingFlow,
-        mikrotikMonitorFlow,
-        mikrotikUsersFlow,
 
         // Welcome flow (EVENTS.WELCOME - catches all unmatched messages with Langchain intent classification, must be last)
         welcomeFlow,
