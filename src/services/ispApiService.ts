@@ -289,77 +289,168 @@ export class IspApiService {
             return `Ping data available (${pingResult.length} lines)`
         }
 
-        return `👤 *Customer Information*
+        // Format user sessions
+        const formatSessions = (sessions: UserSession[]): string => {
+            if (!sessions || sessions.length === 0) return 'No session data'
+            return sessions.map(session => {
+                const start = formatDateTime(session.startSession)
+                const end = session.endSession ? formatDateTime(session.endSession) : 'Active'
+                const duration = session.sessionTime || 'N/A'
+                return `  • ${start} → ${end} (${duration})`
+            }).join('\n')
+        }
 
-📱 *Contact:*
-• Name: ${userInfo.firstName} ${userInfo.lastName}
-• Mobile: ${userInfo.mobile}
-• Phone: ${userInfo.phone || 'N/A'}
-• Email: ${userInfo.mailAddress || 'N/A'}
-🏠 *Address:* ${userInfo.address || 'N/A'}
+        // Format detailed ping results
+        const formatDetailedPing = (pingResult: string[]): string => {
+            if (!pingResult || pingResult.length === 0) return 'No ping data available'
 
-📊 *Account Status:*
-• Status: ${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'}
-• Account: ${accountStatus}
-• Access: ${blockedStatus}
-• Active: ${userInfo.active ? '✅ Yes' : '❌ No'}
-• Type: ${userInfo.accountTypeName}
-• Username: ${userInfo.userName}
+            // Get summary stats and format them properly
+            const summaryLines = pingResult.filter(line =>
+                line.includes('packet-loss') || line.includes('min-rtt') || line.includes('avg-rtt') || line.includes('max-rtt')
+            )
 
-🌐 *Network Details:*
-• IP Address: ${userInfo.ipAddress || 'Not assigned'}
-• Static IP: ${userInfo.staticIP || 'None'}
-• MAC Address: ${userInfo.macAddress || 'Not registered'}
-• NAS Host: ${userInfo.nasHost || 'Not connected'}
-• Router: ${userInfo.routerBrand || 'N/A'}
-• Interface: ${userInfo.mikrotikInterface || 'N/A'}
+            // Get sample ping times (last 5 results)
+            const pingTimes = pingResult.slice(-5).filter(line =>
+                line.includes('ms') && !line.includes('avg-rtt') && !line.includes('min-rtt') && !line.includes('max-rtt')
+            )
 
-⚡ *Connection Speeds:*
-• Upload: ${(userInfo.basicSpeedUp / 1000).toFixed(1)} Mbps
-• Download: ${(userInfo.basicSpeedDown / 1000).toFixed(1)} Mbps
+            let result = ''
 
-📊 *Data Usage:*
-• Daily: ${formatQuota(userInfo.dailyQuota)}
-• Monthly: ${formatQuota(userInfo.monthlyQuota)}
+            if (summaryLines.length > 0) {
+                // Parse and format the summary line properly
+                const summaryLine = summaryLines[0]
 
-📡 *Station Info:*
-• Name: ${userInfo.stationName || 'N/A'}
-• IP: ${userInfo.stationIpAddress || 'N/A'}
-• Status: ${userInfo.stationOnline ? '🟢 Online' : '🔴 Offline'}
-• Uptime: ${userInfo.stationUpTime || 'N/A'}
+                // Extract individual metrics
+                const sentMatch = summaryLine.match(/sent=(\d+)/)
+                const receivedMatch = summaryLine.match(/received=(\d+)/)
+                const packetLossMatch = summaryLine.match(/packet-loss=(\d+%)/)
+                const minRttMatch = summaryLine.match(/min-rtt=([\dmsµ]+)/)
+                const avgRttMatch = summaryLine.match(/avg-rtt=([\dmsµ]+)/)
+                const maxRttMatch = summaryLine.match(/max-rtt=([\dmsµ]+)/)
 
-📶 *Access Point:*
-• Name: ${userInfo.accessPointName || 'N/A'}
-• IP: ${userInfo.accessPointIpAddress || 'N/A'}
-• Status: ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
-• Signal: ${userInfo.accessPointSignal || 'N/A'}
-• Uptime: ${userInfo.accessPointUpTime || 'N/A'}
+                result += '📊 Ping Test Results:\n'
+                if (sentMatch && receivedMatch) {
+                    result += `• Packets: ${sentMatch[1]} sent, ${receivedMatch[1]} received\n`
+                }
+                if (packetLossMatch) {
+                    result += `• Packet Loss: ${packetLossMatch[1]}\n`
+                }
+                if (minRttMatch && avgRttMatch && maxRttMatch) {
+                    result += `• Response Times:\n`
+                    result += `  - Minimum: ${minRttMatch[1]}\n`
+                    result += `  - Average: ${avgRttMatch[1]}\n`
+                    result += `  - Maximum: ${maxRttMatch[1]}\n`
+                }
+            }
 
-👥 *AP Users:*
+            if (pingTimes.length > 0) {
+                result += '\n📈 Sample Response Times:\n'
+                pingTimes.slice(0, 3).forEach((line, index) => {
+                    // Extract just the time value from each ping line
+                    const timeMatch = line.match(/(\d+ms\d+µs)/)
+                    if (timeMatch) {
+                        result += `  ${index + 1}. ${timeMatch[1]}\n`
+                    }
+                })
+            }
+
+            return result || `Ping data available (${pingResult.length} lines)`
+        }
+
+        // Check if account is expired for warning styling
+        const expiryDate = new Date(userInfo.expiryAccount)
+        const isExpired = expiryDate < new Date()
+        const daysUntilExpiry = Math.ceil((expiryDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+
+        let expiryIndicator = ''
+        if (isExpired) {
+            expiryIndicator = ' ⚠️ *EXPIRED*'
+        } else if (daysUntilExpiry <= 7) {
+            expiryIndicator = ` ⚠️ *${daysUntilExpiry} days left*`
+        }
+
+        return `
+👤 **Customer Information** • ID: *${userInfo.id}*
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📱 **Personal Details**
+│ • Name: ${userInfo.firstName} ${userInfo.lastName}
+│ • Username: @${userInfo.userName}
+│ • Mobile: \`${userInfo.mobile}\`
+│ • Email: ${userInfo.mailAddress || 'Not provided'}
+│ • Address: ${userInfo.address || 'Not provided'}
+
+${statusEmoji} **Account Status**
+│ • Connection: ${userInfo.online ? '*Online*' : '*Offline*'}
+│ • Account: ${accountStatus}
+│ • Access: ${blockedStatus}
+│ • Service: ${userInfo.active ? '✅ *Active*' : '❌ *Inactive*'}
+│ • Plan: ${userInfo.accountTypeName}
+│ • Expires: ${formatDate(userInfo.expiryAccount)}${expiryIndicator}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+🌐 **Network Configuration**
+│ • IP: \`${userInfo.ipAddress || 'Not assigned'}\`
+│ • Static IP: ${userInfo.staticIP || 'None'}
+│ • MAC: \`${userInfo.macAddress || 'Not registered'}\`
+│ • NAS: ${userInfo.nasHost || 'Not connected'}
+│ • Router: ${userInfo.routerBrand || 'N/A'}
+
+⚡ **Service Performance**
+│ • Upload: ${(userInfo.basicSpeedUp / 1000).toFixed(1)} Mbps
+│ • Download: ${(userInfo.basicSpeedDown / 1000).toFixed(1)} Mbps
+│ • Uptime: ${userInfo.userUpTime || 'N/A'}
+
+📊 **Data Usage**
+│ • Daily: ${formatQuota(userInfo.dailyQuota)}
+│ • Monthly: ${formatQuota(userInfo.monthlyQuota)}
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+📡 **Infrastructure Status**
+
+${userInfo.stationOnline ? '🟢' : '🔴'} **Station:** ${userInfo.stationName || 'N/A'}
+│ • IP: \`${userInfo.stationIpAddress || 'N/A'}\`
+│ • Uptime: ${userInfo.stationUpTime || 'N/A'}
+
+${userInfo.accessPointOnline ? '🟢' : '🔴'} **Access Point:** ${userInfo.accessPointName || 'N/A'}
+│ • IP: \`${userInfo.accessPointIpAddress || 'N/A'}\`
+│ • Signal: ${userInfo.accessPointSignal || 'N/A'}
+│ • Uptime: ${userInfo.accessPointUpTime || 'N/A'}
+
+👥 **Connected Users:** ${userInfo.accessPointUsers?.filter(u => u.online).length || 0}/${userInfo.accessPointUsers?.length || 0}
 ${formatApUsers(userInfo.accessPointUsers)}
 
-💰 *Billing:*
-• Base Price: $${userInfo.accountPrice.toFixed(2)}${userInfo.realIpPrice ? `\n• Real IP: $${userInfo.realIpPrice.toFixed(2)}` : ''}${userInfo.iptvPrice ? `\n• IPTV: $${userInfo.iptvPrice.toFixed(2)}` : ''}
-• Subtotal: $${(userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2)}
-• Discount: ${userInfo.discount}%
-• Final: $${((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - userInfo.discount / 100)).toFixed(2)}
-• Expiry: ${formatDate(userInfo.expiryAccount)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📅 *History:*
-• Customer Since: ${formatDate(userInfo.creationDate)}
-• Last Login: ${formatDateTime(userInfo.lastLogin)}
-• Last Logout: ${formatDateTime(userInfo.lastLogOut)}
-• User Uptime: ${userInfo.userUpTime || 'N/A'}
+💰 **Billing Information**
+│ • Base Price: $${userInfo.accountPrice.toFixed(2)}
+${userInfo.realIpPrice ? `│ • Real IP: $${userInfo.realIpPrice.toFixed(2)}` : ''}
+${userInfo.iptvPrice ? `│ • IPTV: $${userInfo.iptvPrice.toFixed(2)}` : ''}
+│ • Subtotal: $${(userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2)}
+│ • Discount: ${userInfo.discount}%
+│ • **Monthly Total:** $${((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - userInfo.discount / 100)).toFixed(2)}
 
-👤 *Collector:*
-• Name: ${userInfo.collectorFirstName} ${userInfo.collectorLastName}
-• Username: ${userInfo.collectorUserName}
-• Mobile: ${userInfo.collectorMobile || 'N/A'}
+📅 **Account History**
+│ • Customer Since: ${formatDate(userInfo.creationDate)}
+│ • Last Login: ${formatDateTime(userInfo.lastLogin)}
+│ • Last Logout: ${formatDateTime(userInfo.lastLogOut)}
 
-💬 *Notes:* ${userInfo.comment || 'No notes'}
+━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-📈 *Network Test:*
-${formatPingSummary(userInfo.pingResult)}
+👤 **Assigned Collector**
+│ • Name: ${userInfo.collectorFirstName} ${userInfo.collectorLastName}
+│ • Username: @${userInfo.collectorUserName}
+│ • Mobile: \`${userInfo.collectorMobile || 'N/A'}\`
+
+💬 **Notes:** ${userInfo.comment || 'No additional notes'}
+
+📈 **Network Diagnostics**
+\`\`\`
+${formatDetailedPing(userInfo.pingResult)}
+\`\`\`
 `
     }
 
