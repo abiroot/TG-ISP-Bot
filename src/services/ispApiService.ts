@@ -588,6 +588,94 @@ ${formatDetailedPing(userInfo.pingResult)}
     }
 
     /**
+     * Get Mikrotik user list for a specific interface
+     */
+    async getMikrotikUserList(mikrotikInterface: string): Promise<AccessPointUser[]> {
+        try {
+            const token = await this.authenticate()
+
+            logger.debug({ mikrotikInterface }, 'Getting Mikrotik user list from ISP API')
+
+            const response = await fetch(
+                `${this.baseUrl}/api/mikrotik-user-list?mikrotikInterface=${encodeURIComponent(mikrotikInterface)}`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                logger.error({
+                    status: response.status,
+                    statusText: response.statusText,
+                    body: errorText,
+                    mikrotikInterface
+                }, 'ISP API Mikrotik user list request failed')
+                throw new Error(`Mikrotik user list request failed: ${response.status} ${response.statusText}`)
+            }
+
+            const responseText = await response.text()
+            if (!responseText.trim()) {
+                logger.warn({ mikrotikInterface }, 'ISP API returned empty response for Mikrotik user list')
+                return []
+            }
+
+            // API returns an array of users
+            const usersArray: AccessPointUser[] = JSON.parse(responseText)
+
+            if (!Array.isArray(usersArray)) {
+                logger.warn({ mikrotikInterface, responseType: typeof usersArray }, 'ISP API returned non-array response for Mikrotik user list')
+                return []
+            }
+
+            logger.debug({ mikrotikInterface, userCount: usersArray.length }, 'Successfully retrieved Mikrotik user list')
+            return usersArray
+
+        } catch (error) {
+            logger.error({ err: error, mikrotikInterface }, 'Failed to get Mikrotik user list from ISP API')
+            throw new Error('Failed to retrieve Mikrotik user list from ISP system')
+        }
+    }
+
+    /**
+     * Format Mikrotik user list for display
+     */
+    formatMikrotikUserList(users: AccessPointUser[], interfaceName: string): string {
+        if (!users || users.length === 0) {
+            return `📡 **Mikrotik Interface:** ${interfaceName}\n\n❌ No users found on this interface`
+        }
+
+        const onlineUsers = users.filter(u => u.online)
+        const offlineUsers = users.filter(u => !u.online)
+
+        let result = `📡 **Mikrotik Interface:** ${interfaceName}\n`
+        result += `👥 **Users:** ${onlineUsers.length}/${users.length} online\n\n`
+
+        if (onlineUsers.length > 0) {
+            result += `🟢 **Online Users (${onlineUsers.length}):**\n`
+            result += onlineUsers.map(user => `  • @${user.userName}`).join('\n')
+            result += '\n\n'
+        }
+
+        if (offlineUsers.length > 0) {
+            result += `🔴 **Offline Users (${offlineUsers.length}):**\n`
+            result += offlineUsers.map(user => `  • @${user.userName}`).join('\n')
+            result += '\n\n'
+        }
+
+        result += `📊 **Interface Summary:**\n`
+        result += `• Total Users: ${users.length}\n`
+        result += `• Online: ${onlineUsers.length} (${((onlineUsers.length/users.length)*100).toFixed(1)}%)\n`
+        result += `• Offline: ${offlineUsers.length} (${((offlineUsers.length/users.length)*100).toFixed(1)}%)`
+
+        return result
+    }
+
+    /**
      * Clear authentication token (useful for testing)
      */
     clearAuthCache(): void {

@@ -347,6 +347,56 @@ export const ispTools = {
             }
         },
     }),
+
+    /**
+     * Get Mikrotik user list for a specific interface
+     */
+    getMikrotikUserList: tool({
+        description: 'Get the list of users connected to a specific Mikrotik interface. Use when user asks about users on a specific interface, router, or access point.',
+        inputSchema: z.object({
+            interfaceName: z.string().describe('Mikrotik interface name (e.g., (VM-PPPoe4)-vlan1607-zone4-OLT1-eliehajjarb1)'),
+        }),
+        execute: async (input, options) => {
+            const context = options.experimental_context as ToolExecutionContext
+
+            if (!context?.userPhone) {
+                throw new Error('Security error: userPhone not found in context')
+            }
+
+            toolLogger.info(
+                {
+                    userPhone: context.userPhone,
+                    interfaceName: input.interfaceName,
+                },
+                'Executing getMikrotikUserList tool'
+            )
+
+            try {
+                const userList = await ispApiService.getMikrotikUserList(input.interfaceName)
+                const formattedList = ispApiService.formatMikrotikUserList(userList, input.interfaceName)
+
+                return {
+                    success: true,
+                    message: formattedList,
+                    found: true,
+                    interface: {
+                        name: input.interfaceName,
+                        totalUsers: userList.length,
+                        onlineUsers: userList.filter(u => u.online).length,
+                        offlineUsers: userList.filter(u => !u.online).length,
+                        users: userList,
+                    },
+                }
+            } catch (error) {
+                toolLogger.error({ err: error, interfaceName: input.interfaceName }, 'Failed to get Mikrotik user list')
+                return {
+                    success: false,
+                    message: `❌ Error retrieving user list for interface "${input.interfaceName}". The interface might not exist or the ISP API might be temporarily unavailable. Please check the interface name and try again.`,
+                    found: false,
+                }
+            }
+        },
+    }),
 }
 
 /**
@@ -357,4 +407,5 @@ export const ISP_TOOL_NAMES = {
     CHECK_ACCOUNT_STATUS: 'checkAccountStatus',
     GET_TECHNICAL_DETAILS: 'getTechnicalDetails',
     GET_BILLING_INFO: 'getBillingInfo',
+    GET_MIKROTIK_USER_LIST: 'getMikrotikUserList',
 } as const

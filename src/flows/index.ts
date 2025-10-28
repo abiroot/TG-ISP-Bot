@@ -37,6 +37,7 @@ export { mediaFlow } from './media/imageFlow'
 
 // Test flows (for development and testing)
 export { pingFlow } from './test'
+export { mikrotikMonitorFlow, mikrotikUsersFlow } from './test/mikrotikTestFlow'
 
 // Welcome flow (catch-all using EVENTS.WELCOME with Langchain intent classification)
 export { welcomeFlow } from './ai/chatFlow'

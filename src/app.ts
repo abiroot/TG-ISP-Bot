@@ -43,6 +43,8 @@ import {
     voiceNoteFlow,
     mediaFlow,
     pingFlow,
+    mikrotikMonitorFlow,
+    mikrotikUsersFlow,
     welcomeFlow,
 } from '~/flows'
 
@@ -110,6 +112,8 @@ async function main() {
 
         // Test flows (for development and testing)
         pingFlow,
+        mikrotikMonitorFlow,
+        mikrotikUsersFlow,
 
         // Welcome flow (EVENTS.WELCOME - catches all unmatched messages with Langchain intent classification, must be last)
         welcomeFlow,
