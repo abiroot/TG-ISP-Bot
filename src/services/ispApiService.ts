@@ -134,9 +134,9 @@ export class IspApiService {
     }
 
     /**
-     * Get user information by mobile number
+     * Get user information by mobile number - returns all matching users
      */
-    async getUserInfo(mobile: string): Promise<UserInfo | null> {
+    async getUserInfo(mobile: string): Promise<UserInfo[]> {
         try {
             const token = await this.authenticate()
 
@@ -178,7 +178,7 @@ export class IspApiService {
 
             if (response.status === 404) {
                 logger.debug({ mobile: cleanMobile }, 'User not found in ISP system')
-                return null
+                return []
             }
 
             if (!response.ok) {
@@ -196,22 +196,19 @@ export class IspApiService {
             const responseText = await response.text()
             if (!responseText.trim()) {
                 logger.warn({ mobile: cleanMobile }, 'ISP API returned empty response')
-                return null
+                return []
             }
 
-            // Parse the JSON response - API now returns an array of users
+            // Parse the JSON response - API returns an array of users
             const usersArray: UserInfo[] = JSON.parse(responseText)
 
             if (!Array.isArray(usersArray) || usersArray.length === 0) {
                 logger.debug({ mobile: cleanMobile }, 'No users found in ISP system response')
-                return null
+                return []
             }
 
-            // Take the first user from the array (most likely to be the exact match)
-            const userInfo = usersArray[0]
-            logger.debug({ mobile: cleanMobile, userId: userInfo.id, totalResults: usersArray.length }, 'Successfully retrieved user info')
-
-            return userInfo
+            logger.debug({ mobile: cleanMobile, totalResults: usersArray.length }, 'Successfully retrieved user info array')
+            return usersArray
         } catch (error) {
             logger.error({ err: error, mobile }, 'Failed to get user info from ISP API')
             throw new Error('Failed to retrieve user information from ISP system')

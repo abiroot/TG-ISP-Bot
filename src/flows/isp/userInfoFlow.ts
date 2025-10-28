@@ -68,9 +68,9 @@ export const userInfoFlow = addKeyword<Provider, Database>('EVENT_USER_INFO_DETE
 
             try {
                 // Fetch user information from ISP API directly
-                const userInfo = await ispApiService.getUserInfo(phoneNumber)
+                const users = await ispApiService.getUserInfo(phoneNumber)
 
-                if (!userInfo) {
+                if (!users || users.length === 0) {
                     await sendAndLogResponse(ctx, utils,
                         `❌ *User Not Found*\n\n` +
                         `I couldn't find any user with the phone number: *${phoneNumber}*\n\n` +
@@ -80,16 +80,51 @@ export const userInfoFlow = addKeyword<Provider, Database>('EVENT_USER_INFO_DETE
                     return
                 }
 
-                // Format and display user information
-                const formattedInfo = ispApiService.formatUserInfo(userInfo)
-                await sendAndLogResponse(ctx, utils, formattedInfo, {
-                    response_type: 'user_info_success',
-                    phone_number: phoneNumber,
-                    user_id: userInfo.id,
-                    user_name: `${userInfo.firstName} ${userInfo.lastName}`
-                })
+                // Display information for each user sequentially
+                await sendAndLogResponse(ctx, utils,
+                    `🔍 *Found ${users.length} user(s)* for phone number: *${phoneNumber}*\n\n` +
+                    `Displaying information for each user:`,
+                    {
+                        response_type: 'users_found_summary',
+                        phone_number: phoneNumber,
+                        total_users: users.length
+                    }
+                )
 
-                flowLogger.info({ from: ctx.from, userId: userInfo.id }, 'User information retrieved successfully')
+                for (let i = 0; i < users.length; i++) {
+                    const userInfo = users[i]
+
+                    // Add user header to distinguish between users
+                    const userHeader = `\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n👤 **User ${i + 1}/${users.length}** - ${userInfo.firstName} ${userInfo.lastName}\n━━━━━━━━━━━━━━━━━━━━━━━━━━\n`
+
+                    // Format and display user information
+                    const formattedInfo = userHeader + ispApiService.formatUserInfo(userInfo)
+                    await sendAndLogResponse(ctx, utils, formattedInfo, {
+                        response_type: 'user_info_success',
+                        phone_number: phoneNumber,
+                        user_index: i + 1,
+                        total_users: users.length,
+                        user_id: userInfo.id,
+                        user_name: `${userInfo.firstName} ${userInfo.lastName}`
+                    })
+
+                    flowLogger.info({ from: ctx.from, userId: userInfo.id, userIndex: i + 1, totalUsers: users.length }, 'User information retrieved successfully')
+
+                    // Add a small delay between users to avoid overwhelming the user
+                    if (i < users.length - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 500))
+                    }
+                }
+
+                // Send completion message
+                await sendAndLogResponse(ctx, utils,
+                    `\n✅ *Complete*\n\nDisplayed information for all ${users.length} user(s) found with phone number: *${phoneNumber}*`,
+                    {
+                        response_type: 'all_users_displayed',
+                        phone_number: phoneNumber,
+                        total_users: users.length
+                    }
+                )
 
             } catch (error) {
                 flowLogger.error({ err: error, from: ctx.from, phoneNumber }, 'Failed to fetch user info')
