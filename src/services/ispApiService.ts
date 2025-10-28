@@ -386,6 +386,7 @@ ${statusEmoji} **Account Status**
 │ • Account: ${accountStatus}
 │ • Access: ${blockedStatus}
 │ • Service: ${userInfo.active ? '✅ *Active*' : '❌ *Inactive*'}
+│ • FUP Mode: ${userInfo.fupMode || 'Standard'}
 │ • Plan: ${userInfo.accountTypeName}
 │ • Expires: ${formatDate(userInfo.expiryAccount)}${expiryIndicator}
 
@@ -446,6 +447,13 @@ ${userInfo.iptvPrice ? `│ • IPTV: $${userInfo.iptvPrice.toFixed(2)}` : ''}
 │ • Mobile: \`${userInfo.collectorMobile || 'N/A'}\`
 
 💬 **Notes:** ${userInfo.comment || 'No additional notes'}
+
+🏢 **Account Categories**
+│ • User Category: ${userInfo.userCategoryId}
+│ • Financial Category: ${userInfo.financialCategoryId}
+│ • User Group: ${userInfo.userGroupId}
+│ • Link ID: ${userInfo.linkId}
+│ • MOF/Reference: ${userInfo.mof || 'Not specified'}
 
 📈 **Network Diagnostics**
 \`\`\`
