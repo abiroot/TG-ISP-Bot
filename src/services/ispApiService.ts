@@ -310,62 +310,96 @@ export class IspApiService {
             }).join('\n')
         }
 
-        // Format detailed ping results
+        // Format detailed ping results - show raw sequence + formatted summary
         const formatDetailedPing = (pingResult: string[]): string => {
             if (!pingResult || pingResult.length === 0) return 'No ping data available'
 
-            // Get summary stats and format them properly
-            const summaryLines = pingResult.filter(line =>
-                line.includes('packet-loss') || line.includes('min-rtt') || line.includes('avg-rtt') || line.includes('max-rtt')
+            // Find the summary line with statistics
+            const summaryLine = pingResult.find(line =>
+                line.includes('sent=') && line.includes('received=') && line.includes('packet-loss=')
             )
 
-            // Get sample ping times (last 5 results)
-            const pingTimes = pingResult.slice(-5).filter(line =>
-                line.includes('ms') && !line.includes('avg-rtt') && !line.includes('min-rtt') && !line.includes('max-rtt')
+            const maxRttLine = pingResult.find(line =>
+                line.includes('max-rtt=')
             )
 
             let result = ''
 
-            if (summaryLines.length > 0) {
-                // Parse and format the summary line properly
-                const summaryLine = summaryLines[0]
+            // Show raw ping sequence first (preserving exact API output format)
+            const sequenceLines = pingResult.filter(line =>
+                line.trim().match(/^\s*\d+\s+[\d.]+\s+\d+\s+\d+\s+[\dmsµus]+\s*\w*$/) ||
+                line.trim().match(/^\s*\d+\s+timeout\s*$/) ||
+                line.includes(' SEQ HOST SIZE TTL TIME STATUS')
+            )
 
-                // Extract individual metrics
+            if (sequenceLines.length > 0) {
+                result += '🔍 **Ping Sequence:**\n```\n'
+                result += sequenceLines.join('\n')
+                result += '\n```\n\n'
+            }
+
+            // Format summary statistics with better display
+            if (summaryLine) {
+                // Extract the statistics
                 const sentMatch = summaryLine.match(/sent=(\d+)/)
                 const receivedMatch = summaryLine.match(/received=(\d+)/)
                 const packetLossMatch = summaryLine.match(/packet-loss=(\d+%)/)
-                const minRttMatch = summaryLine.match(/min-rtt=([\dmsµ]+)/)
-                const avgRttMatch = summaryLine.match(/avg-rtt=([\dmsµ]+)/)
-                const maxRttMatch = summaryLine.match(/max-rtt=([\dmsµ]+)/)
+                const minRttMatch = summaryLine.match(/min-rtt=([\dmsµus]+)/)
+                const avgRttMatch = summaryLine.match(/avg-rtt=([\dmsµus]+)/)
+                const maxRttMatch = maxRttLine?.match(/max-rtt=([\dmsµus]+)/)
 
-                result += '📊 Ping Test Results:\n'
+                result += '📈 **Performance Summary:**\n'
+
+                // Packets sent/received - show real data from summary line
                 if (sentMatch && receivedMatch) {
-                    result += `• Packets: ${sentMatch[1]} sent, ${receivedMatch[1]} received\n`
+                    result += `📦 **Packet Delivery:**\n`
+                    result += `  • sent=${sentMatch[1]}\n`
+                    result += `  • received=${receivedMatch[1]}\n`
                 }
+
+                // Packet loss with emoji indicators
                 if (packetLossMatch) {
-                    result += `• Packet Loss: ${packetLossMatch[1]}\n`
+                    const lossPercentage = packetLossMatch[1]
+                    const lossNum = parseInt(lossPercentage.replace('%', ''))
+                    let lossEmoji = '🟢'
+                    if (lossNum > 0 && lossNum <= 5) lossEmoji = '⚠️'
+                    if (lossNum > 5) lossEmoji = '🔴'
+                    result += `📉 **Packet Loss:** ${lossEmoji} ${lossPercentage}\n`
                 }
+
+                // Response times with cleaner formatting
                 if (minRttMatch && avgRttMatch && maxRttMatch) {
-                    result += `• Response Times:\n`
-                    result += `  - Minimum: ${minRttMatch[1]}\n`
-                    result += `  - Average: ${avgRttMatch[1]}\n`
-                    result += `  - Maximum: ${maxRttMatch[1]}\n`
-                }
-            }
-
-            if (pingTimes.length > 0) {
-                result += '\n📈 Sample Response Times:\n'
-                pingTimes.slice(0, 3).forEach((line, index) => {
-                    // Extract just the time value from each ping line
-                    // Handle both µs and us formats
-                    const timeMatch = line.match(/(\d+ms\d+[µu]s)/)
-                    if (timeMatch) {
-                        result += `  ${index + 1}. ${timeMatch[1]}\n`
+                    // Clean up the time format for better readability
+                    const formatTime = (timeStr: string): string => {
+                        return timeStr.replace('ms', 'ms ').replace('µs', 'μs').trim()
                     }
-                })
+
+                    result += `⚡ **Latency Metrics:**\n`
+                    result += `  • Minimum: ${formatTime(minRttMatch[1])}\n`
+                    result += `  • Average: ${formatTime(avgRttMatch[1])}\n`
+                    result += `  • Maximum: ${formatTime(maxRttMatch[1])}\n`
+                }
+
+  
+                // Show exit status if available
+                const exitStatusLine = pingResult.find(line => line.includes('exit-status:'))
+                if (exitStatusLine) {
+                    const statusMatch = exitStatusLine.match(/exit-status:\s*(\d+)/)
+                    if (statusMatch) {
+                        const exitCode = parseInt(statusMatch[1])
+                        const statusEmoji = exitCode === 0 ? '✅' : '❌'
+                        const statusText = exitCode === 0 ? 'Success' : 'Failed'
+                        result += `\n${statusEmoji} **Test Status:** ${statusText} (exit code: ${exitCode})`
+                    }
+                }
+            } else {
+                // Fallback: show all raw data if no summary found
+                result += '📋 **Raw Ping Data:**\n```\n'
+                result += pingResult.join('\n')
+                result += '\n```'
             }
 
-            return result || `Ping data available (${pingResult.length} lines)`
+            return result
         }
 
         // Check if account is expired for warning styling
