@@ -6,7 +6,7 @@
  */
 
 import { addKeyword } from '@builderbot/bot'
-import { TwilioProvider as Provider } from '@builderbot/provider-twilio'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { personalityService } from '~/services/personalityService'
 import { whitelistService } from '~/services/whitelistService'
@@ -17,7 +17,7 @@ const flowLogger = createFlowLogger('routing-example')
 /**
  * New User Flow - For users without personality setup
  */
-export const newUserFlow = addKeyword<Provider, Database>('__new_user__')
+export const newUserFlow = addKeyword<TelegramProvider, Database>('__new_user__')
     .addAnswer(
         '👋 *Welcome to ISP Support Bot!*\n\n' +
             "I'm here to help you with customer support and technical assistance.\n\n" +
@@ -29,7 +29,7 @@ export const newUserFlow = addKeyword<Provider, Database>('__new_user__')
 /**
  * Returning User Flow - For users with existing personality
  */
-export const returningUserFlow = addKeyword<Provider, Database>('__returning_user__')
+export const returningUserFlow = addKeyword<TelegramProvider, Database>('__returning_user__')
     .addAnswer(
         '👋 *Welcome back!*\n\n' +
             'How can I help you today?\n\n' +
@@ -43,7 +43,7 @@ export const returningUserFlow = addKeyword<Provider, Database>('__returning_use
 /**
  * Whitelisted Group Flow - For group chats
  */
-export const whitelistedGroupFlow = addKeyword<Provider, Database>('__whitelisted_group__')
+export const whitelistedGroupFlow = addKeyword<TelegramProvider, Database>('__whitelisted_group__')
     .addAnswer(
         '👋 *Hello everyone!*\n\n' +
             "I'm ready to help with ISP customer support.\n\n" +
@@ -56,7 +56,7 @@ export const whitelistedGroupFlow = addKeyword<Provider, Database>('__whiteliste
 /**
  * Not Whitelisted Flow - For non-whitelisted users
  */
-export const notWhitelistedFlow = addKeyword<Provider, Database>('__not_whitelisted__')
+export const notWhitelistedFlow = addKeyword<TelegramProvider, Database>('__not_whitelisted__')
     .addAnswer(
         '⚠️ *Access Required*\n\n' +
             "I'm currently in private mode.\n" +
@@ -69,7 +69,7 @@ export const notWhitelistedFlow = addKeyword<Provider, Database>('__not_whitelis
  *
  * This demonstrates how to use gotoFlow to route users dynamically
  */
-export const dynamicWelcomeFlow = addKeyword<Provider, Database>(['start', '/start'], {
+export const dynamicWelcomeFlow = addKeyword<TelegramProvider, Database>(['start', '/start'], {
     sensitive: false,
 })
     .addAction(async (ctx, { gotoFlow, state, flowDynamic }) => {
@@ -110,7 +110,7 @@ export const dynamicWelcomeFlow = addKeyword<Provider, Database>(['start', '/sta
 /**
  * Example: Conditional Routing based on External Data
  */
-export const dataBasedRoutingFlow = addKeyword<Provider, Database>(['check status'], {
+export const dataBasedRoutingFlow = addKeyword<TelegramProvider, Database>(['check status'], {
     sensitive: false,
 })
     .addAction(async (ctx, { gotoFlow, flowDynamic }) => {
@@ -140,7 +140,7 @@ export const dataBasedRoutingFlow = addKeyword<Provider, Database>(['check statu
 /**
  * Example: Multi-step routing with user choice
  */
-export const choiceBasedRoutingFlow = addKeyword<Provider, Database>(['menu', '/menu'], {
+export const choiceBasedRoutingFlow = addKeyword<TelegramProvider, Database>(['menu', '/menu'], {
     sensitive: false,
 })
     .addAnswer(

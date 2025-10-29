@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { APP_VERSION } from '~/app'
 import { createFlowLogger } from '~/utils/logger'
@@ -11,7 +12,7 @@ const flowLogger = createFlowLogger('version')
  * Available to all users (not just admins)
  * This helps verify that deployments are running the latest code
  */
-export const versionFlow = addKeyword<Provider, Database>(['version', '/version', 'bot version', '/bot version'], {
+export const versionFlow = addKeyword<TelegramProvider, Database>(['version', '/version', 'bot version', '/bot version'], {
     sensitive: false,
 })
     .addAction(async (ctx, utils) => {

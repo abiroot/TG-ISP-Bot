@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { requireAdmin } from '~/middleware/adminCheck'
 import { rateLimiter } from '~/utils/rateLimiter'
@@ -7,7 +8,7 @@ import { personalityService } from '~/services/personalityService'
 /**
  * Check Rate Limit Status Flow
  */
-export const rateLimitStatusFlow = addKeyword<Provider, Database>(['ratelimit status', '/ratelimit status'])
+export const rateLimitStatusFlow = addKeyword<TelegramProvider, Database>(['ratelimit status', '/ratelimit status'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin
         if (!(await requireAdmin(ctx, utils))) return
@@ -48,7 +49,7 @@ export const rateLimitStatusFlow = addKeyword<Provider, Database>(['ratelimit st
 /**
  * Reset Rate Limit Flow
  */
-export const resetRateLimitFlow = addKeyword<Provider, Database>(['ratelimit reset', '/ratelimit reset'])
+export const resetRateLimitFlow = addKeyword<TelegramProvider, Database>(['ratelimit reset', '/ratelimit reset'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin
         if (!(await requireAdmin(ctx, utils))) return
@@ -74,7 +75,7 @@ export const resetRateLimitFlow = addKeyword<Provider, Database>(['ratelimit res
 /**
  * Unblock User Flow
  */
-export const unblockUserFlow = addKeyword<Provider, Database>(['ratelimit unblock', '/ratelimit unblock'])
+export const unblockUserFlow = addKeyword<TelegramProvider, Database>(['ratelimit unblock', '/ratelimit unblock'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin
         if (!(await requireAdmin(ctx, utils))) return

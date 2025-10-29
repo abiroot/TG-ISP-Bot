@@ -1,6 +1,6 @@
 import { addKeyword } from '@builderbot/bot'
 import type { BotContext, TFlow } from '@builderbot/bot/dist/types'
-import type { TwilioProvider as Provider } from '@builderbot/provider-twilio'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import type { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { createFlowLogger } from '~/utils/logger'
 
@@ -15,14 +15,14 @@ const logger = createFlowLogger('ping')
  * - Dynamic responses
  * - Number-based menu (Telegram-friendly alternative to buttons)
  */
-export const pingFlow: TFlow<Provider, Database> = addKeyword<Provider, Database>(['ping', '/ping'])
+export const pingFlow: TFlow<TelegramProvider, Database> = addKeyword<TelegramProvider, Database>(['ping', '/ping'])
     .addAnswer('🏓 Pong!')
     .addAnswer([
         '✅ Bot is working correctly!',
         '',
         '📊 System Status:',
         '- Database: Connected',
-        '- Twilio: Active',
+        '- Telegram: Active',
         '- Server: Running',
     ])
     .addAction(async (ctx: BotContext, { flowDynamic }) => {

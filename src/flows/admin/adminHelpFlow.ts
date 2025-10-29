@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runAdminMiddleware } from '~/middleware/pipeline'
 import { createFlowLogger } from '~/utils/logger'
@@ -10,7 +11,7 @@ const flowLogger = createFlowLogger('admin-help')
  * Shows all available admin commands
  * Only accessible to administrators
  */
-export const adminHelpFlow = addKeyword<Provider, Database>(['admin help', '/admin help'], {
+export const adminHelpFlow = addKeyword<TelegramProvider, Database>(['admin help', '/admin help'], {
     sensitive: false,
 })
     .addAction(async (ctx, utils) => {

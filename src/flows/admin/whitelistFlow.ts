@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runAdminMiddleware } from '~/middleware/pipeline'
 import { whitelistService } from '~/services/whitelistService'
@@ -8,7 +9,7 @@ import { createFlowLogger } from '~/utils/logger'
 
 const flowLogger = createFlowLogger('whitelist')
 
-export const whitelistGroupFlow = addKeyword<Provider, Database>(
+export const whitelistGroupFlow = addKeyword<TelegramProvider, Database>(
     ['whitelist group', '/whitelist group', 'wl group', 'wl grp'],
     {
         sensitive: false, // Case insensitive - allows "WHITELIST GROUP", "Whitelist Group", etc.
@@ -39,7 +40,7 @@ export const whitelistGroupFlow = addKeyword<Provider, Database>(
         }
     })
 
-export const whitelistNumberFlow = addKeyword<Provider, Database>(
+export const whitelistNumberFlow = addKeyword<TelegramProvider, Database>(
     ['whitelist number', '/whitelist number', 'wl number', 'wl num'],
     {
         sensitive: false,
@@ -106,7 +107,7 @@ export const whitelistNumberFlow = addKeyword<Provider, Database>(
         }
     })
 
-export const removeGroupFlow = addKeyword<Provider, Database>(['remove group', '/remove group'])
+export const removeGroupFlow = addKeyword<TelegramProvider, Database>(['remove group', '/remove group'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin using centralized middleware
         const middlewareResult = await runAdminMiddleware(ctx, utils)
@@ -135,7 +136,7 @@ export const removeGroupFlow = addKeyword<Provider, Database>(['remove group', '
         }
     })
 
-export const removeNumberFlow = addKeyword<Provider, Database>(['remove number', '/remove number'])
+export const removeNumberFlow = addKeyword<TelegramProvider, Database>(['remove number', '/remove number'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin using centralized middleware
         const middlewareResult = await runAdminMiddleware(ctx, utils)
@@ -169,7 +170,7 @@ export const removeNumberFlow = addKeyword<Provider, Database>(['remove number',
         }
     })
 
-export const listWhitelistFlow = addKeyword<Provider, Database>(['list whitelist', '/list whitelist'])
+export const listWhitelistFlow = addKeyword<TelegramProvider, Database>(['list whitelist', '/list whitelist'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin using centralized middleware
         const middlewareResult = await runAdminMiddleware(ctx, utils)

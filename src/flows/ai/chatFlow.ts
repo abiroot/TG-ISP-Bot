@@ -1,4 +1,5 @@
 import { addKeyword, EVENTS } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runUserMiddleware } from '~/middleware/pipeline'
 import { aiService } from '~/services/aiService'
@@ -17,7 +18,7 @@ const flowLogger = createFlowLogger('welcome')
  * This is the official BuilderBot way to create a catch-all flow
  * Now uses centralized middleware pipeline for cleaner code
  */
-export const welcomeFlow = addKeyword<Provider, Database>(EVENTS.WELCOME)
+export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME)
     .addAction(async (ctx, { flowDynamic, gotoFlow, state, endFlow, fallBack, blacklist, provider }) => {
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'WELCOME flow triggered')
 

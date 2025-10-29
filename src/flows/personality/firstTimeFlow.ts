@@ -1,4 +1,5 @@
 import { addKeyword, EVENTS } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { personalityService } from '~/services/personalityService'
 import { startIdleTimer, resetIdleTimer, stopIdleTimer } from '~/utils/idleTimer'
@@ -14,7 +15,7 @@ const flowLogger = createFlowLogger('first-time')
  *
  * Note: Welcome message is sent in welcomeFlow before routing here
  */
-export const firstTimeUserFlow = addKeyword<Provider, Database>('__FIRST_TIME_USER__')
+export const firstTimeUserFlow = addKeyword<TelegramProvider, Database>('__FIRST_TIME_USER__')
     .addAnswer(
         '🤖 What should I call myself? (e.g., "ISPSupport", "TechAssistant", "HelpDesk")\n_Type "cancel" anytime to stop_',
         { capture: true, delay: 1000 },

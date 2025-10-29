@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { personalityService } from '~/services/personalityService'
 import { startIdleTimer, resetIdleTimer, stopIdleTimer } from '~/utils/idleTimer'
@@ -9,7 +10,7 @@ import { dispatchSetupComplete, CUSTOM_EVENTS } from '~/utils/customEvents'
  * Triggers: 'setup personality', '/setup personality', 'setup', '/setup'
  * Case-insensitive matching
  */
-export const personalitySetupFlow = addKeyword<Provider, Database>(
+export const personalitySetupFlow = addKeyword<TelegramProvider, Database>(
     ['setup personality', '/setup personality', 'setup', '/setup'],
     { sensitive: false }
 )

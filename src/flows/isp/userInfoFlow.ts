@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runUserMiddleware } from '~/middleware/pipeline'
 import { ispApiService } from '~/services/ispApiService'
@@ -30,7 +31,7 @@ async function sendAndLogResponse(ctx: any, utils: any, message: string, metadat
  * EVENT_USER_INFO_DETECTED - Triggered when intent service detects user info request
  * This flow handles retrieving and displaying user information from ISP API
  */
-export const userInfoFlow = addKeyword<Provider, Database>('EVENT_USER_INFO_DETECTED')
+export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_INFO_DETECTED')
     .addAction(async (ctx, utils) => {
         flowLogger.info({ from: ctx.from, message: ctx.body }, 'User info flow triggered')
 
@@ -147,7 +148,7 @@ export const userInfoFlow = addKeyword<Provider, Database>('EVENT_USER_INFO_DETE
 /**
  * Handle manual phone number entry when initial extraction fails
  */
-export const manualPhoneEntryFlow = addKeyword<Provider, Database>(['phone', 'number', 'lookup'], { sensitive: false })
+export const manualPhoneEntryFlow = addKeyword<TelegramProvider, Database>(['phone', 'number', 'lookup'], { sensitive: false })
     .addAction(async (ctx, utils) => {
         flowLogger.info({ from: ctx.from, message: ctx.body }, 'Manual phone entry triggered')
 

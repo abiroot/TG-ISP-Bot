@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { requireAdmin } from '~/middleware/adminCheck'
 import { botStateService } from '~/services/botStateService'
@@ -7,7 +8,7 @@ import { APP_VERSION } from '~/app'
 /**
  * Enable Maintenance Mode Flow
  */
-export const enableMaintenanceFlow = addKeyword<Provider, Database>(
+export const enableMaintenanceFlow = addKeyword<TelegramProvider, Database>(
     ['maintenance on', '/maintenance on', 'maint on'],
     {
         sensitive: false,
@@ -38,7 +39,7 @@ export const enableMaintenanceFlow = addKeyword<Provider, Database>(
 /**
  * Disable Maintenance Mode Flow
  */
-export const disableMaintenanceFlow = addKeyword<Provider, Database>(
+export const disableMaintenanceFlow = addKeyword<TelegramProvider, Database>(
     ['maintenance off', '/maintenance off', 'maint off'],
     {
         sensitive: false,
@@ -56,7 +57,7 @@ export const disableMaintenanceFlow = addKeyword<Provider, Database>(
 /**
  * Check Bot Status Flow
  */
-export const botStatusFlow = addKeyword<Provider, Database>(
+export const botStatusFlow = addKeyword<TelegramProvider, Database>(
     ['bot status', '/bot status', 'system status', 'status'],
     {
         sensitive: false,
@@ -88,7 +89,7 @@ export const botStatusFlow = addKeyword<Provider, Database>(
 /**
  * Toggle Feature Flow
  */
-export const toggleFeatureFlow = addKeyword<Provider, Database>(['toggle feature', '/toggle feature'])
+export const toggleFeatureFlow = addKeyword<TelegramProvider, Database>(['toggle feature', '/toggle feature'])
     .addAction(async (ctx, utils) => {
         // Check if user is admin
         if (!(await requireAdmin(ctx, utils))) return

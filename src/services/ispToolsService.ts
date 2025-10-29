@@ -48,15 +48,18 @@ export const ispTools = {
             )
 
             try {
-                const userInfo = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.phoneNumber)
 
-                if (!userInfo) {
+                if (!users || users.length === 0) {
                     return {
                         success: false,
                         message: `❌ User not found: I couldn't find any customer with phone number ${input.phoneNumber}. Please check the number and try again.`,
                         found: false,
                     }
                 }
+
+                // Take the first user from the array (most common case)
+                const userInfo = users[0]
 
                 const formattedInfo = ispApiService.formatUserInfo(userInfo)
 
@@ -109,15 +112,17 @@ export const ispTools = {
             )
 
             try {
-                const userInfo = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.phoneNumber)
 
-                if (!userInfo) {
+                if (!users || users.length === 0) {
                     return {
                         success: false,
                         message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
                         found: false,
                     }
                 }
+
+                const userInfo = users[0]
 
                 const statusEmoji = userInfo.online ? '🟢' : '🔴'
                 const accountStatus = userInfo.activatedAccount ? '✅ Active' : '❌ Inactive'
@@ -192,15 +197,17 @@ export const ispTools = {
             )
 
             try {
-                const userInfo = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.phoneNumber)
 
-                if (!userInfo) {
+                if (!users || users.length === 0) {
                     return {
                         success: false,
                         message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
                         found: false,
                     }
                 }
+
+                const userInfo = users[0]
 
                 const techMessage = `🌐 *Technical Details for ${userInfo.firstName} ${userInfo.lastName}*
 
@@ -274,15 +281,17 @@ export const ispTools = {
             )
 
             try {
-                const userInfo = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.phoneNumber)
 
-                if (!userInfo) {
+                if (!users || users.length === 0) {
                     return {
                         success: false,
                         message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
                         found: false,
                     }
                 }
+
+                const userInfo = users[0]
 
                 const expiryDate = new Date(userInfo.expiryAccount)
                 const isExpired = expiryDate < new Date()

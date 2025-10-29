@@ -1,4 +1,5 @@
 import { addKeyword } from '@builderbot/bot'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runUserMiddleware } from '~/middleware/pipeline'
 import { messageRepository } from '~/database/repositories/messageRepository'
@@ -22,7 +23,7 @@ const flowLogger = createFlowLogger('wipedata')
  * - User's personality settings (private chat only)
  * - User's conversation embeddings (RAG data)
  */
-export const wipeDataFlow = addKeyword<Provider, Database>(
+export const wipeDataFlow = addKeyword<TelegramProvider, Database>(
     ['wipedata', '/wipedata', 'wipe data', '/wipe data', 'delete my data', '/delete my data'],
     {
         sensitive: false,
