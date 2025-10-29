@@ -6,12 +6,14 @@
  */
 
 import { tool } from 'ai'
-import type { CoreTool } from 'ai'
 import { toolExecutionAuditService } from '~/services/toolExecutionAuditService'
 import { createFlowLogger } from '~/utils/logger'
 import type { ToolExecutionContext } from '~/services/ispToolsService'
 
 const logger = createFlowLogger('tool-audit-wrapper')
+
+// Type for AI SDK tool (generic to support any input/output)
+type AITool = ReturnType<typeof tool<any, any>>
 
 /**
  * Wrap an AI SDK tool with automatic audit logging
@@ -32,14 +34,12 @@ const logger = createFlowLogger('tool-audit-wrapper')
  * }))
  * ```
  */
-export function withAudit<TInput, TOutput>(
-    toolName: string,
-    toolDefinition: CoreTool<TInput, TOutput>
-): CoreTool<TInput, TOutput> {
-    return tool({
-        description: toolDefinition.description,
-        parameters: toolDefinition.parameters,
-        execute: async (input, options) => {
+export function withAudit(toolName: string, toolDefinition: any): any {
+    const originalExecute = (toolDefinition as any).execute
+
+    return {
+        ...toolDefinition,
+        execute: async (input: any, options: any) => {
             // Extract context for audit logging
             const context = options?.experimental_context as ToolExecutionContext | undefined
             const toolCallId = (options as any)?.toolCallId
@@ -55,13 +55,16 @@ export function withAudit<TInput, TOutput>(
                 inputParams: input as Record<string, any>,
                 metadata: {
                     userMessage: context?.userMessage,
-                    personality: context?.personality?.name,
+                    personalityName: context?.personality?.bot_name || 'unknown',
                 },
             })
 
             try {
                 // Execute the actual tool
-                const result = await toolDefinition.execute!(input, options!)
+                if (!originalExecute) {
+                    throw new Error(`Tool ${toolName} has no execute function`)
+                }
+                const result = await originalExecute(input, options)
 
                 // Log successful execution
                 await complete('success', result as Record<string, any>)
@@ -86,7 +89,7 @@ export function withAudit<TInput, TOutput>(
                 throw error
             }
         },
-    }) as CoreTool<TInput, TOutput>
+    }
 }
 
 /**
@@ -103,10 +106,8 @@ export function withAudit<TInput, TOutput>(
  * })
  * ```
  */
-export function wrapToolsWithAudit<T extends Record<string, CoreTool<any, any>>>(
-    tools: T
-): T {
-    const wrappedTools: Record<string, CoreTool<any, any>> = {}
+export function wrapToolsWithAudit<T extends Record<string, any>>(tools: T): T {
+    const wrappedTools: Record<string, any> = {}
 
     for (const [toolName, toolDef] of Object.entries(tools)) {
         wrappedTools[toolName] = withAudit(toolName, toolDef)
