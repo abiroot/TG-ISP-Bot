@@ -19,6 +19,7 @@ export async function runMigrations(): Promise<void> {
         '008_add_pgvector_extension.sql',
         '010_seed_whitelist.sql',
         '011_add_user_identifiers.sql',
+        '013_tool_execution_audit.sql',
     ]
 
     try {

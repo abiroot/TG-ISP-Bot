@@ -6,23 +6,9 @@ import {
     MessageFilter,
     ConversationHistoryOptions,
 } from '../schemas/message'
+import { getCircularReplacer } from '~/utils/jsonHelpers'
 
 export class MessageRepository {
-    /**
-     * Handle circular references in JSON.stringify
-     */
-    private getCircularReplacer() {
-        const seen = new WeakSet()
-        return (key: any, value: any) => {
-            if (typeof value === 'object' && value !== null) {
-                if (seen.has(value)) {
-                    return '[Circular Reference]'
-                }
-                seen.add(value)
-            }
-            return value
-        }
-    }
 
     /**
      * Create a new message
@@ -50,7 +36,7 @@ export class MessageRepository {
                 data.media_size || null,
                 data.status || 'sent',
                 data.error_message || null,
-                JSON.stringify(data.metadata || {}, this.getCircularReplacer()),
+                JSON.stringify(data.metadata || {}, getCircularReplacer()),
                 data.reply_to_message_id || null,
                 data.is_bot_command || false,
                 data.is_admin_command || false,
@@ -102,7 +88,7 @@ export class MessageRepository {
         }
         if (data.metadata) {
             fields.push(`metadata = $${paramIndex++}`)
-            values.push(JSON.stringify(data.metadata, this.getCircularReplacer()))
+            values.push(JSON.stringify(data.metadata, getCircularReplacer()))
         }
 
         if (fields.length === 0) return null

@@ -1,24 +1,43 @@
 /**
  * Admin Telegram user IDs configuration
  *
- * Add admin Telegram user IDs here (numeric IDs or usernames)
- * Examples: '123456789' (numeric ID), '@username' (with @)
+ * IMPORTANT: This supports two modes:
  *
- * To get user IDs:
- * 1. Send a message to your bot
- * 2. Check the logs or database for the 'from' field
+ * 1. **NUMERIC IDS** (RECOMMENDED for security):
+ *    - Use actual Telegram numeric IDs: '123456789', '987654321'
+ *    - These IDs never change and cannot be hijacked
+ *    - To get numeric IDs: Check database table 'user_identifiers' or bot logs
+ *
+ * 2. **USERNAMES** (Convenience, less secure):
+ *    - Use Telegram usernames: 'username' or '@username'
+ *    - Mapped to numeric IDs via user_identifiers table
+ *    - WARNING: Users can change their username, requiring database update
+ *
+ * Current Implementation:
+ * - adminCheck middleware first tries direct ID match
+ * - If not matched, looks up username in user_identifiers table
+ * - Returns the mapped Telegram ID for comparison
+ *
+ * Best Practice: Use numeric IDs for production systems
  *
  * Admins have special permissions to:
- * - Whitelist/remove groups
- * - Whitelist/remove users
+ * - Whitelist/remove groups and users
  * - View whitelist status
- * - Toggle maintenance mode
- * - Manage bot features
+ * - Toggle maintenance mode and bot features
+ * - Execute admin commands
+ *
+ * @example
+ * // Recommended (numeric IDs):
+ * export const ADMIN_IDS = ['123456789', '987654321']
+ *
+ * // Alternative (usernames - requires database mapping):
+ * export const ADMIN_IDS = ['SOLamyy', 'lambasoft']
  */
 export const ADMIN_IDS: string[] = [
-    'SOLamyy', // SOLamyy - store username without @ prefix for consistency
-    'lambasoft'
-    // Add more admin IDs as needed
+    'SOLamyy', // @SOLamyy - Mapped via user_identifiers table
+    'lambasoft' // @lambasoft - Mapped via user_identifiers table
+    // TODO: Replace with numeric Telegram IDs for production security
+    // Example: '123456789', '987654321'
 ]
 
 /**

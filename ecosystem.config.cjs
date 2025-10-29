@@ -39,7 +39,7 @@ module.exports = {
       time: true,
 
       // Advanced features
-      kill_timeout: 5000,            // Wait 5s for graceful shutdown
+      kill_timeout: 30000,           // Wait 30s for graceful shutdown (BuilderBot needs time)
       listen_timeout: 10000,         // Wait 10s for app to be ready
       shutdown_with_message: false,
 

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { ispApiService } from '~/services/ispApiService'
 import { createFlowLogger } from '~/utils/logger'
 import { Personality } from '~/database/schemas/personality'
+import { wrapToolsWithAudit } from '~/utils/toolAuditWrapper'
 
 const toolLogger = createFlowLogger('isp-tools')
 
@@ -19,11 +20,13 @@ export interface ToolExecutionContext {
 }
 
 /**
- * ISP Tools for AI SDK
+ * ISP Tools for AI SDK (without audit logging)
  * SECURITY: All tools validate userPhone from experimental_context
  * and enforce proper API usage through ispApiService
+ *
+ * NOTE: Use `ispTools` export instead - it includes automatic audit logging
  */
-export const ispTools = {
+const rawIspTools = {
     /**
      * Get user information by phone number
      */
@@ -409,6 +412,24 @@ export const ispTools = {
         },
     }),
 }
+
+/**
+ * ISP Tools with automatic audit logging
+ *
+ * All tool executions are automatically logged to tool_execution_audit table
+ * for compliance, security monitoring, and analytics.
+ *
+ * Audit logs include:
+ * - Tool name and input parameters
+ * - User context (Telegram ID, username, display name)
+ * - Execution timing and status (success/error/timeout)
+ * - Output results or error messages
+ * - Metadata (conversation context, personality, user message)
+ *
+ * @see toolExecutionAuditService for querying audit logs
+ * @see wrapToolsWithAudit for audit wrapper implementation
+ */
+export const ispTools = wrapToolsWithAudit(rawIspTools)
 
 /**
  * Tool names for type-safe reference

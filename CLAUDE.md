@@ -440,7 +440,7 @@ This bot is built specifically for Telegram using the Bot API.
 - **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
 - **TESTING.md** - Testing setup and examples
 - I'm using VitoDeploy to deploy on prod server (https://vitodeploy.com/docs/getting-started/introduction/) use crawl4ai to research it.
-You can ssh to my VitoServer using `ssh root@159.223.220.101`. The project directory on the server is /home/vito/tg-isp.abiroot.dev
+You can ssh to my VitoServer using `ssh root@159.223.220.101`. The project directory on the server is /home/vito/book-keep.abiroot.dev
 PS: We have multiple sites running on the server, make sure not to break anything and try to use Vito's recommendation
-PS: There's an auto deploy script, when we git push it gets deployed on the server. It takes ~2 minutes to finish the deploy. So if you want any change on the server, you must do it here, locally, then git push it
-I have to manually update the Vito deploy script. If you want it updated, let me know and I will update it for you and let you know once I do
+PS: There's an auto deploy script, when we git push it gets deployed on the server. It takes ~2 minutes to finish the deploy.
+- I have to manually update the Vito deploy script. If you want it updated, let me know and I will update it for you and let you know once I do

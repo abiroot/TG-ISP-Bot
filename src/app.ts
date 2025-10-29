@@ -157,6 +157,7 @@ async function main() {
     const { imageAnalysisService } = await import('~/services/imageAnalysisService')
     const { conversationRagService } = await import('~/services/conversationRagService')
     const { embeddingWorkerService } = await import('~/services/embeddingWorkerService')
+    const { toolExecutionAuditService } = await import('~/services/toolExecutionAuditService')
 
     // Create bot with queue configuration and extensions
     const { handleCtx, httpServer } = await createBot(
@@ -182,6 +183,7 @@ async function main() {
                 imageAnalysisService,
                 conversationRagService,
                 embeddingWorkerService,
+                toolExecutionAuditService,
             },
         }
     )
