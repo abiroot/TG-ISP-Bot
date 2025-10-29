@@ -1,5 +1,4 @@
 import { addKeyword } from '@builderbot/bot'
-import { TwilioProvider as Provider } from '@builderbot/provider-twilio'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { runUserMiddleware } from '~/middleware/pipeline'
 import { isAdmin } from '~/config/admins'

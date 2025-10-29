@@ -1,5 +1,4 @@
 import { addKeyword } from '@builderbot/bot'
-import { TwilioProvider as Provider } from '@builderbot/provider-twilio'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { personalityService } from '~/services/personalityService'
 import { startIdleTimer, resetIdleTimer, stopIdleTimer } from '~/utils/idleTimer'
