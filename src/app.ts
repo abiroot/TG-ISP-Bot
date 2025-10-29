@@ -192,13 +192,15 @@ async function main() {
         port: env.POSTGRES_DB_PORT,
     })
 
-    // Add debug logging middleware BEFORE creating bot
-    adapterProvider.server.use((req, res, next) => {
-        console.log(`\n📥 ${new Date().toISOString()} - ${req.method} ${req.url}`)
-        console.log('Headers:', JSON.stringify(req.headers, null, 2))
-        console.log('Body:', JSON.stringify(req.body, null, 2))
-        next()
-    })
+    // Add debug logging middleware for development only
+    if (env.NODE_ENV === 'development') {
+        adapterProvider.server.use((req, res, next) => {
+            console.log(`\n📥 ${new Date().toISOString()} - ${req.method} ${req.url}`)
+            console.log('Headers:', JSON.stringify(req.headers, null, 2))
+            console.log('Body:', JSON.stringify(req.body, null, 2))
+            next()
+        })
+    }
 
     // Import services for extensions
     const { aiService } = await import('~/services/aiService')
@@ -222,7 +224,7 @@ async function main() {
         },
         {
             queue: {
-                timeout: 30000, // 30 seconds for async operations
+                timeout: 60000, // 60 seconds for async operations (AI + ISP API calls)
                 concurrencyLimit: 50, // Handle 50 parallel conversations
             },
             extensions: {
