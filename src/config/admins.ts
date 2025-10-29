@@ -17,6 +17,7 @@
  */
 export const ADMIN_IDS: string[] = [
     'SOLamyy', // SOLamyy - store username without @ prefix for consistency
+    'lambasoft'
     // Add more admin IDs as needed
 ]
 
