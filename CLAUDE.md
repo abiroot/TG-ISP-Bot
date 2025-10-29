@@ -439,8 +439,100 @@ This bot is built specifically for Telegram using the Bot API.
 - **MESSAGE_STORAGE.md** - Message logging system and query examples
 - **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
 - **TESTING.md** - Testing setup and examples
-- I'm using VitoDeploy to deploy on prod server (https://vitodeploy.com/docs/getting-started/introduction/) use crawl4ai to research it.
-You can ssh to my VitoServer using `ssh root@159.223.220.101`. The project directory on the server is /home/vito/book-keep.abiroot.dev
-PS: We have multiple sites running on the server, make sure not to break anything and try to use Vito's recommendation
-PS: There's an auto deploy script, when we git push it gets deployed on the server. It takes ~2 minutes to finish the deploy.
-- I have to manually update the Vito deploy script. If you want it updated, let me know and I will update it for you and let you know once I do
+
+## VitoDeploy Production Deployment
+
+### Server Infrastructure
+- **VitoDeploy Control Panel:** `ssh root@161.35.72.42`
+  - Location: `/home/vito/vito/`
+  - Database: `/home/vito/vito/storage/database.sqlite` (SQLite)
+  - Application: Laravel-based VitoDeploy v3.x
+
+- **Production Server:** `ssh root@159.223.220.101`
+  - **tg-isp.abiroot.dev:** `/home/vito/tg-isp.abiroot.dev` (PORT 3010)
+  - **wup-isp.abiroot.dev:** `/home/vito/wup-isp.abiroot.dev` (PORT 3009)
+  - **book-keep.abiroot.dev:** `/home/vito/book-keep.abiroot.dev` (PORT 3008)
+  - **zedinspect.abiroot.dev:** `/home/zedinspect/zedinspect.abiroot.dev` (PHP/Laravel app)
+
+### VitoDeploy Deployment Scripts Location
+**CRITICAL:** VitoDeploy stores deployment scripts in its SQLite database, NOT as files on servers:
+- **Database path:** `161.35.72.42:/home/vito/vito/storage/database.sqlite`
+- **Table:** `deployment_scripts`
+- **Script IDs:**
+  - Script 2: zedinspect.abiroot.dev (PHP/Laravel)
+  - Script 5: book-keep.abiroot.dev (Node.js/PM2)
+  - Script 8: wup-isp.abiroot.dev (Node.js/PM2)
+  - Script 14: tg-isp.abiroot.dev (Node.js/PM2)
+
+### How to Update Deployment Scripts
+```bash
+# SSH to VitoDeploy server
+ssh root@161.35.72.42
+
+# Update script via Laravel Tinker
+cd /home/vito/vito
+php artisan tinker --execute='
+$newContent = "#!/bin/bash\n... your script here ...";
+DB::table("deployment_scripts")->where("id", 14)->update(["content" => $newContent]);
+echo "Script updated";
+'
+```
+
+### Auto-Deployment Notes
+- **Trigger:** Git push to `main` branch triggers auto-deployment
+- **Webhook:** VitoDeploy monitors GitHub webhooks (may need manual trigger if webhook fails)
+- **Duration:** ~2-3 minutes for full deployment
+- **Manual Deploy:** If auto-deploy doesn't trigger, pull code manually and run build script
+
+### PM2 & Process Management
+**CRITICAL CONFIGURATION:**
+- All Node.js apps run under **vito user** (NOT root)
+- All apps managed via **PM2** with `ecosystem.config.cjs`
+- **`kill_timeout: 30000`** (30 seconds) - BuilderBot apps need time for graceful shutdown
+- Graceful shutdown handlers in `src/app.ts` (lines 252-287) handle SIGTERM/SIGINT
+
+### Deployment Script Structure (Node.js Apps)
+All Node.js deployment scripts include:
+1. Git pull with rebase
+2. `npm ci` for clean dependency install
+3. Build cache cleanup
+4. `npm run build`
+5. **Port cleanup** - Kill any zombie processes on app port (CRITICAL for preventing EADDRINUSE)
+6. PM2 stop/delete old process
+7. 3-second wait for full termination
+8. PM2 start with ecosystem.config.cjs
+9. 10-second stabilization wait
+10. Health check verification
+
+### Common Issues & Solutions
+
+**Issue: Port conflicts (EADDRINUSE errors)**
+- **Cause:** BuilderBot apps don't release ports fast enough during PM2 restarts
+- **Solution:** Deployment scripts now include `lsof -ti:$PORT | xargs kill -9` before PM2 start
+- **Manual fix:** `lsof -ti:3010 | xargs kill -9 && pm2 restart tg-isp.abiroot.dev`
+
+**Issue: PM2 crash loops**
+- **Cause:** App crashes within `min_uptime: 10000` window (10 seconds)
+- **Solution:** Increased `kill_timeout` from 5s to 30s in ecosystem.config.cjs
+- **Check status:** `ssh root@159.223.220.101 "su - vito -c 'pm2 list'"`
+
+**Issue: Auto-deploy not triggering**
+- **Cause:** VitoDeploy webhooks not configured or failing
+- **Manual deploy:**
+  ```bash
+  ssh root@159.223.220.101
+  su - vito
+  cd /home/vito/tg-isp.abiroot.dev
+  git reset --hard origin/main
+  git pull origin main
+  npm ci
+  npm run build
+  pm2 restart tg-isp.abiroot.dev
+  ```
+
+### Important Reminders
+- ⚠️ Multiple sites run on production server - be cautious with system-wide changes
+- ⚠️ ALWAYS test `npm run build` locally before git push to prevent deployment blockers
+- ⚠️ Deployment script changes require manual update via VitoDeploy database (ask user to update if needed)
+- ✅ Git push triggers auto-deployment (~2 minutes)
+- ✅ PM2 saves state - apps auto-restart on server reboot
