@@ -9,9 +9,8 @@ import { BotCtx, BotUtils } from '~/types'
 import { requireWhitelist } from './whitelistCheck'
 import { requireRateLimit } from './rateLimitCheck'
 import { getPersonality } from './personalityCheck'
-import { requireAdmin } from './adminCheck'
+import { requireAdmin, checkAdmin } from './adminCheck'
 import { botStateService } from '~/services/botStateService'
-import { isAdmin } from '~/config/admins'
 import { Personality } from '~/database/schemas/personality'
 import { createFlowLogger } from '~/utils/logger'
 
@@ -52,9 +51,9 @@ export async function runMiddleware(
     options: MiddlewareOptions = {}
 ): Promise<MiddlewareResult> {
     const opts = { ...DEFAULT_OPTIONS, ...options }
-    const userIsAdmin = isAdmin(ctx.from)
+    const userIsAdmin = await checkAdmin(ctx, utils)
 
-    logger.debug({ from: ctx.from, options: opts }, 'Running middleware pipeline')
+    logger.debug({ from: ctx.from, isAdmin: userIsAdmin, options: opts }, 'Running middleware pipeline')
 
     // Admin check (if required)
     if (opts.requireAdmin) {
