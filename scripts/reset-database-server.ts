@@ -20,8 +20,8 @@ import { execSync } from 'child_process'
 import { createInterface } from 'readline'
 
 const SERVER_HOST = 'root@159.223.220.101'
-const DB_NAME = 'wup_isp'
-const DB_USER = 'wup_isp'
+const DB_NAME = 'tg_isp'
+const DB_USER = 'tg_isp'
 
 const rl = createInterface({
     input: process.stdin,

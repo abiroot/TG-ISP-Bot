@@ -78,15 +78,15 @@ logs-db: ## View logs from database only
 
 db-shell: ## Open PostgreSQL shell
 	@echo "$(GREEN)Connecting to PostgreSQL...$(NC)"
-	@echo "Database: wup_isp_dev"
-	docker-compose -f docker-compose.dev.yml exec postgres psql -U wupisp_user -d wup_isp_dev
+	@echo "Database: tg_isp_dev"
+	docker-compose -f docker-compose.dev.yml exec postgres psql -U tgisp_user -d tg_isp_dev
 
 db-migrate: ## Run database migrations
 	@echo "$(GREEN)Running migrations...$(NC)"
 	docker-compose -f docker-compose.dev.yml exec postgres sh -c '\
 		for file in /docker-entrypoint-initdb.d/*.sql; do \
 			echo "Executing $$file..."; \
-			psql -U wupisp_user -d wup_isp_dev -f $$file; \
+			psql -U tgisp_user -d tg_isp_dev -f $$file; \
 		done'
 	@echo "$(GREEN)Migrations complete!$(NC)"
 
@@ -96,8 +96,8 @@ db-reset: ## Reset database (WARNING: Deletes all data!)
 	echo; \
 	if [[ $$REPLY =~ ^[Yy]$$ ]]; then \
 		echo "$(YELLOW)Dropping and recreating database...$(NC)"; \
-		docker-compose -f docker-compose.dev.yml exec postgres psql -U wupisp_user -d postgres -c "DROP DATABASE IF EXISTS wup_isp_dev;"; \
-		docker-compose -f docker-compose.dev.yml exec postgres psql -U wupisp_user -d postgres -c "CREATE DATABASE wup_isp_dev;"; \
+		docker-compose -f docker-compose.dev.yml exec postgres psql -U tgisp_user -d postgres -c "DROP DATABASE IF EXISTS tg_isp_dev;"; \
+		docker-compose -f docker-compose.dev.yml exec postgres psql -U tgisp_user -d postgres -c "CREATE DATABASE tg_isp_dev;"; \
 		$(MAKE) db-migrate; \
 		echo "$(GREEN)Database reset complete!$(NC)"; \
 	else \
@@ -107,7 +107,7 @@ db-reset: ## Reset database (WARNING: Deletes all data!)
 db-backup: ## Backup database to backups/
 	@echo "$(GREEN)Creating database backup...$(NC)"
 	@mkdir -p backups
-	docker-compose -f docker-compose.dev.yml exec -T postgres pg_dump -U wupisp_user wup_isp_dev > backups/backup_$$(date +%Y%m%d_%H%M%S).sql
+	docker-compose -f docker-compose.dev.yml exec -T postgres pg_dump -U tgisp_user tg_isp_dev > backups/backup_$$(date +%Y%m%d_%H%M%S).sql
 	@echo "$(GREEN)Backup created in backups/$(NC)"
 
 db-restore: ## Restore database from latest backup
@@ -118,19 +118,19 @@ db-restore: ## Restore database from latest backup
 		exit 1; \
 	fi; \
 	echo "$(GREEN)Restoring from $$latest$(NC)"; \
-	docker-compose -f docker-compose.dev.yml exec -T postgres psql -U wupisp_user wup_isp_dev < $$latest; \
+	docker-compose -f docker-compose.dev.yml exec -T postgres psql -U tgisp_user tg_isp_dev < $$latest; \
 	echo "$(GREEN)Restore complete!$(NC)"
 
 db-connect-local: ## Connect to database from local machine (port 5433)
 	@echo "$(GREEN)Connection info:$(NC)"
 	@echo "Host: localhost"
 	@echo "Port: 5433"
-	@echo "Database: wup_isp_dev"
-	@echo "User: wupisp_user"
-	@echo "Password: wupisp_dev_password"
+	@echo "Database: tg_isp_dev"
+	@echo "User: tgisp_user"
+	@echo "Password: tgisp_dev_password"
 	@echo ""
 	@echo "Example connection string:"
-	@echo "postgresql://wupisk_user:wupisp_dev_password@localhost:5433/wup_isp_dev"
+	@echo "postgresql://tgisk_user:tgisp_dev_password@localhost:5433/tg_isp_dev"
 
 ##@ Testing
 
@@ -161,7 +161,7 @@ build: ## Build production bundle
 tools: ## Start development environment with pgAdmin
 	@echo "$(GREEN)Starting with pgAdmin...$(NC)"
 	@echo "$(YELLOW)pgAdmin: http://localhost:5050$(NC)"
-	@echo "$(YELLOW)Login: admin@wupisp.local / admin$(NC)"
+	@echo "$(YELLOW)Login: admin@tgisp.local / admin$(NC)"
 	docker-compose -f docker-compose.dev.yml --profile tools up -d
 	@echo "$(GREEN)Development environment with tools is running!$(NC)"
 

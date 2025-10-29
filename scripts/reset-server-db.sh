@@ -10,7 +10,7 @@ echo "   ========================================"
 echo ""
 echo "⚠️  WARNING: This will DELETE ALL DATA on production server!"
 echo "Server: root@159.223.220.101"
-echo "Database: wup_isp"
+echo "Database: tg_isp"
 echo ""
 echo "Tables affected:"
 echo "  • messages"
@@ -44,7 +44,7 @@ echo "🔄 Connecting to production server..."
 echo ""
 
 # Execute SQL commands on the server
-ssh root@159.223.220.101 "sudo -u postgres psql -d wup_isp" <<'EOF'
+ssh root@159.223.220.101 "sudo -u postgres psql -d tg_isp" <<'EOF'
 -- Truncate all tables
 TRUNCATE TABLE messages RESTART IDENTITY CASCADE;
 TRUNCATE TABLE conversation_embeddings RESTART IDENTITY CASCADE;

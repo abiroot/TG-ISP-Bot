@@ -2,7 +2,7 @@
 # PM2 Health Check Script
 # Monitors app health and prevents infinite restart loops
 
-APP_NAME="${1:-wup-isp.abiroot.dev}"
+APP_NAME="${1:-tg-isp.abiroot.dev}"
 MAX_RESTARTS=50
 CHECK_INTERVAL=60  # Check every 60 seconds
 

@@ -230,7 +230,7 @@ WHERE context_id = 'group_123'
 
 ### Daily Backups
 ```bash
-pg_dump -U abiroot wup-isp > backup_$(date +%Y%m%d).sql
+pg_dump -U abiroot tg-isp > backup_$(date +%Y%m%d).sql
 ```
 
 ### Point-in-Time Recovery

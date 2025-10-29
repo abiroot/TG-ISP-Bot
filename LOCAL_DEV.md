@@ -41,9 +41,9 @@ The local development environment consists of:
 
 1. **PostgreSQL 15** with pgvector extension
    - Port: **5433** (host) → 5432 (container)
-   - Database: `wup_isp_dev`
-   - User: `wupisp_user`
-   - Password: `wupisp_dev_password`
+   - Database: `tg_isp_dev`
+   - User: `tgisp_user`
+   - Password: `tgisp_dev_password`
 
 2. **Application** (Node.js 21 Alpine)
    - Port: **3010** (host) → 3010 (container)
@@ -138,7 +138,7 @@ make prune        # Clean up unused Docker resources
 
 ```bash
 # Clone repository (if not already done)
-cd WUP-ISP-Bot
+cd tg-ISP-Bot
 
 # Create local environment file
 make setup
@@ -262,7 +262,7 @@ make test-ui
 make db-shell
 
 # Direct connection
-psql postgresql://wupisp_user:wupisp_dev_password@localhost:5433/wup_isp_dev
+psql postgresql://tgisp_user:tgisp_dev_password@localhost:5433/tg_isp_dev
 ```
 
 ### Using pgAdmin (Web UI)
@@ -275,30 +275,30 @@ make tools
 open http://localhost:5050
 
 # Login
-Email: admin@wupisp.local
+Email: admin@tgisp.local
 Password: admin
 
 # Add server
 Host: postgres (or host.docker.internal)
 Port: 5432
-Database: wup_isp_dev
-User: wupisp_user
-Password: wupisp_dev_password
+Database: tg_isp_dev
+User: tgisp_user
+Password: tgisp_dev_password
 ```
 
 ### Using External Tools
 
 **Connection String**:
 ```
-postgresql://wupisp_user:wupisp_dev_password@localhost:5433/wup_isp_dev
+postgresql://tgisp_user:tgisp_dev_password@localhost:5433/tg_isp_dev
 ```
 
 **Individual Settings**:
 - Host: `localhost`
 - Port: `5433`
-- Database: `wup_isp_dev`
-- User: `wupisp_user`
-- Password: `wupisp_dev_password`
+- Database: `tg_isp_dev`
+- User: `tgisp_user`
+- Password: `tgisp_dev_password`
 
 **Compatible Tools**:
 - DataGrip (JetBrains)
@@ -375,7 +375,7 @@ make clean
 
 ```bash
 # Check volume mounts
-docker inspect wupisp-app-dev | grep -A 10 Mounts
+docker inspect tgisp-app-dev | grep -A 10 Mounts
 
 # Restart app
 make restart-app

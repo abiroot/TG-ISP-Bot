@@ -123,7 +123,7 @@ jobs:
       postgres:
         image: postgres:15
         env:
-          POSTGRES_DB: wup_isp_test
+          POSTGRES_DB: tg_isp_test
           POSTGRES_USER: test_user
           POSTGRES_PASSWORD: test_password
         options: >-
@@ -155,7 +155,7 @@ jobs:
         env:
           POSTGRES_DB_HOST: localhost
           POSTGRES_DB_PORT: 5432
-          POSTGRES_DB_NAME: wup_isp_test
+          POSTGRES_DB_NAME: tg_isp_test
           POSTGRES_DB_USER: test_user
           POSTGRES_DB_PASSWORD: test_password
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

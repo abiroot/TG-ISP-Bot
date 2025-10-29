@@ -4,11 +4,11 @@ services:
   # PostgreSQL 15 with pgvector extension
   postgres:
     image: ankane/pgvector:v0.5.1
-    container_name: wupisp-postgres-dev
+    container_name: tgisp-postgres-dev
     environment:
-      POSTGRES_DB: wup_isp_dev
-      POSTGRES_USER: wupisp_user
-      POSTGRES_PASSWORD: wupisp_dev_password
+      POSTGRES_DB: tg_isp_dev
+      POSTGRES_USER: tgisp_user
+      POSTGRES_PASSWORD: tgisp_dev_password
       POSTGRES_INITDB_ARGS: "--encoding=UTF8"
     ports:
       - "5433:5432"  # Mapped to 5433 to avoid conflicts
@@ -16,13 +16,13 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./src/database/migrations:/docker-entrypoint-initdb.d:ro
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U wupisp_user -d wup_isp_dev"]
+      test: ["CMD-SHELL", "pg_isready -U tgisp_user -d tg_isp_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
     networks:
-      - wupisp-network
+      - tgisp-network
     restart: unless-stopped
 
   # Application (development mode with hot-reload)
@@ -30,15 +30,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.dev
-    container_name: wupisp-app-dev
+    container_name: tgisp-app-dev
     environment:
       NODE_ENV: development
       PORT: 3010
       POSTGRES_DB_HOST: postgres
       POSTGRES_DB_PORT: 5432  # Internal port
-      POSTGRES_DB_NAME: wup_ispp_dev
-      POSTGRES_DB_USER: wupisp_user
-      POSTGRES_DB_PASSWORD: wupisp_dev_password
+      POSTGRES_DB_NAME: tg_ispp_dev
+      POSTGRES_DB_USER: tgisp_user
+      POSTGRES_DB_PASSWORD: tgisp_dev_password
     env_file:
       - .env.local
     ports:
@@ -51,16 +51,16 @@ services:
       postgres:
         condition: service_healthy
     networks:
-      - wupisp-network
+      - tgisp-network
     command: pnpm run dev:simple
     restart: unless-stopped
 
   # pgAdmin (optional - for database management UI)
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: wupisp-pgadmin-dev
+    container_name: tgisp-pgadmin-dev
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@wupisp.local
+      PGADMIN_DEFAULT_EMAIL: admin@tgisp.local
       PGADMIN_DEFAULT_PASSWORD: admin
       PGADMIN_CONFIG_SERVER_MODE: 'False'
     ports:
@@ -68,7 +68,7 @@ services:
     volumes:
       - pgadmin_data:/var/lib/pgadmin
     networks:
-      - wupisp-network
+      - tgisp-network
     restart: unless-stopped
     profiles:
       - tools  # Only starts with --profile tools
@@ -80,5 +80,5 @@ volumes:
     driver: local
 
 networks:
-  wupisp-network:
+  tgisp-network:
     driver: bridge

@@ -11,7 +11,7 @@ module.exports = {
   apps: [
     {
       // Application configuration
-      name: 'wup-isp.abiroot.dev',
+      name: 'tg-isp.abiroot.dev',
       script: './dist/app.js',
       interpreter: 'node',
 

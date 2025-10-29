@@ -396,7 +396,7 @@ scripts/
 **Production Deployment (VitoDeploy):**
 - Deployed to DigitalOcean server via VitoDeploy (https://vitodeploy.com/docs)
 - SSH access: `ssh root@159.223.220.101`
-- Project directory: `/home/vito/wup-isp.abiroot.dev`
+- Project directory: `/home/vito/tg-isp.abiroot.dev`
 - **Auto-deploy**: Git push triggers automatic deployment (~2 minutes)
 - **IMPORTANT**: Multiple sites run on this server - be cautious with system-level changes
 - Deployment script updates require manual intervention - request if needed
@@ -440,7 +440,7 @@ This bot is built specifically for Telegram using the Bot API.
 - **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
 - **TESTING.md** - Testing setup and examples
 - I'm using VitoDeploy to deploy on prod server (https://vitodeploy.com/docs/getting-started/introduction/) use crawl4ai to research it.
-You can ssh to my VitoServer using `ssh root@159.223.220.101`. The project directory on the server is /home/vito/wup-isp.abiroot.dev
+You can ssh to my VitoServer using `ssh root@159.223.220.101`. The project directory on the server is /home/vito/tg-isp.abiroot.dev
 PS: We have multiple sites running on the server, make sure not to break anything and try to use Vito's recommendation
 PS: There's an auto deploy script, when we git push it gets deployed on the server. It takes ~2 minutes to finish the deploy. So if you want any change on the server, you must do it here, locally, then git push it
 I have to manually update the Vito deploy script. If you want it updated, let me know and I will update it for you and let you know once I do
