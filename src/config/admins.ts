@@ -35,7 +35,8 @@
  */
 export const ADMIN_IDS: string[] = [
     'SOLamyy', // @SOLamyy - Mapped via user_identifiers table
-    'lambasoft' // @lambasoft - Mapped via user_identifiers table
+    'lambasoft', // @lambasoft - Mapped via user_identifiers table
+    '5795384135' // Jhonny Hachem - Numeric Telegram ID
     // TODO: Replace with numeric Telegram IDs for production security
     // Example: '123456789', '987654321'
 ]
