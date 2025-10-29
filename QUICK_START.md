@@ -13,7 +13,7 @@ make setup
 make dev
 ```
 
-Your app is now running at **http://localhost:3009** 🎉
+Your app is now running at **http://localhost:3010** 🎉
 
 ---
 
@@ -66,7 +66,7 @@ make db-reset  # Reset database (⚠️ deletes data)
 
 ## Ports
 
-- App: **3009**
+- App: **3010**
 - PostgreSQL: **5433**
 - pgAdmin: **5050** (with `make tools`)
 

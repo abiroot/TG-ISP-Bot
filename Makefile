@@ -29,7 +29,7 @@ setup: ## First-time setup (copy env file)
 dev: ## Start development environment (PostgreSQL + App)
 	@echo "$(GREEN)Starting development environment...$(NC)"
 	@echo "$(YELLOW)PostgreSQL: localhost:5433$(NC)"
-	@echo "$(YELLOW)App: localhost:3009$(NC)"
+	@echo "$(YELLOW)App: localhost:3010$(NC)"
 	docker-compose -f docker-compose.dev.yml up -d
 	@echo "$(GREEN)Development environment is running!$(NC)"
 	@echo "Run 'make logs' to view logs"

@@ -22,7 +22,7 @@ RUN apk add --no-cache --virtual .gyp \
 COPY . .
 
 # Expose port
-EXPOSE 3009
+EXPOSE 3010
 
 # Development command (will be overridden by docker-compose)
 CMD ["pnpm", "run", "dev:simple"]

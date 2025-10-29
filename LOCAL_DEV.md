@@ -19,7 +19,7 @@ make logs
 ```
 
 That's it! Your local environment is running on:
-- **App**: http://localhost:3009
+- **App**: http://localhost:3010
 - **PostgreSQL**: localhost:5433
 - **pgAdmin** (optional): http://localhost:5050
 
@@ -46,7 +46,7 @@ The local development environment consists of:
    - Password: `wupisp_dev_password`
 
 2. **Application** (Node.js 21 Alpine)
-   - Port: **3009** (host) → 3009 (container)
+   - Port: **3010** (host) → 3010 (container)
    - Hot-reload enabled via volumes
    - Source code mounted for live changes
 
@@ -59,7 +59,7 @@ The local development environment consists of:
 
 All ports are chosen to avoid conflicts:
 - **5433** for PostgreSQL (instead of default 5432)
-- **3009** for application (instead of 3008)
+- **3010** for application (instead of 3008)
 - **5050** for pgAdmin
 
 ---
@@ -450,7 +450,7 @@ make restart
 
 | Aspect | Development | Production |
 |--------|-------------|------------|
-| Port | 3009 | 3008 |
+| Port | 3010 | 3008 |
 | Database | Local Docker (5433) | DigitalOcean |
 | Hot Reload | Yes | No |
 | Build | Development | Optimized |
@@ -488,7 +488,7 @@ If you encounter issues:
 - [ ] `make setup` completed
 - [ ] `.env.local` configured with API keys
 - [ ] `make dev` starts without errors
-- [ ] Can access http://localhost:3009
+- [ ] Can access http://localhost:3010
 - [ ] `make db-shell` connects successfully
 - [ ] `make logs` shows application logs
 - [ ] `make test` runs successfully

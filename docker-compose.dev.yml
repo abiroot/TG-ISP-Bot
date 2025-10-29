@@ -33,7 +33,7 @@ services:
     container_name: wupisp-app-dev
     environment:
       NODE_ENV: development
-      PORT: 3009
+      PORT: 3010
       POSTGRES_DB_HOST: postgres
       POSTGRES_DB_PORT: 5432  # Internal port
       POSTGRES_DB_NAME: wup_ispp_dev
@@ -42,7 +42,7 @@ services:
     env_file:
       - .env.local
     ports:
-      - "3009:3009"  # Application port
+      - "3010:3010"  # Application port
     volumes:
       - .:/app
       - /app/node_modules
