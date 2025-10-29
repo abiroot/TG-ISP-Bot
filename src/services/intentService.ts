@@ -2,6 +2,7 @@ import { z } from 'zod'
 import { ChatOpenAI } from '@langchain/openai'
 import { env } from '~/config/env'
 import { Message } from '~/database/schemas/message'
+import { logger } from '~/utils/logger'
 
 // Define intent categories for ISP Support bot
 const intentSchema = z.object({
@@ -171,34 +172,67 @@ Provide:
     }
 
     /**
+     * Convert number words to digits
+     */
+    private convertNumberWordsToDigits(text: string): string {
+        const numberWords: { [key: string]: string } = {
+            'zero': '0', 'one': '1', 'two': '2', 'three': '3', 'four': '4',
+            'five': '5', 'six': '6', 'seven': '7', 'eight': '8', 'nine': '9'
+        }
+
+        let converted = text.toLowerCase()
+
+        // Handle "double" cases first (like "double seven" -> "77")
+        converted = converted.replace(/double\s*(zero|one|two|three|four|five|six|seven|eight|nine)/gi, (_, match) => {
+            return numberWords[match] + numberWords[match]
+        })
+
+        // Replace remaining number words with digits
+        Object.entries(numberWords).forEach(([word, digit]) => {
+            const regex = new RegExp(`\\b${word}\\b`, 'gi')
+            converted = converted.replace(regex, digit)
+        })
+
+        return converted
+    }
+
+    /**
      * Extract phone number from message
      */
     extractPhoneNumber(message: string): string | null {
+        // First convert number words to digits for voice transcriptions
+        const convertedMessage = this.convertNumberWordsToDigits(message)
+
         // Clean the message first - normalize spaces and remove common separators
-        const cleanMessage = message.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
+        const cleanMessage = convertedMessage.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
 
         // Enhanced patterns for phone numbers in natural language (including spaced formats)
         const phonePatterns = [
-            // Numbers with spaces: +961 71 534 710, 961 71 534 710, 71 534 710
-            /\b(?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})\b/g,
-            // Standalone numbers: 71534710, +96171534710, 96171534710
-            /\b(\+?\d{8,15})\b/g,
+            // Voice transcription pattern: 7 8 8 1 7 6 9 7, +9 6 1 7 1 5 3 4 7 1 0
+            /\b(?:\+?\d\s?){6,15}\b/g,
+            // Numbers with spaces: +961 71 534 710, 961 71 534 710, 71 534 710, 78 81 76 97
+            /\b(?:\+?961\s?)?\d{1,2}(?:\s?\d{2,3}){1,3}(?:\s?\d{2,3})\b/g,
+            // Standalone numbers: 71534710, +96171534710, 96171534710, 78817697
+            /\b(\+?\d{6,15})\b/g,
             // Numbers with context: phone number 71534710, number: 71-534-710, mobile: +961 71 534 710
-            /(?:phone|number|mobile|contact)\s*[:-]?\s*((?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})|\+?\d{8,15})/gi,
+            /(?:phone|number|mobile|contact)\s*[:-]?\s*((?:\+?961\s?)?\d{1,2}(?:\s?\d{2,3}){1,3}(?:\s?\d{2,3})|\+?\d{6,15})/gi,
             // After common phrases: for 71534710, for +961 71 534 710, at 71 534 710
-            /(?:for|at|to)\s+((?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})|\+?\d{8,15})\b/gi,
+            /(?:for|at|to)\s+((?:\+?961\s?)?\d{1,2}(?:\s?\d{2,3}){1,3}(?:\s?\d{2,3})|\+?\d{6,15})\b/gi,
         ]
 
         // Try to find phone numbers in the message
         for (const pattern of phonePatterns) {
             const matches = cleanMessage.match(pattern)
+
             if (matches) {
                 for (const match of matches) {
                     // Extract just the number part and clean it
-                    const phoneNumber = match.replace(/[^\d+]/g, '')
+                    let phoneNumber = match.replace(/[^\d+]/g, '')
 
-                    // Skip if it's too short or too long
-                    if (phoneNumber.length < 6 || phoneNumber.length > 15) continue
+                    // Skip if it's too short or too long (reduced minimum to 6)
+                    if (phoneNumber.length < 6 || phoneNumber.length > 15) {
+                        continue
+                    }
 
                     // For international formatting consistency
                     if (!phoneNumber.startsWith('+') && phoneNumber.length >= 10) {
@@ -213,10 +247,12 @@ Provide:
             }
         }
 
-        // Fallback: Try simple extraction for edge cases
+        // Fallback: Try simple extraction for edge cases (reduced minimum to 6)
         const simpleNumberMatch = cleanMessage.match(/\b\d{6,15}\b/)
+
         if (simpleNumberMatch) {
             let phoneNumber = simpleNumberMatch[0]
+
             if (!phoneNumber.startsWith('+') && phoneNumber.length > 10 && !phoneNumber.startsWith('00')) {
                 phoneNumber = '+' + phoneNumber
             }

@@ -101,13 +101,148 @@ export function generateTempFilePath(extension: string = 'tmp'): string {
 }
 
 /**
- * Wrapper for provider.saveFile with proper temp directory
+ * Download voice file directly using Telegram API as fallback
+ */
+async function downloadVoiceFileDirectly(ctx: any, tempDir: string): Promise<string> {
+    try {
+        // Extract file_id from the correct location in context
+        let fileId = null
+        if (ctx.message?.voice?.file_id) {
+            fileId = ctx.message.voice.file_id
+        } else if (ctx.messageCtx?.update?.message?.voice?.file_id) {
+            fileId = ctx.messageCtx.update.message.voice.file_id
+        } else if (ctx.messageCtx?.update?.message?.audio?.file_id) {
+            fileId = ctx.messageCtx.update.message.audio.file_id
+        }
+
+        if (!fileId) {
+            throw new Error('No voice file_id found in context')
+        }
+
+        logger.debug({ fileId }, 'Downloading voice file directly via Telegram API')
+
+        // Get bot token from environment
+        const botToken = process.env.TELEGRAM_BOT_TOKEN
+        if (!botToken) {
+            throw new Error('TELEGRAM_BOT_TOKEN not found in environment')
+        }
+
+        // Get file info from Telegram API
+        const fileInfoUrl = `https://api.telegram.org/bot${botToken}/getFile?file_id=${fileId}`
+        const fileInfoResponse = await fetch(fileInfoUrl)
+
+        if (!fileInfoResponse.ok) {
+            throw new Error(`Failed to get file info: ${fileInfoResponse.status} ${fileInfoResponse.statusText}`)
+        }
+
+        const fileInfo = await fileInfoResponse.json()
+        if (!fileInfo.ok || !fileInfo.result?.file_path) {
+            throw new Error('Invalid file info response from Telegram API')
+        }
+
+        // Download the file
+        const downloadUrl = `https://api.telegram.org/file/bot${botToken}/${fileInfo.result.file_path}`
+        const fileResponse = await fetch(downloadUrl)
+
+        if (!fileResponse.ok) {
+            throw new Error(`Failed to download file: ${fileResponse.status} ${fileResponse.statusText}`)
+        }
+
+        // Generate local file path with normalized extension
+        let extension = path.extname(fileInfo.result.file_path) || '.ogg'
+        // Normalize .oga to .ogg for transcription service compatibility
+        if (extension === '.oga') {
+            extension = '.ogg'
+        }
+        const localPath = generateTempFilePath(extension.replace('.', ''))
+
+        // Save file to disk
+        const buffer = await fileResponse.arrayBuffer()
+        fs.writeFileSync(localPath, Buffer.from(buffer))
+
+        logger.debug({ fileId, localPath, size: buffer.byteLength }, 'Voice file downloaded successfully')
+        return localPath
+    } catch (error) {
+        logger.error({ err: error }, 'Failed to download voice file directly')
+        throw error
+    }
+}
+
+/**
+ * Wrapper for provider.saveFile with proper temp directory and enhanced error handling
  */
 export async function saveToTemp(provider: any, ctx: any): Promise<string> {
     const tempDir = getTempDir()
-    const localPath = await provider.saveFile(ctx, { path: tempDir })
-    logger.debug({ path: localPath }, 'File saved to temp directory')
-    return localPath
+
+    try {
+        logger.debug({
+            provider: provider.constructor?.name || 'unknown',
+            hasMessage: !!ctx.message,
+            hasMessageCtx: !!ctx.messageCtx,
+            hasVoice: !!(ctx.message?.voice || ctx.messageCtx?.update?.message?.voice),
+            tempDir
+        }, 'Attempting to save file to temp directory')
+
+        // Validate context before passing to provider
+        if (!ctx) {
+            throw new Error('Context is undefined - cannot save file')
+        }
+
+        // Check for media in multiple possible locations (BuilderBot context structure)
+        const hasMedia = ctx.message?.voice || ctx.message?.audio || ctx.message?.document ||
+                         ctx.messageCtx?.update?.message?.voice ||
+                         ctx.messageCtx?.update?.message?.audio ||
+                         ctx.messageCtx?.update?.message?.document
+
+        if (!hasMedia) {
+            logger.warn({ ctx }, 'No media found in context message')
+            throw new Error('No media file found in context message')
+        }
+
+        // Try provider's saveFile method first
+        try {
+            const localPath = await provider.saveFile(ctx, { path: tempDir })
+
+            if (!localPath) {
+                throw new Error('Provider saveFile returned undefined path')
+            }
+
+            logger.debug({ path: localPath }, 'File saved to temp directory successfully')
+            return localPath
+        } catch (providerError) {
+            logger.warn({ err: providerError }, 'Provider saveFile failed, trying direct download for voice files')
+
+            // Fallback to direct download for voice files
+            const hasVoice = ctx.message?.voice || ctx.messageCtx?.update?.message?.voice
+            if (hasVoice) {
+                logger.info('Using direct Telegram API download for voice file')
+                return await downloadVoiceFileDirectly(ctx, tempDir)
+            }
+
+            throw providerError
+        }
+    } catch (error) {
+        logger.error({
+            err: error,
+            tempDir,
+            hasProvider: !!provider,
+            providerType: provider.constructor?.name,
+            hasContext: !!ctx,
+            hasMessage: !!ctx?.message,
+            hasMessageCtx: !!ctx?.messageCtx,
+            messageType: {
+                voice: !!(ctx?.message?.voice || ctx?.messageCtx?.update?.message?.voice),
+                audio: !!(ctx?.message?.audio || ctx?.messageCtx?.update?.message?.audio),
+                document: !!(ctx?.message?.document || ctx?.messageCtx?.update?.message?.document)
+            }
+        }, 'Failed to save file to temp directory')
+
+        // Re-throw with more descriptive error
+        if (error instanceof Error) {
+            throw new Error(`File save failed: ${error.message}`)
+        }
+        throw new Error(`File save failed: ${String(error)}`)
+    }
 }
 
 // Auto-cleanup old temp files every hour

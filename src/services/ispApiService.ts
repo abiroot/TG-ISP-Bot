@@ -143,16 +143,13 @@ export class IspApiService {
             // Clean mobile number format - remove any non-digit characters except +
             let cleanMobile = mobile.replace(/[^\d+]/g, '')
 
-            logger.debug({ originalMobile: mobile, cleanMobile }, 'Processing mobile number for ISP API')
-
+            
             // Convert Lebanese international format to local format
             // +96171534710 or 96171534710 should become 71534710
             if (cleanMobile.startsWith('+961') && cleanMobile.length === 13) {
                 cleanMobile = cleanMobile.substring(4) // Remove +961
-                logger.debug({ convertedMobile: cleanMobile }, 'Converted +961 format to local format')
             } else if (cleanMobile.startsWith('961') && cleanMobile.length === 12) {
                 cleanMobile = cleanMobile.substring(3) // Remove 961
-                logger.debug({ convertedMobile: cleanMobile }, 'Converted 961 format to local format')
             } else if (cleanMobile.startsWith('+961')) {
                 // Handle any other +961 variations
                 cleanMobile = cleanMobile.substring(4) // Remove +961
@@ -163,7 +160,6 @@ export class IspApiService {
                 logger.debug({ convertedMobile: cleanMobile }, 'Converted 961 format (any length) to local format')
             }
 
-            logger.debug({ finalMobile: cleanMobile }, 'Final mobile number for ISP API request')
 
             const response = await fetch(
                 `${this.baseUrl}/api/user-info?mobile=${encodeURIComponent(cleanMobile)}`,
@@ -207,7 +203,6 @@ export class IspApiService {
                 return []
             }
 
-            logger.debug({ mobile: cleanMobile, totalResults: usersArray.length }, 'Successfully retrieved user info array')
             return usersArray
         } catch (error) {
             logger.error({ err: error, mobile }, 'Failed to get user info from ISP API')
@@ -443,8 +438,8 @@ ${statusEmoji} **Account Status**
 │ • Interface: ${userInfo.mikrotikInterface || 'N/A'}
 
 ⚡ **Service Performance**
-│ • Upload: ${(userInfo.basicSpeedUp / 1000).toFixed(1)} Mbps
-│ • Download: ${(userInfo.basicSpeedDown / 1000).toFixed(1)} Mbps
+│ • Upload: ${userInfo.basicSpeedUp ? (userInfo.basicSpeedUp / 1000).toFixed(1) : 'N/A'} Mbps
+│ • Download: ${userInfo.basicSpeedDown ? (userInfo.basicSpeedDown / 1000).toFixed(1) : 'N/A'} Mbps
 │ • Uptime: ${userInfo.userUpTime || 'N/A'}
 
 📊 **Data Usage**
@@ -470,12 +465,12 @@ ${formatApUsers(userInfo.accessPointUsers)}
 ━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 💰 **Billing Information**
-│ • Base Price: $${userInfo.accountPrice.toFixed(2)}
+│ • Base Price: $${userInfo.accountPrice ? userInfo.accountPrice.toFixed(2) : 'N/A'}
 │ • Real IP: $${(userInfo.realIpPrice || 0).toFixed(2)}
 │ • IPTV: $${(userInfo.iptvPrice || 0).toFixed(2)}
-│ • Subtotal: $${(userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2)}
-│ • Discount: ${userInfo.discount}%
-│ • **Monthly Total:** $${((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - userInfo.discount / 100)).toFixed(2)}
+│ • Subtotal: $${userInfo.accountPrice ? (userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)).toFixed(2) : 'N/A'}
+│ • Discount: ${userInfo.discount || 0}%
+│ • **Monthly Total:** $${userInfo.accountPrice ? ((userInfo.accountPrice + (userInfo.realIpPrice || 0) + (userInfo.iptvPrice || 0)) * (1 - (userInfo.discount || 0) / 100)).toFixed(2) : 'N/A'}
 
 📅 **Account History**
 │ • Customer Since: ${formatDate(userInfo.creationDate)}
@@ -512,7 +507,6 @@ ${formatDetailedPing(userInfo.pingResult)}
         try {
             const token = await this.authenticate()
 
-            logger.debug({ query }, 'Searching for users in ISP API')
 
             // For now, we'll try the same endpoint but handle multiple results
             // In the future, this might be a dedicated search endpoint
@@ -572,7 +566,6 @@ ${formatDetailedPing(userInfo.pingResult)}
      * Returns phone number formatted for API (local format)
      */
     extractPhoneNumberFromMessage(message: string, senderId: string): string {
-        logger.debug({ message, senderId }, 'Extracting phone number from message')
 
         // Clean the message first - normalize spaces and remove common separators
         const cleanMessage = message.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
@@ -600,7 +593,6 @@ ${formatDetailedPing(userInfo.pingResult)}
                     // Skip if it's too short or too long
                     if (phoneNumber.length < 6 || phoneNumber.length > 15) continue
 
-                    logger.debug({ foundNumber: phoneNumber, originalMatch: match }, 'Found phone number in message')
                     return phoneNumber // Return as-is, will be processed by getUserInfo
                 }
             }
@@ -615,7 +607,6 @@ ${formatDetailedPing(userInfo.pingResult)}
 
         // If no phone number found in message, return empty string
         // User must provide phone number in their message
-        logger.debug({ senderId }, 'No phone number found in message')
         return ''
     }
 
@@ -626,7 +617,6 @@ ${formatDetailedPing(userInfo.pingResult)}
         try {
             const token = await this.authenticate()
 
-            logger.debug({ mikrotikInterface }, 'Getting Mikrotik user list from ISP API')
 
             const response = await fetch(
                 `${this.baseUrl}/api/mikrotik-user-list?mikrotikInterface=${encodeURIComponent(mikrotikInterface)}`,
@@ -713,7 +703,6 @@ ${formatDetailedPing(userInfo.pingResult)}
     clearAuthCache(): void {
         this.authToken = null
         this.tokenExpiry = 0
-        logger.debug('Authentication cache cleared')
     }
 }
 

@@ -34,26 +34,64 @@ export const voiceNoteFlow = addKeyword<TelegramProvider, Database>(EVENTS.VOICE
             contextId,
             ctx.body || 'voice_note',
             async (accumulatedMessages) => {
+                flowLogger.info({ count: accumulatedMessages.length, contextId }, 'Processing voice note(s)')
                 console.log(`  🔄 Processing ${accumulatedMessages.length} voice note(s) for ${contextId}`)
+
+                // Extract voice data from the correct location in context
+                let voiceData = null
+                if (ctx.message?.voice) {
+                    voiceData = ctx.message.voice
+                } else if (ctx.messageCtx?.update?.message?.voice) {
+                    voiceData = ctx.messageCtx.update.message.voice
+                } else if (ctx.messageCtx?.update?.message?.audio) {
+                    voiceData = ctx.messageCtx.update.message.audio
+                }
+
+                // Log voice note metadata for debugging
+                if (voiceData) {
+                    flowLogger.info({
+                        fileId: voiceData.file_id,
+                        duration: voiceData.duration,
+                        mimeType: voiceData.mime_type,
+                        fileSize: voiceData.file_size,
+                        fileUniqueId: voiceData.file_unique_id
+                    }, 'Voice note metadata received')
+                    console.log(`  📋 Voice metadata: file_id=${voiceData.file_id}, duration=${voiceData.duration}s, mime_type=${voiceData.mime_type}, size=${voiceData.file_size} bytes`)
+                } else {
+                    flowLogger.error({ ctx: ctx }, 'No voice message found in context')
+                    console.log('  🔍 Context structure:', {
+                        hasMessage: !!ctx.message,
+                        hasMessageCtx: !!ctx.messageCtx,
+                        hasUpdate: !!ctx.messageCtx?.update,
+                        hasUpdateMessage: !!ctx.messageCtx?.update?.message,
+                        hasVoice: !!ctx.messageCtx?.update?.message?.voice,
+                        hasAudio: !!ctx.messageCtx?.update?.message?.audio
+                    })
+                    throw new Error('Voice message context is invalid - no voice data found')
+                }
 
                 // Check if context is whitelisted
                 const whitelisted = await requireWhitelist(ctx, { flowDynamic } as any)
                 if (!whitelisted) {
                     if (!isAdmin(ctx.from)) {
+                        flowLogger.warn({ from: ctx.from, contextId }, 'Not whitelisted and not admin - ignoring voice message')
                         console.log('  ⚠️  Not whitelisted and not admin - ignoring voice message')
                         return
                     }
+                    flowLogger.info({ from: ctx.from, contextId }, 'Not whitelisted but is admin - allowing voice message')
                     console.log('  ℹ️  Not whitelisted but is admin - allowing voice message')
                 }
 
                 // Get personality
                 const personality = await getPersonality(ctx, { flowDynamic } as any)
                 if (!personality) {
+                    flowLogger.error({ from: ctx.from, contextId }, 'No personality found - cannot process voice message')
                     console.log('  ⚠️  No personality found - cannot process voice message')
                     await flowDynamic('⚠️ Please set up your personality first using the setup command.')
                     return
                 }
 
+                flowLogger.info({ personality: personality.bot_name }, 'Personality found for voice processing')
                 console.log('  ✓ Personality found:', personality.bot_name)
 
                 // Notify user about batch processing
@@ -66,13 +104,35 @@ export const voiceNoteFlow = addKeyword<TelegramProvider, Database>(EVENTS.VOICE
                 let localPath: string | undefined
                 try {
                     // Save the voice note locally using temp file utility
-                    flowLogger.debug('Saving voice file')
+                    flowLogger.info({ provider: 'telegram' }, 'Starting voice file download')
+                    console.log('  💾 Downloading voice file...')
                     localPath = await saveToTemp(provider, ctx)
-                    flowLogger.debug({ path: localPath }, 'Voice file saved')
+                    flowLogger.info({ path: localPath }, 'Voice file saved successfully')
+                    console.log('  ✓ Voice file saved to:', localPath)
+
+                    // Validate the saved file
+                    if (!localPath || !fs.existsSync(localPath)) {
+                        const errorMsg = 'Voice file was not saved properly'
+                        flowLogger.error({ path: localPath }, errorMsg)
+                        throw new Error(errorMsg)
+                    }
+
+                    // Check file size
+                    const stats = fs.statSync(localPath)
+                    flowLogger.info({ size: stats.size, path: localPath }, 'Saved file stats')
+                    console.log(`  📊 File size: ${stats.size} bytes`)
+
+                    if (stats.size === 0) {
+                        const errorMsg = 'Downloaded voice file is empty'
+                        flowLogger.error({ path: localPath, size: stats.size }, errorMsg)
+                        throw new Error(errorMsg)
+                    }
 
                     // Transcribe the audio
-                    console.log('  → Transcribing audio...')
+                    flowLogger.info({ path: localPath }, 'Starting audio transcription')
+                    console.log('  🎯 Transcribing audio...')
                     const transcription = await transcriptionService.transcribeAudio(localPath)
+                    flowLogger.info({ transcriptionLength: transcription.length }, 'Transcription completed successfully')
                     console.log('  ✓ Transcription complete:', transcription.substring(0, 100))
 
                     // Send transcription to user (basic logging handled automatically)
@@ -131,9 +191,9 @@ export const voiceNoteFlow = addKeyword<TelegramProvider, Database>(EVENTS.VOICE
                                 try {
                                     // Import and use ISP API service directly
                                     const { ispApiService } = await import('~/services/ispApiService')
-                                    const userInfo = await ispApiService.getUserInfo(phoneNumber)
+                                    const users = await ispApiService.getUserInfo(phoneNumber)
 
-                                    if (!userInfo) {
+                                    if (!users || users.length === 0) {
                                         await flowDynamic(
                                             `❌ *User Not Found*\n\n` +
                                             `I couldn't find any user with the phone number: *${phoneNumber}*\n\n` +
@@ -143,11 +203,22 @@ export const voiceNoteFlow = addKeyword<TelegramProvider, Database>(EVENTS.VOICE
                                         return
                                     }
 
-                                    // Format and display user information
-                                    const formattedInfo = ispApiService.formatUserInfo(userInfo)
-                                    await flowDynamic(formattedInfo, { delay: 500 })
+                                    // Display information for each user sequentially
+                                    await flowDynamic(
+                                        `🔍 *Found ${users.length} user(s)* for phone number: *${phoneNumber}*\n\n` +
+                                        `Displaying information for each user:`,
+                                        { delay: 500 }
+                                    )
 
-                                    flowLogger.info({ from: ctx.from, userId: userInfo.id }, 'User information retrieved successfully from voice note')
+                                    for (let i = 0; i < users.length; i++) {
+                                        const userInfo = users[i]
+
+                                        // Format and display user information
+                                        const formattedInfo = ispApiService.formatUserInfo(userInfo)
+                                        await flowDynamic(formattedInfo, { delay: 500 })
+
+                                        flowLogger.info({ from: ctx.from, userId: userInfo.id }, 'User information retrieved successfully from voice note')
+                                    }
 
                                 } catch (error) {
                                     flowLogger.error({ err: error, from: ctx.from, phoneNumber }, 'Failed to fetch user info from voice note')
@@ -213,13 +284,31 @@ export const voiceNoteFlow = addKeyword<TelegramProvider, Database>(EVENTS.VOICE
                     await flowDynamic(response)
                     console.log('  ✓ Response sent')
                 } catch (error) {
+                    // Enhanced error handling with specific error types
+                    flowLogger.error({ err: error, from: ctx.from, contextId, localPath }, 'Voice message processing failed')
                     console.error('  ❌ Error processing voice message:', error)
-                    const errorMsg =
-                        '❌ Sorry, I encountered an error processing your voice message. Please try again or send a text message.'
-                    await flowDynamic(errorMsg)
+
+                    let userFriendlyMessage = '❌ Sorry, I encountered an error processing your voice message. Please try again or send a text message.'
+
+                    if (error instanceof Error) {
+                        const errorMsg = error.message.toLowerCase()
+
+                        if (errorMsg.includes('openai') || errorMsg.includes('api') || errorMsg.includes('whisper')) {
+                            userFriendlyMessage = '🔧 *Transcription Service Error*\n\nI\'m having trouble connecting to the transcription service. This is usually temporary.\n\nPlease try again in a few moments or send a text message instead.'
+                        } else if (errorMsg.includes('file') || errorMsg.includes('download') || errorMsg.includes('save')) {
+                            userFriendlyMessage = '📁 *File Download Error*\n\nI couldn\'t download the voice file properly. This might be due to:\n• Network connection issues\n• Voice file being too large\n• Temporary server issues\n\nPlease try sending the voice message again.'
+                        } else if (errorMsg.includes('empty') || errorMsg.includes('size') || errorMsg.includes('invalid')) {
+                            userFriendlyMessage = '📄 *Invalid Voice File*\n\nThe voice file appears to be corrupted or empty.\n\nPlease try recording and sending the voice message again.'
+                        } else if (errorMsg.includes('format') || errorMsg.includes('audio')) {
+                            userFriendlyMessage = '🎵 *Audio Format Error*\n\nI couldn\'t process the audio format of your voice message.\n\nPlease try sending a shorter voice message or use text instead.'
+                        }
+                    }
+
+                    await flowDynamic(userFriendlyMessage)
                 } finally {
                     // Clean up: delete the temporary voice file using utility
                     if (localPath) {
+                        flowLogger.debug({ path: localPath }, 'Cleaning up temporary voice file')
                         await cleanupTempFile(localPath)
                     }
                 }
