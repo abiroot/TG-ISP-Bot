@@ -450,19 +450,14 @@ This bot is built specifically for Telegram using the Bot API.
 
 - **Production Server:** `ssh root@159.223.220.101`
   - **tg-isp.abiroot.dev:** `/home/vito/tg-isp.abiroot.dev` (PORT 3010)
-  - **wup-isp.abiroot.dev:** `/home/vito/wup-isp.abiroot.dev` (PORT 3009)
-  - **book-keep.abiroot.dev:** `/home/vito/book-keep.abiroot.dev` (PORT 3008)
-  - **zedinspect.abiroot.dev:** `/home/zedinspect/zedinspect.abiroot.dev` (PHP/Laravel app)
+  - **Note:** This is the ONLY active site on this server
 
 ### VitoDeploy Deployment Scripts Location
 **CRITICAL:** VitoDeploy stores deployment scripts in its SQLite database, NOT as files on servers:
 - **Database path:** `161.35.72.42:/home/vito/vito/storage/database.sqlite`
 - **Table:** `deployment_scripts`
-- **Script IDs:**
-  - Script 2: zedinspect.abiroot.dev (PHP/Laravel)
-  - Script 5: book-keep.abiroot.dev (Node.js/PM2)
-  - Script 8: wup-isp.abiroot.dev (Node.js/PM2)
-  - Script 14: tg-isp.abiroot.dev (Node.js/PM2)
+- **Active Site:**
+  - Script 14: tg-isp.abiroot.dev (Node.js/PM2) - Site ID: 14
 
 ### How to Update Deployment Scripts
 ```bash
@@ -479,17 +474,19 @@ echo "Script updated";
 ```
 
 ### Auto-Deployment Notes
-- **Trigger:** Git push to `main` branch triggers auto-deployment
-- **Webhook:** VitoDeploy monitors GitHub webhooks (may need manual trigger if webhook fails)
+- **Trigger:** Git push to `main` branch triggers auto-deployment via GitHub webhook
+- **Verification:** Auto-deployment is WORKING CORRECTLY as of 2025-10-29
 - **Duration:** ~2-3 minutes for full deployment
-- **Manual Deploy:** If auto-deploy doesn't trigger, pull code manually and run build script
+- **Status Check:** View deployment logs at `161.35.72.42:/home/vito/vito/storage/app/server-logs/`
+- **Manual Deploy:** If needed, SSH to production and run deployment script manually
 
 ### PM2 & Process Management
 **CRITICAL CONFIGURATION:**
-- All Node.js apps run under **vito user** (NOT root)
-- All apps managed via **PM2** with `ecosystem.config.cjs`
-- **`kill_timeout: 30000`** (30 seconds) - BuilderBot apps need time for graceful shutdown
+- App runs under **vito user** (NOT root)
+- Managed via **PM2** with `ecosystem.config.cjs`
+- **`kill_timeout: 30000`** (30 seconds) - BuilderBot needs time for graceful shutdown
 - Graceful shutdown handlers in `src/app.ts` (lines 252-287) handle SIGTERM/SIGINT
+- **Current PM2 processes:** Only `tg-isp.abiroot.dev` (all other sites deleted)
 
 ### Deployment Script Structure (Node.js Apps)
 All Node.js deployment scripts include:
@@ -531,8 +528,9 @@ All Node.js deployment scripts include:
   ```
 
 ### Important Reminders
-- ⚠️ Multiple sites run on production server - be cautious with system-wide changes
 - ⚠️ ALWAYS test `npm run build` locally before git push to prevent deployment blockers
 - ⚠️ Deployment script changes require manual update via VitoDeploy database (ask user to update if needed)
+- ✅ Auto-deployment is fully functional and verified working (2025-10-29)
 - ✅ Git push triggers auto-deployment (~2 minutes)
-- ✅ PM2 saves state - apps auto-restart on server reboot
+- ✅ PM2 saves state - app auto-restarts on server reboot
+- ✅ Only one site (tg-isp.abiroot.dev) runs on this server
