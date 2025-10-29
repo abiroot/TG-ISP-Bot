@@ -50,6 +50,62 @@ import {
 
 const PORT = env.PORT
 
+/**
+ * Configure Telegram webhook if in production mode
+ */
+async function configureWebhook() {
+    // Only configure webhook in production
+    if (env.NODE_ENV !== 'production') {
+        loggers.app.info('🔧 Development mode: Skipping webhook configuration')
+        return
+    }
+
+    try {
+        // Get the webhook URL from environment or construct from known domain
+        const webhookUrl = env.WEBHOOK_URL || `https://tg-isp.abiroot.dev/webhook`
+
+        const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/setWebhook`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: `url=${encodeURIComponent(webhookUrl)}`,
+        })
+
+        const result = await response.json()
+
+        if (result.ok) {
+            loggers.app.info(`✅ Telegram webhook configured: ${webhookUrl}`)
+        } else {
+            loggers.app.error({ result }, '❌ Failed to configure Telegram webhook')
+        }
+    } catch (error) {
+        loggers.app.error({ err: error }, '❌ Error configuring Telegram webhook')
+    }
+}
+
+/**
+ * Clear Telegram webhook (called on shutdown)
+ */
+async function clearWebhook() {
+    if (env.NODE_ENV !== 'production') {
+        return
+    }
+
+    try {
+        const response = await fetch(`https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/deleteWebhook`)
+        const result = await response.json()
+
+        if (result.ok) {
+            loggers.app.info('🔌 Telegram webhook cleared')
+        } else {
+            loggers.app.error({ result }, 'Failed to clear Telegram webhook')
+        }
+    } catch (error) {
+        loggers.app.error({ err: error }, 'Error clearing Telegram webhook')
+    }
+}
+
 async function main() {
     loggers.app.info(`🚀 Starting ISP Support Bot v${APP_VERSION}...`)
 
@@ -67,6 +123,9 @@ async function main() {
         loggers.app.fatal({ err: error }, 'Failed to run migrations')
         process.exit(1)
     }
+
+    // Configure Telegram webhook for production
+    await configureWebhook()
 
     // Create flow with all registered flows
     const adapterFlow = createFlow([
@@ -246,6 +305,9 @@ async function main() {
 process.on('SIGINT', async () => {
     loggers.app.info('Received SIGINT signal, shutting down gracefully...')
 
+    // Clear Telegram webhook
+    await clearWebhook()
+
     // Stop RAG worker
     try {
         const { embeddingWorkerService } = await import('~/services/embeddingWorkerService')
@@ -263,6 +325,9 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
     loggers.app.info('Received SIGTERM signal, shutting down gracefully...')
+
+    // Clear Telegram webhook
+    await clearWebhook()
 
     // Stop RAG worker
     try {

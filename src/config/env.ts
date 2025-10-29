@@ -14,6 +14,7 @@ const envSchema = z.object({
 
     // Telegram
     TELEGRAM_BOT_TOKEN: z.string().min(1, 'Telegram bot token is required'),
+    WEBHOOK_URL: z.string().url().optional(),
 
     // OpenAI (used for embeddings)
     OPENAI_API_KEY: z.string().min(1, 'OpenAI API key is required'),
