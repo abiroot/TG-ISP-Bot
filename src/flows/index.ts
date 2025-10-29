@@ -1,9 +1,9 @@
 // Admin flows
 export {
     whitelistGroupFlow,
-    whitelistNumberFlow,
+    whitelistUserFlow,
     removeGroupFlow,
-    removeNumberFlow,
+    removeUserFlow,
     listWhitelistFlow,
 } from './admin/whitelistFlow'
 

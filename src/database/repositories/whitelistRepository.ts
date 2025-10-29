@@ -43,9 +43,9 @@ export class WhitelistRepository {
         return result.rows
     }
 
-    // ===== NUMBERS =====
+    // ===== USERS =====
 
-    async isNumberWhitelisted(userIdentifier: string): Promise<boolean> {
+    async isUserWhitelisted(userIdentifier: string): Promise<boolean> {
         const result = await pool.query(
             'SELECT EXISTS(SELECT 1 FROM whitelisted_numbers WHERE user_identifier = $1 AND is_active = TRUE)',
             [userIdentifier]
@@ -53,7 +53,7 @@ export class WhitelistRepository {
         return result.rows[0].exists
     }
 
-    async addNumber(data: CreateWhitelistedNumber): Promise<WhitelistedNumber> {
+    async addUser(data: CreateWhitelistedNumber): Promise<WhitelistedNumber> {
         const result = await pool.query(
             `INSERT INTO whitelisted_numbers (user_identifier, whitelisted_by, notes)
              VALUES ($1, $2, $3)
@@ -64,7 +64,7 @@ export class WhitelistRepository {
         return result.rows[0]
     }
 
-    async removeNumber(userIdentifier: string): Promise<boolean> {
+    async removeUser(userIdentifier: string): Promise<boolean> {
         const result = await pool.query(
             'UPDATE whitelisted_numbers SET is_active = FALSE WHERE user_identifier = $1',
             [userIdentifier]
@@ -72,7 +72,7 @@ export class WhitelistRepository {
         return result.rowCount ? result.rowCount > 0 : false
     }
 
-    async getAllNumbers(): Promise<WhitelistedNumber[]> {
+    async getAllUsers(): Promise<WhitelistedNumber[]> {
         const result = await pool.query(
             'SELECT * FROM whitelisted_numbers WHERE is_active = TRUE ORDER BY whitelisted_at DESC'
         )

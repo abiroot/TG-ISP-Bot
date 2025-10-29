@@ -8,7 +8,7 @@ export class WhitelistService {
         if (isGroup) {
             return await whitelistRepository.isGroupWhitelisted(contextId)
         } else {
-            return await whitelistRepository.isNumberWhitelisted(contextId)
+            return await whitelistRepository.isUserWhitelisted(contextId)
         }
     }
 
@@ -24,10 +24,10 @@ export class WhitelistService {
     }
 
     /**
-     * Add a user to whitelist (supports phone numbers, Telegram IDs, and usernames)
+     * Add a user to whitelist (supports Telegram usernames and user IDs)
      */
-    async whitelistNumber(userIdentifier: string, whitelistedBy: string, notes?: string) {
-        return await whitelistRepository.addNumber({
+    async whitelistUser(userIdentifier: string, whitelistedBy: string, notes?: string) {
+        return await whitelistRepository.addUser({
             user_identifier: userIdentifier,
             whitelisted_by: whitelistedBy,
             notes,
@@ -44,8 +44,8 @@ export class WhitelistService {
     /**
      * Remove a user from whitelist
      */
-    async removeNumber(userIdentifier: string): Promise<boolean> {
-        return await whitelistRepository.removeNumber(userIdentifier)
+    async removeUser(userIdentifier: string): Promise<boolean> {
+        return await whitelistRepository.removeUser(userIdentifier)
     }
 
     /**
@@ -56,10 +56,10 @@ export class WhitelistService {
     }
 
     /**
-     * Get all whitelisted numbers
+     * Get all whitelisted users
      */
-    async getAllNumbers() {
-        return await whitelistRepository.getAllNumbers()
+    async getAllUsers() {
+        return await whitelistRepository.getAllUsers()
     }
 }
 

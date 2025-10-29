@@ -26,10 +26,11 @@ export const adminHelpFlow = addKeyword<TelegramProvider, Database>(['admin help
 
 *🛡️ Whitelist Management*
 • \`/wl group\` - Whitelist current group
-• \`/wl number +1234567890\` - Whitelist phone number (inline)
-• \`/wl number\` - Whitelist phone number (prompt)
+• \`/wl user @username\` - Whitelist username (inline)
+• \`/wl user 1234567890\` - Whitelist Telegram ID (inline)
+• \`/wl user\` - Whitelist user (prompt)
 • \`/remove group\` - Remove current group
-• \`/remove number\` - Remove phone number
+• \`/remove user\` - Remove user
 • \`/list whitelist\` - Show all whitelisted items
 
 *🤖 Bot Management*

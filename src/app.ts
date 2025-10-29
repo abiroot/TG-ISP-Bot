@@ -21,9 +21,9 @@ export const APP_VERSION = packageJson.version
 // Import all flows
 import {
     whitelistGroupFlow,
-    whitelistNumberFlow,
+    whitelistUserFlow,
     removeGroupFlow,
-    removeNumberFlow,
+    removeUserFlow,
     listWhitelistFlow,
     enableMaintenanceFlow,
     disableMaintenanceFlow,
@@ -74,9 +74,9 @@ async function main() {
     const adapterFlow = createFlow([
         // Admin flows (whitelist management)
         whitelistGroupFlow,
-        whitelistNumberFlow,
+        whitelistUserFlow,
         removeGroupFlow,
-        removeNumberFlow,
+        removeUserFlow,
         listWhitelistFlow,
 
         // Admin flows (bot management)
