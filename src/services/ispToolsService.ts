@@ -211,6 +211,7 @@ export const ispTools = {
 • Static IP: ${userInfo.staticIP || 'None'}
 • MAC Address: ${userInfo.macAddress || 'Not registered'}
 • NAS Host: ${userInfo.nasHost || 'Not connected'}
+• Mikrotik Interface: ${userInfo.mikrotikInterface || 'N/A'}
 
 📡 *Connection Status:*
 • Online: ${userInfo.online ? '🟢 Yes' : '🔴 No'}
@@ -230,6 +231,7 @@ export const ispTools = {
                         staticIP: userInfo.staticIP,
                         macAddress: userInfo.macAddress,
                         nasHost: userInfo.nasHost,
+                        mikrotikInterface: userInfo.mikrotikInterface,
                         online: userInfo.online,
                         accessPointOnline: userInfo.accessPointOnline,
                         stationOnline: userInfo.stationOnline,

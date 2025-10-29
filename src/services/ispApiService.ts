@@ -440,6 +440,7 @@ ${statusEmoji} **Account Status**
 │ • MAC: \`${userInfo.macAddress || 'Not registered'}\`
 │ • NAS: ${userInfo.nasHost || 'Not connected'}
 │ • Router: ${userInfo.routerBrand || 'N/A'}
+│ • Interface: ${userInfo.mikrotikInterface || 'N/A'}
 
 ⚡ **Service Performance**
 │ • Upload: ${(userInfo.basicSpeedUp / 1000).toFixed(1)} Mbps
