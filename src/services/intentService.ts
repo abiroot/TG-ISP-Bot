@@ -110,23 +110,23 @@ Current user message: "${userMessage}"
 
 Classify the user's intention into ONE of these categories:
 
-1. USER_INFO - User wants to retrieve information about a customer using their phone number
-   Examples: "Check phone number +1234567890", "Get info for 555-1234", "Show customer details for +961123456"
+1. USER_INFO - User wants to retrieve information about a customer using their phone number or username
+   Examples: "Check phone number +1234567890", "Get info for josianeyoussef", "Show customer details for john_doe", "Check user @username", "Info for 555-1234"
 
 2. ACCOUNT_STATUS - User asking about account status, online status, or activation
-   Examples: "Is customer +1234567890 online?", "Check account status for 555-1234", "Is this account active?"
+   Examples: "Is customer +1234567890 online?", "Check account status for josianeyoussef", "Is username john_doe active?", "Status for 555-1234"
 
 3. TECHNICAL_SUPPORT - User asking about technical details like IP, MAC address, connection issues
-   Examples: "What's the IP for customer +1234567890?", "Check MAC address", "Connection issues for 555-1234"
+   Examples: "What's the IP for customer josianeyoussef?", "Check MAC address for john_doe", "Connection issues for +1234567890", "Technical details for 555-1234"
 
 4. BILLING_QUERY - User asking about billing, account price, expiry dates, discounts
-   Examples: "Check billing for +1234567890", "When does account expire?", "What's the price for 555-1234?"
+   Examples: "Check billing for josianeyoussef", "When does account for john_doe expire?", "What's the price for +1234567890?", "Billing info for 555-1234"
 
 5. NETWORK_INFO - User asking about network speeds, access points, NAS hosts
-   Examples: "What are the speeds for +1234567890?", "Check AP status", "Network info for 555-1234"
+   Examples: "What are the speeds for josianeyoussef?", "Check AP status for john_doe", "Network info for +1234567890", "Connection details for 555-1234"
 
-6. CUSTOMER_SEARCH - User trying to find/search for a customer by name or partial info
-   Examples: "Find customer John Doe", "Search for users", "Look up customer"
+6. CUSTOMER_SEARCH - User trying to find/search for a customer by name, username, or partial info
+   Examples: "Find customer John Doe", "Search for user josianeyoussef", "Look up username john_doe", "Find users"
 
 7. GREETING - Simple greeting without specific intent
    Examples: "Hello", "Hi", "Good morning", "Hey there", "Hey"
@@ -169,6 +169,23 @@ Provide:
         // Match various phone number formats
         const phoneRegex = /(\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/
         return phoneRegex.test(message)
+    }
+
+    /**
+     * Quick check if message contains a user identifier (phone number or username)
+     */
+    containsUserIdentifier(message: string): boolean {
+        // Check for phone numbers
+        if (this.containsPhoneNumber(message)) return true
+
+        // Check for usernames (@username, username references, etc.)
+        const usernamePatterns = [
+            /@[a-zA-Z][a-zA-Z0-9_.]{2,31}/g, // @username mentions
+            /(?:user|username|account|customer)\s*[:-]?\s*[a-zA-Z][a-zA-Z0-9_.]{2,31}/gi, // user references
+            /\b[a-zA-Z][a-zA-Z0-9_.]{2,31}\b(?!@\w)/g, // standalone usernames
+        ]
+
+        return usernamePatterns.some(pattern => pattern.test(message))
     }
 
     /**

@@ -44,26 +44,31 @@ export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_I
             const phoneNumber = ispApiService.extractPhoneNumberFromMessage(ctx.body, ctx.from)
 
             if (!phoneNumber) {
-                // If no phone number found, ask user to provide one
+                // If no user identifier found, ask user to provide one
                 await sendAndLogResponse(ctx, utils,
-                    '📞 *Phone Number Required*\n\n' +
-                    'I need a phone number to look up user information.\n\n' +
-                    'Please provide a phone number in any of these formats:\n' +
+                    '📞 *User Identifier Required*\n\n' +
+                    'I need a phone number or username to look up user information.\n\n' +
+                    'Please provide one of the following:\n\n' +
+                    '📱 **Phone Number Formats:**\n' +
                     '• +1234567890\n' +
                     '• 123-456-7890\n' +
                     '• (123) 456-7890\n' +
                     '• 123.456.7890\n\n' +
-                    'Example: "Check +1234567890" or "Info for 123-456-7890"',
-                    { response_type: 'phone_required' }
+                    '👤 **Username Formats:**\n' +
+                    '• josianeyoussef\n' +
+                    '• john_doe\n' +
+                    '• @username\n\n' +
+                    'Example: "Check +1234567890" or "Info for josianeyoussef"',
+                    { response_type: 'identifier_required' }
                 )
                 return utils.fallBack()
             }
 
-            flowLogger.info({ from: ctx.from, phoneNumber }, 'Phone number extracted, fetching user info directly')
+            flowLogger.info({ from: ctx.from, identifier: phoneNumber }, 'User identifier extracted, fetching user info directly')
 
             await sendAndLogResponse(ctx, utils, '🔍 *Searching...* Please wait while I retrieve the user information.', {
                 response_type: 'searching',
-                phone_number: phoneNumber
+                identifier: phoneNumber
             })
 
             try {
@@ -73,20 +78,20 @@ export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_I
                 if (!users || users.length === 0) {
                     await sendAndLogResponse(ctx, utils,
                         `❌ *User Not Found*\n\n` +
-                        `I couldn't find any user with the phone number: *${phoneNumber}*\n\n` +
-                        `Please:\n• Double-check the phone number\n• Make sure the number is registered in the ISP system\n• Try a different phone number`,
-                        { response_type: 'user_not_found', phone_number: phoneNumber }
+                        `I couldn't find any user with the identifier: *${phoneNumber}*\n\n` +
+                        `Please:\n• Double-check the phone number or username\n• Make sure it's registered in the ISP system\n• Try a different identifier`,
+                        { response_type: 'user_not_found', identifier: phoneNumber }
                     )
                     return
                 }
 
                 // Display information for each user sequentially
                 await sendAndLogResponse(ctx, utils,
-                    `🔍 *Found ${users.length} user(s)* for phone number: *${phoneNumber}*\n\n` +
+                    `🔍 *Found ${users.length} user(s)* for identifier: *${phoneNumber}*\n\n` +
                     `Displaying information for each user:`,
                     {
                         response_type: 'users_found_summary',
-                        phone_number: phoneNumber,
+                        identifier: phoneNumber,
                         total_users: users.length
                     }
                 )
@@ -101,14 +106,14 @@ export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_I
                     const formattedInfo = userHeader + ispApiService.formatUserInfo(userInfo)
                     await sendAndLogResponse(ctx, utils, formattedInfo, {
                         response_type: 'user_info_success',
-                        phone_number: phoneNumber,
+                        identifier: phoneNumber,
                         user_index: i + 1,
                         total_users: users.length,
                         user_id: userInfo.id,
                         user_name: `${userInfo.firstName} ${userInfo.lastName}`
                     })
 
-                    flowLogger.info({ from: ctx.from, userId: userInfo.id, userIndex: i + 1, totalUsers: users.length }, 'User information retrieved successfully')
+                    flowLogger.info({ from: ctx.from, userId: userInfo.id, userIndex: i + 1, totalUsers: users.length, identifier: phoneNumber }, 'User information retrieved successfully')
 
                     // Add a small delay between users to avoid overwhelming the user
                     if (i < users.length - 1) {
@@ -118,22 +123,22 @@ export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_I
 
                 // Send completion message
                 await sendAndLogResponse(ctx, utils,
-                    `\n✅ *Complete*\n\nDisplayed information for all ${users.length} user(s) found with phone number: *${phoneNumber}*`,
+                    `\n✅ *Complete*\n\nDisplayed information for all ${users.length} user(s) found with identifier: *${phoneNumber}*`,
                     {
                         response_type: 'all_users_displayed',
-                        phone_number: phoneNumber,
+                        identifier: phoneNumber,
                         total_users: users.length
                     }
                 )
 
             } catch (error) {
-                flowLogger.error({ err: error, from: ctx.from, phoneNumber }, 'Failed to fetch user info')
+                flowLogger.error({ err: error, from: ctx.from, identifier: phoneNumber }, 'Failed to fetch user info')
                 await sendAndLogResponse(ctx, utils,
                     '❌ *Error Retrieving Information*\n\n' +
                     'I encountered an error while trying to fetch the user information. ' +
-                    'This could be due to:\n• Network connectivity issues\n• ISP API being temporarily unavailable\n• Invalid phone number format\n\n' +
+                    'This could be due to:\n• Network connectivity issues\n• ISP API being temporarily unavailable\n• Invalid identifier format\n\n' +
                     'Please try again in a few moments.',
-                    { response_type: 'api_error', phone_number: phoneNumber, error: error.message }
+                    { response_type: 'api_error', identifier: phoneNumber, error: error.message }
                 )
             }
         } catch (error) {
@@ -146,36 +151,37 @@ export const userInfoFlow = addKeyword<TelegramProvider, Database>('EVENT_USER_I
     })
   
 /**
- * Handle manual phone number entry when initial extraction fails
+ * Handle manual user identifier entry when initial extraction fails
  */
-export const manualPhoneEntryFlow = addKeyword<TelegramProvider, Database>(['phone', 'number', 'lookup'], { sensitive: false })
+export const manualPhoneEntryFlow = addKeyword<TelegramProvider, Database>(['phone', 'number', 'lookup', 'user', 'username'], { sensitive: false })
     .addAction(async (ctx, utils) => {
-        flowLogger.info({ from: ctx.from, message: ctx.body }, 'Manual phone entry triggered')
+        flowLogger.info({ from: ctx.from, message: ctx.body }, 'Manual user identifier entry triggered')
 
         // Run middleware pipeline
         const middlewareResult = await runUserMiddleware(ctx, utils)
         if (!middlewareResult.allowed) return
 
-        // Extract phone number from the message
-        const phoneNumber = intentService.extractPhoneNumber(ctx.body)
+        // Extract user identifier from the message
+        const identifier = intentService.extractPhoneNumber(ctx.body)
 
-        if (!phoneNumber) {
+        if (!identifier) {
             await sendAndLogResponse(ctx, utils,
-                '📞 *Please provide a phone number*\n\n' +
-                'I need a valid phone number to look up user information.\n\n' +
-                'Accepted formats:\n• +1234567890\n• 123-456-7890\n• (123) 456-7890\n• 123.456.7890\n\n' +
-                'Please send a message with the phone number you want to check.',
-                { response_type: 'manual_phone_required' }
+                '📞 *Please provide a user identifier*\n\n' +
+                'I need a valid phone number or username to look up user information.\n\n' +
+                '📱 **Accepted Phone Formats:**\n• +1234567890\n• 123-456-7890\n• (123) 456-7890\n• 123.456.7890\n\n' +
+                '👤 **Accepted Username Formats:**\n• josianeyoussef\n• john_doe\n• @username\n\n' +
+                'Please send a message with the phone number or username you want to check.',
+                { response_type: 'manual_identifier_required' }
             )
             return utils.fallBack()
         }
 
         // Store and proceed with confirmation
-        await utils.state.update({ phoneNumberQuery: phoneNumber })
+        await utils.state.update({ identifierQuery: identifier })
         await sendAndLogResponse(ctx, utils,
-            `🔍 *Confirm Phone Number*\n\n` +
-            `I found this phone number: *${phoneNumber}*\n\n` +
+            `🔍 *Confirm User Identifier*\n\n` +
+            `I found this identifier: *${identifier}*\n\n` +
             `Is this correct? Reply "yes" to proceed or "no" to try again.`,
-            { response_type: 'phone_confirmation', phone_number: phoneNumber }
+            { response_type: 'identifier_confirmation', identifier: identifier }
         )
     })

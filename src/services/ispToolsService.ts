@@ -28,12 +28,12 @@ export interface ToolExecutionContext {
  */
 const rawIspTools = {
     /**
-     * Get user information by phone number
+     * Get user information by phone number or username
      */
     getUserInfo: tool({
-        description: 'Look up customer information using their phone number. Use this when user asks about a customer, account details, or user information.',
+        description: 'Look up customer information using their phone number or username. Use this when user asks about a customer, account details, or user information. Supports both phone numbers (e.g., +1234567890, 123-456-7890, (123) 456-7890) and usernames (e.g., josianeyoussef, john_doe).',
         inputSchema: z.object({
-            phoneNumber: z.string().describe('Phone number to look up (can be in various formats: +1234567890, 123-456-7890, (123) 456-7890)'),
+            identifier: z.string().describe('Phone number or username to look up (phone numbers can be in various formats: +1234567890, 123-456-7890, (123) 456-7890; usernames are alphanumeric like josianeyoussef or john_doe)'),
         }),
         execute: async (input, options) => {
             const context = options.experimental_context as ToolExecutionContext
@@ -45,18 +45,20 @@ const rawIspTools = {
             toolLogger.info(
                 {
                     userPhone: context.userPhone,
-                    lookupPhone: input.phoneNumber,
+                    lookupIdentifier: input.identifier,
                 },
                 'Executing getUserInfo tool'
             )
 
             try {
-                const users = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.identifier)
 
                 if (!users || users.length === 0) {
+                    const isPhone = input.identifier.match(/^\+?\d{6,15}$/)
+                    const identifierType = isPhone ? 'phone number' : 'username'
                     return {
                         success: false,
-                        message: `❌ User not found: I couldn't find any customer with phone number ${input.phoneNumber}. Please check the number and try again.`,
+                        message: `❌ User not found: I couldn't find any customer with the ${identifierType} ${input.identifier}. Please check the ${identifierType} and try again.`,
                         found: false,
                     }
                 }
@@ -81,7 +83,7 @@ const rawIspTools = {
                     },
                 }
             } catch (error) {
-                toolLogger.error({ err: error, phoneNumber: input.phoneNumber }, 'Failed to get user info')
+                toolLogger.error({ err: error, identifier: input.identifier }, 'Failed to get user info')
                 return {
                     success: false,
                     message: '❌ Error retrieving user information. The ISP API might be temporarily unavailable. Please try again later.',
@@ -95,9 +97,9 @@ const rawIspTools = {
      * Check account status (online/offline, active/blocked)
      */
     checkAccountStatus: tool({
-        description: 'Check if a customer account is online, offline, active, blocked, or expired. Use for status-related queries.',
+        description: 'Check if a customer account is online, offline, active, blocked, or expired. Use for status-related queries. Supports both phone numbers and usernames.',
         inputSchema: z.object({
-            phoneNumber: z.string().describe('Phone number to check status for'),
+            identifier: z.string().describe('Phone number or username to check status for'),
         }),
         execute: async (input, options) => {
             const context = options.experimental_context as ToolExecutionContext
@@ -109,18 +111,20 @@ const rawIspTools = {
             toolLogger.info(
                 {
                     userPhone: context.userPhone,
-                    lookupPhone: input.phoneNumber,
+                    lookupIdentifier: input.identifier,
                 },
                 'Executing checkAccountStatus tool'
             )
 
             try {
-                const users = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.identifier)
 
                 if (!users || users.length === 0) {
+                    const isPhone = input.identifier.match(/^\+?\d{6,15}$/)
+                    const identifierType = isPhone ? 'phone number' : 'username'
                     return {
                         success: false,
-                        message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
+                        message: `❌ User not found: No customer found with the ${identifierType} ${input.identifier}`,
                         found: false,
                     }
                 }
@@ -166,7 +170,7 @@ const rawIspTools = {
                     },
                 }
             } catch (error) {
-                toolLogger.error({ err: error, phoneNumber: input.phoneNumber }, 'Failed to check account status')
+                toolLogger.error({ err: error, identifier: input.identifier }, 'Failed to check account status')
                 return {
                     success: false,
                     message: '❌ Error checking account status. Please try again later.',
@@ -180,9 +184,9 @@ const rawIspTools = {
      * Get technical information (IP, MAC, network details)
      */
     getTechnicalDetails: tool({
-        description: 'Get technical details like IP address, MAC address, NAS host, and connection information for a customer.',
+        description: 'Get technical details like IP address, MAC address, NAS host, and connection information for a customer. Supports both phone numbers and usernames.',
         inputSchema: z.object({
-            phoneNumber: z.string().describe('Phone number to get technical details for'),
+            identifier: z.string().describe('Phone number or username to get technical details for'),
         }),
         execute: async (input, options) => {
             const context = options.experimental_context as ToolExecutionContext
@@ -194,18 +198,20 @@ const rawIspTools = {
             toolLogger.info(
                 {
                     userPhone: context.userPhone,
-                    lookupPhone: input.phoneNumber,
+                    lookupIdentifier: input.identifier,
                 },
                 'Executing getTechnicalDetails tool'
             )
 
             try {
-                const users = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.identifier)
 
                 if (!users || users.length === 0) {
+                    const isPhone = input.identifier.match(/^\+?\d{6,15}$/)
+                    const identifierType = isPhone ? 'phone number' : 'username'
                     return {
                         success: false,
-                        message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
+                        message: `❌ User not found: No customer found with the ${identifierType} ${input.identifier}`,
                         found: false,
                     }
                 }
@@ -250,7 +256,7 @@ const rawIspTools = {
                     },
                 }
             } catch (error) {
-                toolLogger.error({ err: error, phoneNumber: input.phoneNumber }, 'Failed to get technical details')
+                toolLogger.error({ err: error, identifier: input.identifier }, 'Failed to get technical details')
                 return {
                     success: false,
                     message: '❌ Error retrieving technical details. Please try again later.',
@@ -264,9 +270,9 @@ const rawIspTools = {
      * Get billing information
      */
     getBillingInfo: tool({
-        description: 'Get billing details including account price, discounts, expiry dates, and payment information.',
+        description: 'Get billing details including account price, discounts, expiry dates, and payment information. Supports both phone numbers and usernames.',
         inputSchema: z.object({
-            phoneNumber: z.string().describe('Phone number to get billing information for'),
+            identifier: z.string().describe('Phone number or username to get billing information for'),
         }),
         execute: async (input, options) => {
             const context = options.experimental_context as ToolExecutionContext
@@ -278,18 +284,20 @@ const rawIspTools = {
             toolLogger.info(
                 {
                     userPhone: context.userPhone,
-                    lookupPhone: input.phoneNumber,
+                    lookupIdentifier: input.identifier,
                 },
                 'Executing getBillingInfo tool'
             )
 
             try {
-                const users = await ispApiService.getUserInfo(input.phoneNumber)
+                const users = await ispApiService.getUserInfo(input.identifier)
 
                 if (!users || users.length === 0) {
+                    const isPhone = input.identifier.match(/^\+?\d{6,15}$/)
+                    const identifierType = isPhone ? 'phone number' : 'username'
                     return {
                         success: false,
-                        message: `❌ User not found: No customer found with phone number ${input.phoneNumber}`,
+                        message: `❌ User not found: No customer found with the ${identifierType} ${input.identifier}`,
                         found: false,
                     }
                 }
@@ -352,7 +360,7 @@ const rawIspTools = {
                     },
                 }
             } catch (error) {
-                toolLogger.error({ err: error, phoneNumber: input.phoneNumber }, 'Failed to get billing info')
+                toolLogger.error({ err: error, identifier: input.identifier }, 'Failed to get billing info')
                 return {
                     success: false,
                     message: '❌ Error retrieving billing information. Please try again later.',

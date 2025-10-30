@@ -1,5 +1,6 @@
 import { env } from '~/config/env'
 import { createFlowLogger } from '~/utils/logger'
+import { extractUserIdentifiers, extractFirstUserIdentifier, isPhoneNumber, isUsername } from '~/utils/userIdentifierExtractor'
 
 const logger = createFlowLogger('isp-api')
 
@@ -134,35 +135,53 @@ export class IspApiService {
     }
 
     /**
-     * Get user information by mobile number - returns all matching users
+     * Get user information by mobile number or username - returns all matching users
+     * Supports both phone numbers (with normalization) and usernames
      */
-    async getUserInfo(mobile: string): Promise<UserInfo[]> {
+    async getUserInfo(identifier: string): Promise<UserInfo[]> {
+        let searchQuery = identifier.trim()
+        let isPhoneNumber = false
+
         try {
             const token = await this.authenticate()
 
-            // Clean mobile number format - remove any non-digit characters except +
-            let cleanMobile = mobile.replace(/[^\d+]/g, '')
+            // Check if identifier is a phone number or username
+            // Phone number detection and normalization
+            // Remove any non-digit characters except + to check if it's a phone number
+            const cleanNumber = searchQuery.replace(/[^\d+]/g, '')
+            isPhoneNumber = cleanNumber.match(/^\+?\d{6,15}$/) !== null // Basic phone number pattern
 
-            
-            // Convert Lebanese international format to local format
-            // +96171534710 or 96171534710 should become 71534710
-            if (cleanMobile.startsWith('+961') && cleanMobile.length === 13) {
-                cleanMobile = cleanMobile.substring(4) // Remove +961
-            } else if (cleanMobile.startsWith('961') && cleanMobile.length === 12) {
-                cleanMobile = cleanMobile.substring(3) // Remove 961
-            } else if (cleanMobile.startsWith('+961')) {
-                // Handle any other +961 variations
-                cleanMobile = cleanMobile.substring(4) // Remove +961
-                logger.debug({ convertedMobile: cleanMobile }, 'Converted +961 format (any length) to local format')
-            } else if (cleanMobile.startsWith('961')) {
-                // Handle any other 961 variations
-                cleanMobile = cleanMobile.substring(3) // Remove 961
-                logger.debug({ convertedMobile: cleanMobile }, 'Converted 961 format (any length) to local format')
+            if (isPhoneNumber) {
+                // This is a phone number - apply Lebanese number normalization
+                logger.debug({ identifier: searchQuery }, 'Detected phone number, applying normalization')
+
+                let cleanMobile = cleanNumber
+
+                // Convert Lebanese international format to local format
+                // +96171534710 or 96171534710 should become 71534710
+                if (cleanMobile.startsWith('+961') && cleanMobile.length === 13) {
+                    cleanMobile = cleanMobile.substring(4) // Remove +961
+                } else if (cleanMobile.startsWith('961') && cleanMobile.length === 12) {
+                    cleanMobile = cleanMobile.substring(3) // Remove 961
+                } else if (cleanMobile.startsWith('+961')) {
+                    // Handle any other +961 variations
+                    cleanMobile = cleanMobile.substring(4) // Remove +961
+                    logger.debug({ convertedMobile: cleanMobile }, 'Converted +961 format (any length) to local format')
+                } else if (cleanMobile.startsWith('961')) {
+                    // Handle any other 961 variations
+                    cleanMobile = cleanMobile.substring(3) // Remove 961
+                    logger.debug({ convertedMobile: cleanMobile }, 'Converted 961 format (any length) to local format')
+                }
+
+                searchQuery = cleanMobile
+                logger.debug({ original: identifier, normalized: searchQuery }, 'Phone number normalized for API')
+            } else {
+                // This is a username - use as-is
+                logger.debug({ username: searchQuery }, 'Detected username, using without normalization')
             }
 
-
             const response = await fetch(
-                `${this.baseUrl}/api/user-info?mobile=${encodeURIComponent(cleanMobile)}`,
+                `${this.baseUrl}/api/user-info?mobile=${encodeURIComponent(searchQuery)}`,
                 {
                     method: 'GET',
                     headers: {
@@ -173,7 +192,7 @@ export class IspApiService {
             )
 
             if (response.status === 404) {
-                logger.debug({ mobile: cleanMobile }, 'User not found in ISP system')
+                logger.debug({ query: searchQuery, type: isPhoneNumber ? 'phone' : 'username' }, 'User not found in ISP system')
                 return []
             }
 
@@ -183,7 +202,8 @@ export class IspApiService {
                     status: response.status,
                     statusText: response.statusText,
                     body: errorText,
-                    mobile: cleanMobile
+                    query: searchQuery,
+                    type: isPhoneNumber ? 'phone' : 'username'
                 }, 'ISP API user info request failed')
                 throw new Error(`User info request failed: ${response.status} ${response.statusText}`)
             }
@@ -191,7 +211,7 @@ export class IspApiService {
             // Check if response is empty before parsing JSON
             const responseText = await response.text()
             if (!responseText.trim()) {
-                logger.warn({ mobile: cleanMobile }, 'ISP API returned empty response')
+                logger.warn({ query: searchQuery, type: isPhoneNumber ? 'phone' : 'username' }, 'ISP API returned empty response')
                 return []
             }
 
@@ -199,13 +219,19 @@ export class IspApiService {
             const usersArray: UserInfo[] = JSON.parse(responseText)
 
             if (!Array.isArray(usersArray) || usersArray.length === 0) {
-                logger.debug({ mobile: cleanMobile }, 'No users found in ISP system response')
+                logger.debug({ query: searchQuery, type: isPhoneNumber ? 'phone' : 'username' }, 'No users found in ISP system response')
                 return []
             }
 
+            logger.debug({
+                query: searchQuery,
+                type: isPhoneNumber ? 'phone' : 'username',
+                userCount: usersArray.length
+            }, 'Successfully retrieved user info from ISP API')
+
             return usersArray
         } catch (error) {
-            logger.error({ err: error, mobile }, 'Failed to get user info from ISP API')
+            logger.error({ err: error, query: searchQuery, type: isPhoneNumber ? 'phone' : 'username' }, 'Failed to get user info from ISP API')
             throw new Error('Failed to retrieve user information from ISP system')
         }
     }
@@ -554,53 +580,27 @@ ${formatDetailedPing(userInfo.pingResult)}
     }
 
     /**
-     * Extract phone number from user message or use sender's number
-     * Handles various formats: +961 71 534 710, 961 71 534 710, 71 534 710, 71534710, etc.
-     * Returns phone number formatted for API (local format)
+     * Extract user identifier (phone number or username) from user message
+     * Enhanced to handle both phone numbers and usernames
+     * Returns identifier for API lookup
+     *
+     * @deprecated Use extractUserIdentifiers or extractFirstUserIdentifier from userIdentifierExtractor instead
      */
     extractPhoneNumberFromMessage(message: string, senderId: string): string {
+        const identifier = extractFirstUserIdentifier(message)
 
-        // Clean the message first - normalize spaces and remove common separators
-        const cleanMessage = message.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
-
-        // Enhanced patterns for phone numbers in natural language (including spaced formats)
-        const phonePatterns = [
-            // Numbers with spaces: +961 71 534 710, 961 71 534 710, 71 534 710
-            /\b(?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})\b/g,
-            // Standalone numbers: 71534710, +96171534710, 96171534710
-            /\b(\+?\d{8,15})\b/g,
-            // Numbers with context: phone number 71534710, number: 71-534-710, mobile: +961 71 534 710
-            /(?:phone|number|mobile|contact)\s*[:-]?\s*((?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})|\+?\d{8,15})/gi,
-            // After common phrases: for 71534710, for +961 71 534 710, at 71 534 710
-            /(?:for|at|to)\s+((?:\+?961\s?)?\d{1,2}(?:\s?\d{3}){1,2}(?:\s?\d{2,3})|\+?\d{8,15})\b/gi,
-        ]
-
-        // Try to find phone numbers in the message
-        for (const pattern of phonePatterns) {
-            const matches = cleanMessage.match(pattern)
-            if (matches) {
-                for (const match of matches) {
-                    // Extract just the number part and clean it
-                    const phoneNumber = match.replace(/[^\d+]/g, '')
-
-                    // Skip if it's too short or too long
-                    if (phoneNumber.length < 6 || phoneNumber.length > 15) continue
-
-                    return phoneNumber // Return as-is, will be processed by getUserInfo
-                }
-            }
+        if (!identifier) {
+            logger.debug({ message }, 'No phone number or username found in message')
+            return ''
         }
 
-        // Fallback: Try simple extraction for edge cases
-        const simpleNumberMatch = cleanMessage.match(/\b\d{6,15}\b/)
-        if (simpleNumberMatch) {
-            logger.debug({ foundNumber: simpleNumberMatch[0] }, 'Found simple phone number')
-            return simpleNumberMatch[0]
-        }
+        logger.debug({
+            identifier: identifier.value,
+            type: identifier.type,
+            original: identifier.original
+        }, 'Extracted user identifier from message')
 
-        // If no phone number found in message, return empty string
-        // User must provide phone number in their message
-        return ''
+        return identifier.value
     }
 
     /**

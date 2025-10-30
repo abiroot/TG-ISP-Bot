@@ -108,18 +108,18 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                     case 'TECHNICAL_SUPPORT':
                     case 'BILLING_QUERY':
                     case 'NETWORK_INFO': {
-                        // Check if message contains a phone number - if yes, route to user info flow
-                        // If no phone number, let AI handle it with conversation context
+                        // Check if message contains a user identifier (phone number or username)
+                        // If yes, route to user info flow; if no, let AI handle it with conversation context
                         const { ispApiService } = await import('~/services/ispApiService')
-                        const hasPhoneNumber = ispApiService.extractPhoneNumberFromMessage(ctx.body, ctx.from)
+                        const hasUserIdentifier = ispApiService.extractPhoneNumberFromMessage(ctx.body, ctx.from)
 
-                        if (hasPhoneNumber) {
-                            flowLogger.info({ from: ctx.from, intent: intentResult.intention, phoneNumber: hasPhoneNumber }, 'Phone number detected - routing to user info flow')
+                        if (hasUserIdentifier) {
+                            flowLogger.info({ from: ctx.from, intent: intentResult.intention, identifier: hasUserIdentifier }, 'User identifier detected - routing to user info flow')
                             // Import and route to user info flow
                             const { userInfoFlow } = await import('~/flows/isp/userInfoFlow')
                             return gotoFlow(userInfoFlow)
                         } else {
-                            flowLogger.info({ from: ctx.from, intent: intentResult.intention }, 'No phone number in follow-up question - using AI with context')
+                            flowLogger.info({ from: ctx.from, intent: intentResult.intention }, 'No user identifier in follow-up question - using AI with context')
                             // Fall through to AI response for follow-up questions
                             break
                         }
@@ -129,7 +129,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                         flowLogger.info({ from: ctx.from }, 'Handling greeting intent')
                         const greetingResponse = `Hello! 👋 I'm ${personality.bot_name}, your ISP Support assistant.\n\n` +
                             `I can help you:\n` +
-                            `📞 Look up customer information by phone number\n` +
+                            `📞 Look up customer information by phone number or username\n` +
                             `🔍 Check account status and online status\n` +
                             `🌐 View network details and connection info\n` +
                             `💰 Check billing and account expiry\n` +
@@ -173,12 +173,12 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                     case 'HELP': {
                         flowLogger.info({ from: ctx.from }, 'Handling help intent')
                         const helpResponse = `🤖 *How to use ${personality.bot_name}:*\n\n` +
-                            `📞 *Customer Info:* "Check +1234567890" or "Get info for 555-1234"\n` +
-                            `📊 *Account Status:* "Is customer +1234567890 online?"\n` +
-                            `🌐 *Technical Support:* "What's the IP for +1234567890?"\n` +
-                            `💰 *Billing Query:* "Check billing for +1234567890"\n` +
-                            `📡 *Network Info:* "What are the speeds for +1234567890?"\n\n` +
-                            `Simply provide a phone number with your query, and I'll fetch the information!`
+                            `📞 *Customer Info:* "Check +1234567890" or "Get info for josianeyoussef"\n` +
+                            `📊 *Account Status:* "Is customer josianeyoussef online?" or "Status for 555-1234"\n` +
+                            `🌐 *Technical Support:* "What's the IP for john_doe?" or "Technical details for +1234567890"\n` +
+                            `💰 *Billing Query:* "Check billing for josianeyoussef" or "Billing for 555-1234"\n` +
+                            `📡 *Network Info:* "What are the speeds for john_doe?" or "Network for +1234567890"\n\n` +
+                            `Simply provide a **phone number** or **username** with your query, and I'll fetch the information!`
                         await flowDynamic(helpResponse)
 
                         // Log the help response
