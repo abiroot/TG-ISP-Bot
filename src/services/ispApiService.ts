@@ -250,20 +250,13 @@ export class IspApiService {
             }
         }
 
-        // Format quota - values are already in GB/MB from API, not KB
+        // Format quota - values are already in MB from API, not KB
         const formatQuota = (quota: string): string => {
             const value = parseFloat(quota)
             if (isNaN(value)) return `${quota} (unknown unit)`
 
-            // Values appear to be in GB already (e.g., 910.8573 GB, 341336.1369 GB)
-            if (value > 1000) {
-                return `${value.toFixed(2)} GB`
-            } else if (value > 1) {
-                return `${value.toFixed(2)} GB`
-            } else {
-                // If less than 1, assume it's in MB
-                return `${(value * 1024).toFixed(2)} MB`
-            }
+            // Display values as they come from API but always use MB unit
+            return `${value.toFixed(2)} MB`
         }
 
         // Format access point users
