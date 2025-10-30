@@ -691,6 +691,155 @@ ${formatDetailedPing(userInfo.pingResult)}
     }
 
     /**
+     * Update location for a single user
+     */
+    async updateUserLocation(userName: string, latitude: number, longitude: number): Promise<{
+        success: boolean
+        error?: string
+    }> {
+        try {
+            const token = await this.authenticate()
+
+            // Validate coordinates
+            if (latitude < -90 || latitude > 90) {
+                return {
+                    success: false,
+                    error: 'Invalid latitude: must be between -90 and 90'
+                }
+            }
+            if (longitude < -180 || longitude > 180) {
+                return {
+                    success: false,
+                    error: 'Invalid longitude: must be between -180 and 180'
+                }
+            }
+
+            // Validate username
+            if (!userName || userName.trim().length === 0) {
+                return {
+                    success: false,
+                    error: 'Username is required'
+                }
+            }
+
+            logger.info({ userName, latitude, longitude }, 'Updating user location in ISP system')
+
+            const response = await fetch(`${this.baseUrl}/api/update-user-location`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    userName: userName.trim(),
+                    latitude,
+                    longitude
+                })
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                logger.error({
+                    userName,
+                    latitude,
+                    longitude,
+                    status: response.status,
+                    error: errorText
+                }, 'Failed to update user location - API error')
+                return {
+                    success: false,
+                    error: `API error (${response.status}): ${errorText}`
+                }
+            }
+
+            const result = await response.text()
+
+            // Parse the response (API returns "true" or "false" as text)
+            const success = result.trim().toLowerCase() === 'true'
+
+            if (success) {
+                logger.info({ userName, latitude, longitude }, 'User location updated successfully')
+            } else {
+                logger.warn({ userName, latitude, longitude }, 'User location update failed - API returned false')
+            }
+
+            return { success }
+
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            logger.error({
+                userName,
+                latitude,
+                longitude,
+                error: errorMessage
+            }, 'Failed to update user location - exception')
+            return {
+                success: false,
+                error: errorMessage
+            }
+        }
+    }
+
+    /**
+     * Update location for multiple users (batch processing)
+     */
+    async updateMultipleUserLocations(userLocations: Array<{
+        userName: string
+        latitude: number
+        longitude: number
+    }>): Promise<{
+        results: Array<{
+            userName: string
+            success: boolean
+            error?: string
+        }>
+        summary: {
+            total: number
+            successful: number
+            failed: number
+        }
+    }> {
+        logger.info({ userCount: userLocations.length }, 'Starting batch location update')
+
+        const results = []
+
+        for (const userLocation of userLocations) {
+            const result = await this.updateUserLocation(
+                userLocation.userName,
+                userLocation.latitude,
+                userLocation.longitude
+            )
+
+            results.push({
+                userName: userLocation.userName,
+                success: result.success,
+                error: result.error
+            })
+
+            // Small delay between API calls to avoid overwhelming the server
+            await new Promise(resolve => setTimeout(resolve, 100))
+        }
+
+        const successful = results.filter(r => r.success).length
+        const failed = results.length - successful
+
+        logger.info({
+            total: results.length,
+            successful,
+            failed
+        }, 'Batch location update completed')
+
+        return {
+            results,
+            summary: {
+                total: results.length,
+                successful,
+                failed
+            }
+        }
+    }
+
+    /**
      * Clear authentication token (useful for testing)
      */
     clearAuthCache(): void {

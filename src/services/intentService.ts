@@ -14,6 +14,7 @@ const intentSchema = z.object({
             'BILLING_QUERY', // User asking about billing, account price, expiry, etc.
             'NETWORK_INFO', // User asking about network speeds, AP info, etc.
             'CUSTOMER_SEARCH', // User trying to find/search for a customer
+            'LOCATION_UPDATE', // User wants to update location for one or more users
             'GREETING', // Simple greeting
             'APPRECIATION', // Expressing thanks or gratitude
             'HELP', // User needs help/guidance
@@ -128,16 +129,19 @@ Classify the user's intention into ONE of these categories:
 6. CUSTOMER_SEARCH - User trying to find/search for a customer by name, username, or partial info
    Examples: "Find customer John Doe", "Search for user josianeyoussef", "Look up username john_doe", "Find users"
 
-7. GREETING - Simple greeting without specific intent
+7. LOCATION_UPDATE - User wants to update location coordinates for one or more users
+   Examples: "Update location for acc", "Set acc's location to 33.8938 35.5018", "We have 5 users at the tower", "Update location for acc, jhonnyacc2, and 79174574", "Set location for multiple users", "Update acc location"
+
+8. GREETING - Simple greeting without specific intent
    Examples: "Hello", "Hi", "Good morning", "Hey there", "Hey"
 
-8. APPRECIATION - Expressing thanks or gratitude
+9. APPRECIATION - Expressing thanks or gratitude
    Examples: "Thanks", "Thank you", "Appreciate it", "Thanks a lot", "Thx", "Perfect, thanks"
 
-9. HELP - User needs help or guidance
+10. HELP - User needs help or guidance
    Examples: "How do I use this?", "Help", "What can you do?", "Show me commands"
 
-10. UNKNOWN - Cannot determine clear intent
+11. UNKNOWN - Cannot determine clear intent
 
 Provide:
 - intention: The classified category

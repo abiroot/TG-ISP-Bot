@@ -133,7 +133,8 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                             `🔍 Check account status and online status\n` +
                             `🌐 View network details and connection info\n` +
                             `💰 Check billing and account expiry\n` +
-                            `📡 Provide technical support details\n\n` +
+                            `📡 Provide technical support details\n` +
+                            `📍 Update user locations (single or batch)\n\n` +
                             `How can I help you today?`
                         await flowDynamic(greetingResponse)
 
@@ -177,7 +178,8 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                             `📊 *Account Status:* "Is customer josianeyoussef online?" or "Status for 555-1234"\n` +
                             `🌐 *Technical Support:* "What's the IP for john_doe?" or "Technical details for +1234567890"\n` +
                             `💰 *Billing Query:* "Check billing for josianeyoussef" or "Billing for 555-1234"\n` +
-                            `📡 *Network Info:* "What are the speeds for john_doe?" or "Network for +1234567890"\n\n` +
+                            `📡 *Network Info:* "What are the speeds for john_doe?" or "Network for +1234567890"\n` +
+                            `📍 *Location Updates:* "Update location for acc" or "We have 5 users at tower location"\n\n` +
                             `Simply provide a **phone number** or **username** with your query, and I'll fetch the information!`
                         await flowDynamic(helpResponse)
 

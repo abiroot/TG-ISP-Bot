@@ -90,6 +90,17 @@ ${this.ISP_ENABLED ? `You have access to the following tools for ISP customer su
    - Returns: Account price, discounts, expiry dates, payment status
    - Example: "Check billing for +1234567890" → getBillingInfo(phoneNumber="+1234567890")
 
+5. **updateUserLocation** - Update location coordinates for a single user
+   - Use when user asks: "Update location for acc", "Set acc's location to coordinates", "Change user location"
+   - Returns: Success/failure status with coordinates
+   - Example: "Update location for acc" → updateUserLocation(userName="acc", latitude=33.8938, longitude=35.5018)
+   - Example: "Set josianeyoussef location" → updateUserLocation(userName="josianeyoussef", latitude=33.8938, longitude=35.5018)
+
+6. **updateMultipleUserLocations** - Update location for multiple users at once (batch processing)
+   - Use when user asks: "We have 5 users at tower location", "Update location for acc, jhonnyacc2, and 79174574", "Set location for multiple users"
+   - Returns: Success/failure status for each user with summary
+   - Example: "Update location for acc and jhonnyacc2" → updateMultipleUserLocations(userNames=["acc", "jhonnyacc2"], latitude=33.8938, longitude=35.5018)
+
 🎯 TOOL USAGE RULES:
 - Be DIRECT: Call tools immediately WITHOUT asking for confirmation
 - Handle phone numbers in various formats: +1234567890, 123-456-7890, (123) 456-7890, 123.456.7890
@@ -107,10 +118,25 @@ ${this.ISP_ENABLED ? `You have access to the following tools for ISP customer su
 
 🚨 TOOL EXECUTION RULES - CRITICAL:
 
-**1. Customer Lookup Tools:**
+**1. Customer Lookup Tools (READ Operations):**
 - getUserInfo, checkAccountStatus, getTechnicalDetails, getBillingInfo
 - These are READ operations that fetch CURRENT data from ISP system
 - When user asks for customer information with a specific phone number, ALWAYS call the appropriate tool
+
+**2. Location Update Tools (WRITE Operations):**
+- updateUserLocation, updateMultipleUserLocations
+- These are WRITE operations that UPDATE data in ISP system
+- Use when user wants to update location for one or more users
+- For single users: updateUserLocation(userName="acc", latitude=33.8938, longitude=35.5018)
+- For multiple users: updateMultipleUserLocations(userNames=["acc", "jhonnyacc2"], latitude=33.8938, longitude=35.5018)
+- **CRITICAL:** Always use the MOST RECENT location coordinates from the conversation!
+- Look for recent messages with "📍 Location shared: latitude, longitude" format
+- If user just sent a location via Telegram sharing, use those coordinates immediately
+- **IMPORTANT:** Recent location data appears as "📍 Location shared: 33.955007, 35.616232" in conversation
+- **NEVER use old coordinates from RAG memory when recent coordinates are available**
+- **PRIORITIZE:** Most recent location message > RAG location data > asking user
+- Location messages may include: latitude, longitude, place name, and address
+- **NEVER ask for coordinates if a location was shared in the current conversation**
 - For follow-up questions about recently discussed customers (within the same conversation), you can reference the data already provided
 - Use conversation context and RAG memory to recall previous customer information
 - Example: If you just showed customer details for +1234567890 and user asks "What's their IP?", reference the IP from the data you already provided
@@ -411,6 +437,7 @@ I will use this historical context to provide you with accurate, personalized re
                 userMessage, // User's message for context-aware date validation
             }
 
+    
             aiLogger.debug(
                 {
                     contextId,

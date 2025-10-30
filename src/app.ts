@@ -42,6 +42,7 @@ import {
     manualPhoneEntryFlow,
     voiceNoteFlow,
     mediaFlow,
+    locationFlow,
     pingFlow,
     mikrotikMonitorFlow,
     mikrotikUsersFlow,
@@ -113,6 +114,7 @@ async function main() {
         // Media flows (MUST be before welcome flow to catch media events)
         voiceNoteFlow,
         mediaFlow,
+        locationFlow,
 
         // Test flows (for development and testing)
         pingFlow,

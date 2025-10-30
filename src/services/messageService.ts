@@ -284,9 +284,35 @@ export class MessageService {
             for (const msg of messages) {
                 try {
                     if (msg.direction === 'incoming') {
+                        let content = msg.content || ''
+
+                        // Include location data in conversation history if available in metadata
+                        const metadata = msg.metadata || {}
+
+                        // Check for location data in both direct metadata and nested metadata
+                        const locationData = metadata.latitude && metadata.longitude ?
+                            metadata :
+                            (metadata.metadata ? metadata.metadata : null)
+
+                        if (locationData && locationData.latitude && locationData.longitude) {
+                            const locationInfo = [
+                                `📍 Location shared: ${locationData.latitude}, ${locationData.longitude}`,
+                                locationData.location_name ? `🏢 Place: ${locationData.location_name}` : null,
+                                locationData.address ? `📍 Address: ${locationData.address}` : null,
+                            ].filter(Boolean).join('\n')
+
+                            // For location messages, replace the event ID content with actual location info
+                            if (metadata.media_type === 'location' && content.startsWith('_event_location_')) {
+                                content = locationInfo
+                            } else {
+                                // Prepend location info to content or use as content if empty
+                                content = locationInfo + (content ? `\n\n${content}` : '')
+                            }
+                        }
+
                         modelMessages.push({
                             role: 'user',
-                            content: msg.content || '',
+                            content: content,
                         })
                     } else {
                         const metadata = msg.metadata || {}

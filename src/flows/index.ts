@@ -32,9 +32,10 @@ export { firstTimeUserFlow } from './personality/firstTimeFlow'
 export { userInfoFlow, manualPhoneEntryFlow } from './isp'
 export { mikrotikMonitorFlow, mikrotikUsersFlow } from './isp/mikrotikMonitorFlow'
 
-// Media flows (voice notes, images, videos)
+// Media flows (voice notes, images, videos, location)
 export { voiceNoteFlow } from './media/voiceFlow'
 export { mediaFlow } from './media/imageFlow'
+export { locationFlow } from './media/locationFlow'
 
 // Test flows (for development and testing)
 export { pingFlow } from './test'

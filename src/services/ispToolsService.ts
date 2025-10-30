@@ -419,6 +419,207 @@ const rawIspTools = {
             }
         },
     }),
+
+    /**
+     * Update user location coordinates
+     */
+    updateUserLocation: tool({
+        description: 'Update the location coordinates for a single user in the ISP system. Use when the user wants to update location for one specific person. Supports both usernames (e.g., acc, josianeyoussef) and phone numbers.',
+        inputSchema: z.object({
+            userName: z.string().describe('Username or phone number of the user to update location for (e.g., acc, josianeyoussef, jhonnyacc2, 79174574)'),
+            latitude: z.number().describe('Latitude coordinate (e.g., 33.8938). Must be between -90 and 90.'),
+            longitude: z.number().describe('Longitude coordinate (e.g., 35.5018). Must be between -180 and 180.'),
+        }),
+        execute: async (input, options) => {
+            const context = options.experimental_context as ToolExecutionContext
+
+            if (!context?.userPhone) {
+                throw new Error('Security error: userPhone not found in context')
+            }
+
+            toolLogger.info(
+                {
+                    userPhone: context.userPhone,
+                    userName: input.userName,
+                    latitude: input.latitude,
+                    longitude: input.longitude,
+                },
+                'Executing updateUserLocation tool'
+            )
+
+            try {
+                // Call ISP API to update user location
+                const result = await ispApiService.updateUserLocation(
+                    input.userName,
+                    input.latitude,
+                    input.longitude
+                )
+
+                if (result.success) {
+                    toolLogger.info(
+                        {
+                            userPhone: context.userPhone,
+                            userName: input.userName,
+                            latitude: input.latitude,
+                            longitude: input.longitude,
+                        },
+                        'User location updated successfully'
+                    )
+
+                    return {
+                        success: true,
+                        message: `✅ **Location Updated Successfully!**\n\n👤 **User:** ${input.userName}\n📍 **Coordinates:** ${input.latitude}, ${input.longitude}\n\nThe user's location has been updated in the ISP system.`,
+                        userName: input.userName,
+                        coordinates: {
+                            latitude: input.latitude,
+                            longitude: input.longitude,
+                        },
+                    }
+                } else {
+                    toolLogger.warn(
+                        {
+                            userPhone: context.userPhone,
+                            userName: input.userName,
+                            error: result.error,
+                        },
+                        'Failed to update user location in ISP system'
+                    )
+
+                    return {
+                        success: false,
+                        message: `❌ **Failed to Update Location**\n\n👤 **User:** ${input.userName}\n📍 **Coordinates:** ${input.latitude}, ${input.longitude}\n\n**Error:** ${result.error || 'Unknown error occurred'}\n\n**Possible reasons:**\n• User doesn't exist in the system\n• Invalid coordinates provided\n• API connectivity issues`,
+                        error: result.error,
+                        userName: input.userName,
+                    }
+                }
+            } catch (error) {
+                toolLogger.error(
+                    {
+                        err: error,
+                        userPhone: context.userPhone,
+                        userName: input.userName,
+                        latitude: input.latitude,
+                        longitude: input.longitude,
+                    },
+                    'Error in updateUserLocation tool'
+                )
+
+                return {
+                    success: false,
+                    message: `❌ **Error Updating Location**\n\nFailed to update location for ${input.userName}. Please check:\n• User exists in the system\n• Coordinates are valid (latitude: -90 to 90, longitude: -180 to 180)\n• API is accessible\n\n**Technical error:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    userName: input.userName,
+                }
+            }
+        },
+    }),
+
+    /**
+     * Update location for multiple users (batch processing)
+     */
+    updateMultipleUserLocations: tool({
+        description: 'Update location coordinates for multiple users at once. Use when the user wants to update the same location for several users (e.g., "we have 5 users at the tower location" or "update acc, jhonnyacc2, and 79174574").',
+        inputSchema: z.object({
+            userNames: z.array(z.string()).describe('Array of usernames or phone numbers to update location for (e.g., ["acc", "jhonnyacc2", "79174574"])'),
+            latitude: z.number().describe('Latitude coordinate (e.g., 33.8938). Must be between -90 and 90.'),
+            longitude: z.number().describe('Longitude coordinate (e.g., 35.5018). Must be between -180 and 180.'),
+        }),
+        execute: async (input, options) => {
+            const context = options.experimental_context as ToolExecutionContext
+
+            if (!context?.userPhone) {
+                throw new Error('Security error: userPhone not found in context')
+            }
+
+            toolLogger.info(
+                {
+                    userPhone: context.userPhone,
+                    userCount: input.userNames.length,
+                    userNames: input.userNames,
+                    latitude: input.latitude,
+                    longitude: input.longitude,
+                },
+                'Executing updateMultipleUserLocations tool'
+            )
+
+            try {
+                // Prepare user locations array for batch processing
+                const userLocations = input.userNames.map(userName => ({
+                    userName: userName.trim(),
+                    latitude: input.latitude,
+                    longitude: input.longitude
+                }))
+
+                // Call ISP API for batch update
+                const result = await ispApiService.updateMultipleUserLocations(userLocations)
+
+                // Format success message with detailed results
+                const successUsers = result.results.filter(r => r.success)
+                const failedUsers = result.results.filter(r => !r.success)
+
+                let message = `📍 **Batch Location Update Complete**\n\n`
+                message += `📊 **Summary:** ${result.summary.successful}/${result.summary.total} successful\n\n`
+
+                if (successUsers.length > 0) {
+                    message += `✅ **Successfully Updated (${successUsers.length}):**\n`
+                    successUsers.forEach(user => {
+                        message += `• @${user.userName}\n`
+                    })
+                }
+
+                if (failedUsers.length > 0) {
+                    message += `\n❌ **Failed to Update (${failedUsers.length}):**\n`
+                    failedUsers.forEach(user => {
+                        message += `• @${user.userName} - ${user.error || 'Unknown error'}\n`
+                    })
+                }
+
+                message += `\n🌐 **Location:** ${input.latitude}, ${input.longitude}`
+
+                toolLogger.info(
+                    {
+                        userPhone: context.userPhone,
+                        totalUsers: result.summary.total,
+                        successful: result.summary.successful,
+                        failed: result.summary.failed,
+                        latitude: input.latitude,
+                        longitude: input.longitude,
+                    },
+                    'Batch location update completed'
+                )
+
+                return {
+                    success: result.summary.successful > 0,
+                    message,
+                    summary: result.summary,
+                    results: result.results,
+                    coordinates: {
+                        latitude: input.latitude,
+                        longitude: input.longitude,
+                    },
+                }
+
+            } catch (error) {
+                toolLogger.error(
+                    {
+                        err: error,
+                        userPhone: context.userPhone,
+                        userNames: input.userNames,
+                        latitude: input.latitude,
+                        longitude: input.longitude,
+                    },
+                    'Error in updateMultipleUserLocations tool'
+                )
+
+                return {
+                    success: false,
+                    message: `❌ **Batch Update Error**\n\nFailed to update locations for ${input.userNames.length} users. Please check:\n• All users exist in the system\n• Coordinates are valid\n• API is accessible\n\n**Technical error:** ${error instanceof Error ? error.message : 'Unknown error'}`,
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    userNames: input.userNames,
+                }
+            }
+        },
+    }),
 }
 
 /**
@@ -448,4 +649,6 @@ export const ISP_TOOL_NAMES = {
     GET_TECHNICAL_DETAILS: 'getTechnicalDetails',
     GET_BILLING_INFO: 'getBillingInfo',
     GET_MIKROTIK_USER_LIST: 'getMikrotikUserList',
+    UPDATE_USER_LOCATION: 'updateUserLocation',
+    UPDATE_MULTIPLE_USER_LOCATIONS: 'updateMultipleUserLocations',
 } as const
