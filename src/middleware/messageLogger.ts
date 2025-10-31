@@ -1,65 +1,14 @@
 import { messageService } from '~/services/messageService'
-import { BotCtx, BotUtils } from '~/types'
 
 /**
- * Middleware to log incoming messages
- * Call this at the beginning of each flow
- */
-export async function logIncomingMessage(ctx: BotCtx, utils: BotUtils): Promise<void> {
-    try {
-        await messageService.logIncomingMessage(ctx)
-        console.log(`📥 Logged incoming message from ${ctx.from}`)
-    } catch (error) {
-        console.error('❌ Failed to log incoming message:', error)
-        // Don't throw - we don't want to break the flow if logging fails
-    }
-}
-
-/**
- * Wrapper for flowDynamic to log outgoing messages
- * Use this instead of flowDynamic directly
- */
-export async function flowDynamicWithLogging(
-    ctx: BotCtx,
-    utils: BotUtils,
-    message: string | string[]
-): Promise<void> {
-    try {
-        // Send the message
-        await utils.flowDynamic(message)
-
-        // Log each message
-        const messages = Array.isArray(message) ? message : [message]
-        for (const msg of messages) {
-            await messageService.logOutgoingMessage(ctx.from, ctx.from, msg, undefined, {
-                method: 'flowDynamic',
-            })
-        }
-
-        console.log(`📤 Logged outgoing message to ${ctx.from}`)
-    } catch (error) {
-        console.error('❌ Failed to send/log outgoing message:', error)
-        throw error // We DO want to throw here since message sending failed
-    }
-}
-
-/**
- * Create a wrapper for bot utils that automatically logs messages
- */
-export function createLoggingUtils(ctx: BotCtx, utils: BotUtils): BotUtils & {
-    flowDynamicLogged: (message: string | string[]) => Promise<void>
-} {
-    return {
-        ...utils,
-        flowDynamicLogged: async (message: string | string[]) => {
-            await flowDynamicWithLogging(ctx, utils, message)
-        },
-    }
-}
-
-/**
- * Global message logger that can be called from anywhere
- * Logs both incoming and outgoing messages automatically
+ * Global message logger for event-based message logging
+ *
+ * Used in src/app.ts event handlers:
+ * - provider.on('message') → logIncoming()
+ * - provider.on('send_message') → logOutgoing()
+ *
+ * Note: Manual middleware functions removed (logIncomingMessage, flowDynamicWithLogging, createLoggingUtils)
+ * as they are replaced by automatic event-based logging in app.ts
  */
 export class MessageLogger {
     /**

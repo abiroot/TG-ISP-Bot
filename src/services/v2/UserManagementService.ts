@@ -30,6 +30,21 @@ import type { Personality, CreatePersonality, UpdatePersonality } from '~/databa
 const userMgmtLogger = createFlowLogger('user-management')
 
 /**
+ * User Management Service Error with structured error codes
+ */
+export class UserManagementServiceError extends Error {
+    constructor(
+        message: string,
+        public readonly code: string,
+        public readonly cause?: unknown,
+        public readonly retryable: boolean = false
+    ) {
+        super(message)
+        this.name = 'UserManagementServiceError'
+    }
+}
+
+/**
  * User Management Service
  *
  * Centralized service for all user-related operations
@@ -54,7 +69,12 @@ export class UserManagementService {
             return await personalityRepository.getByContextId(contextId)
         } catch (error) {
             userMgmtLogger.error({ err: error, contextId }, 'Failed to get personality')
-            throw error
+            throw new UserManagementServiceError(
+                'Failed to retrieve personality',
+                'PERSONALITY_FETCH_ERROR',
+                error,
+                true // Database errors may be transient
+            )
         }
     }
 
@@ -68,7 +88,12 @@ export class UserManagementService {
             return personality
         } catch (error) {
             userMgmtLogger.error({ err: error, contextId: data.context_id }, 'Failed to create personality')
-            throw error
+            throw new UserManagementServiceError(
+                'Failed to create personality',
+                'PERSONALITY_CREATE_ERROR',
+                error,
+                true // Database errors may be transient
+            )
         }
     }
 
@@ -82,7 +107,12 @@ export class UserManagementService {
             return personality
         } catch (error) {
             userMgmtLogger.error({ err: error, contextId }, 'Failed to update personality')
-            throw error
+            throw new UserManagementServiceError(
+                'Failed to update personality',
+                'PERSONALITY_UPDATE_ERROR',
+                error,
+                true // Database errors may be transient
+            )
         }
     }
 
@@ -99,7 +129,12 @@ export class UserManagementService {
             return deleted
         } catch (error) {
             userMgmtLogger.error({ err: error, contextId }, 'Failed to delete personality')
-            throw error
+            throw new UserManagementServiceError(
+                'Failed to delete personality',
+                'PERSONALITY_DELETE_ERROR',
+                error,
+                true // Database errors may be transient
+            )
         }
     }
 
@@ -122,6 +157,7 @@ export class UserManagementService {
             }
         } catch (error) {
             userMgmtLogger.error({ err: error, from }, 'Failed to check whitelist')
+            // Return false on error rather than throwing (fail open for better UX)
             return false
         }
     }
@@ -259,7 +295,12 @@ export class UserManagementService {
             return result
         } catch (error) {
             userMgmtLogger.error({ err: error, userIdentifier }, 'Failed to delete user data')
-            throw error
+            throw new UserManagementServiceError(
+                'Failed to delete user data (GDPR)',
+                'USER_DATA_DELETE_ERROR',
+                error,
+                false // GDPR deletions should not auto-retry
+            )
         }
     }
 

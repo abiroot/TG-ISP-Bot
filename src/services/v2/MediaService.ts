@@ -28,6 +28,21 @@ import { unlink } from 'fs/promises'
 const mediaLogger = createFlowLogger('media-service')
 
 /**
+ * Media Service Error with structured error codes
+ */
+export class MediaServiceError extends Error {
+    constructor(
+        message: string,
+        public readonly code: string,
+        public readonly cause?: unknown,
+        public readonly retryable: boolean = false
+    ) {
+        super(message)
+        this.name = 'MediaServiceError'
+    }
+}
+
+/**
  * Transcription result
  */
 export interface TranscriptionResult {
@@ -110,7 +125,12 @@ export class MediaService {
             })
 
             if (!response.ok) {
-                throw new Error(`Transcription failed: ${response.statusText}`)
+                throw new MediaServiceError(
+                    `Transcription failed: ${response.statusText}`,
+                    'TRANSCRIPTION_API_ERROR',
+                    undefined,
+                    response.status >= 500 || response.status === 429 // Retry on server errors or rate limits
+                )
             }
 
             const result = await response.json()
@@ -134,8 +154,17 @@ export class MediaService {
                 transcriptionTimeMs,
             }
         } catch (error) {
+            if (error instanceof MediaServiceError) {
+                throw error
+            }
+
             mediaLogger.error({ err: error, audioPath }, 'Voice transcription failed')
-            throw error
+            throw new MediaServiceError(
+                'Transcription failed with network error',
+                'TRANSCRIPTION_NETWORK_ERROR',
+                error,
+                true // Network errors are retryable
+            )
         }
     }
 
@@ -187,7 +216,12 @@ export class MediaService {
             }
         } catch (error) {
             mediaLogger.error({ err: error, imageUrl }, 'Image analysis failed')
-            throw error
+            throw new MediaServiceError(
+                'Image analysis failed',
+                'IMAGE_ANALYSIS_ERROR',
+                error,
+                true // AI errors may be transient
+            )
         }
     }
 
@@ -262,7 +296,12 @@ export class MediaService {
             }
         } catch (error) {
             mediaLogger.error({ err: error, imageUrl }, 'Structured image analysis failed')
-            throw error
+            throw new MediaServiceError(
+                'Structured image analysis failed',
+                'STRUCTURED_ANALYSIS_ERROR',
+                error,
+                true // AI errors may be transient
+            )
         }
     }
 
@@ -300,7 +339,12 @@ export class MediaService {
             }
         } catch (error) {
             mediaLogger.error({ err: error, imageUrl }, 'Text extraction failed')
-            throw error
+            throw new MediaServiceError(
+                'Text extraction failed',
+                'OCR_ERROR',
+                error,
+                true // AI errors may be transient
+            )
         }
     }
 

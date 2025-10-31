@@ -27,6 +27,21 @@ import type { Personality } from '~/database/schemas/personality'
 const ispLogger = createFlowLogger('isp-service')
 
 /**
+ * ISP Service Error with structured error codes
+ */
+export class ISPServiceError extends Error {
+    constructor(
+        message: string,
+        public readonly code: string,
+        public readonly cause?: unknown,
+        public readonly retryable: boolean = false
+    ) {
+        super(message)
+        this.name = 'ISPServiceError'
+    }
+}
+
+/**
  * ISP User Information (complete - matches API response)
  */
 export interface ISPUserInfo {
@@ -189,7 +204,12 @@ export class ISPService {
             })
 
             if (!response.ok) {
-                throw new Error(`Authentication failed: ${response.statusText}`)
+                throw new ISPServiceError(
+                    `Authentication failed: ${response.statusText}`,
+                    'AUTH_FAILED',
+                    undefined,
+                    response.status >= 500 // Retry on server errors
+                )
             }
 
             // API returns raw JWT token (not JSON)
@@ -200,8 +220,17 @@ export class ISPService {
             ispLogger.info('ISP API authentication successful')
             return this.authToken
         } catch (error) {
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
             ispLogger.error({ err: error }, 'ISP API authentication failed')
-            throw error
+            throw new ISPServiceError(
+                'Authentication failed with network error',
+                'AUTH_NETWORK_ERROR',
+                error,
+                true // Network errors are retryable
+            )
         }
     }
 
@@ -211,7 +240,12 @@ export class ISPService {
      */
     async searchCustomer(identifier: string): Promise<ISPUserInfo[]> {
         if (!this.config.enabled) {
-            throw new Error('ISP service is disabled')
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
         }
 
         try {
@@ -229,9 +263,16 @@ export class ISPService {
 
             if (!response.ok) {
                 if (response.status === 404) {
+                    // Not found is not an error - return empty array
                     return []
                 }
-                throw new Error(`Customer search failed: ${response.statusText}`)
+
+                throw new ISPServiceError(
+                    `Customer search failed: ${response.statusText}`,
+                    'SEARCH_FAILED',
+                    undefined,
+                    response.status >= 500 // Retry on server errors
+                )
             }
 
             const data = await response.json()
@@ -244,8 +285,17 @@ export class ISPService {
 
             return users
         } catch (error) {
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
             ispLogger.error({ err: error, identifier }, 'Customer search failed')
-            throw error
+            throw new ISPServiceError(
+                'Customer search failed with network error',
+                'SEARCH_NETWORK_ERROR',
+                error,
+                true // Network errors are retryable
+            )
         }
     }
 
@@ -258,7 +308,12 @@ export class ISPService {
         longitude: number
     ): Promise<{ success: boolean; error?: string }> {
         if (!this.config.enabled) {
-            throw new Error('ISP service is disabled')
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
         }
 
         try {
@@ -275,14 +330,27 @@ export class ISPService {
 
             if (!response.ok) {
                 const error = await response.text()
+                ispLogger.warn(
+                    { userName, latitude, longitude, error },
+                    'Location update failed'
+                )
                 return { success: false, error }
             }
 
             ispLogger.info({ userName, latitude, longitude }, 'User location updated')
             return { success: true }
         } catch (error) {
-            ispLogger.error({ err: error, userName }, 'Location update failed')
-            return { success: false, error: error.message }
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
+            ispLogger.error({ err: error, userName }, 'Location update failed with network error')
+            throw new ISPServiceError(
+                'Location update failed with network error',
+                'LOCATION_UPDATE_NETWORK_ERROR',
+                error,
+                true // Network errors are retryable
+            )
         }
     }
 
@@ -296,21 +364,43 @@ export class ISPService {
         results: Array<{ userName: string; success: boolean; error?: string }>
     }> {
         if (!this.config.enabled) {
-            throw new Error('ISP service is disabled')
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
         }
 
         const results: Array<{ userName: string; success: boolean; error?: string }> = []
 
         for (const update of updates) {
-            const result = await this.updateUserLocation(
-                update.userName,
-                update.latitude,
-                update.longitude
-            )
-            results.push({
-                userName: update.userName,
-                ...result,
-            })
+            try {
+                const result = await this.updateUserLocation(
+                    update.userName,
+                    update.latitude,
+                    update.longitude
+                )
+                results.push({
+                    userName: update.userName,
+                    ...result,
+                })
+            } catch (error) {
+                // Catch ISPServiceError and convert to result format
+                if (error instanceof ISPServiceError) {
+                    results.push({
+                        userName: update.userName,
+                        success: false,
+                        error: `${error.code}: ${error.message}`,
+                    })
+                } else {
+                    results.push({
+                        userName: update.userName,
+                        success: false,
+                        error: 'Unknown error occurred',
+                    })
+                }
+            }
         }
 
         const summary = {
