@@ -6,6 +6,8 @@
 
 import type { BotMethods } from '@builderbot/bot/dist/types'
 import type { TelegramProvider } from '@builderbot-plugins/telegram'
+import type { BotCtx, BotUtils } from '~/types'
+import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 
 /**
  * Escape HTML special characters to prevent rendering issues
@@ -95,8 +97,8 @@ export function markdownToHtml(text: string): string {
  * ```
  */
 export async function sendFormattedMessage(
-    ctx: any,
-    utils: BotMethods<any, any>,
+    ctx: BotCtx,
+    utils: BotMethods<TelegramProvider, Database>,
     message: string | string[],
     options?: {
         delay?: number
@@ -144,8 +146,8 @@ export async function sendFormattedMessage(
  * ```
  */
 export async function sendMarkdownAsHtml(
-    ctx: any,
-    utils: BotMethods<any, any>,
+    ctx: BotCtx,
+    utils: BotMethods<TelegramProvider, Database>,
     markdownText: string | string[],
     options?: {
         delay?: number

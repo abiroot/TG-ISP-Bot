@@ -1,4 +1,5 @@
 import { messageService } from '~/services/messageService'
+import type { BotCtx, ExtendedJsonValue } from '~/types'
 
 /**
  * Global message logger for event-based message logging
@@ -14,7 +15,7 @@ export class MessageLogger {
     /**
      * Log incoming message
      */
-    static async logIncoming(ctx: any): Promise<void> {
+    static async logIncoming(ctx: BotCtx): Promise<void> {
         try {
             await messageService.logIncomingMessage(ctx)
         } catch (error) {
@@ -30,7 +31,7 @@ export class MessageLogger {
         recipient: string,
         content: string,
         messageId?: string,
-        metadata?: Record<string, any>
+        metadata?: Record<string, ExtendedJsonValue>
     ): Promise<void> {
         try {
             await messageService.logOutgoingMessage(contextId, recipient, content, messageId, metadata)
@@ -49,7 +50,7 @@ export class MessageLogger {
         mediaUrl: string,
         mediaType: string,
         messageId?: string,
-        metadata?: Record<string, any>
+        metadata?: Record<string, ExtendedJsonValue>
     ): Promise<void> {
         try {
             await messageService.logOutgoingMediaMessage(

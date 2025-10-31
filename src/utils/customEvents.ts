@@ -6,6 +6,7 @@
  */
 
 import { createFlowLogger } from './logger'
+import type { BotInstance, JsonValue, Personality } from '~/types'
 
 const logger = createFlowLogger('events')
 
@@ -29,7 +30,7 @@ export type CustomEventName = (typeof CUSTOM_EVENTS)[keyof typeof CUSTOM_EVENTS]
 export interface CustomEventPayload {
     eventName: CustomEventName
     from: string
-    data?: Record<string, any>
+    data?: Record<string, JsonValue>
     timestamp: number
 }
 
@@ -38,10 +39,10 @@ export interface CustomEventPayload {
  * Can be used with bot.dispatch() to trigger flows
  */
 export function dispatchCustomEvent(
-    bot: any,
+    bot: BotInstance,
     eventName: CustomEventName,
     from: string,
-    data?: Record<string, any>
+    data?: Record<string, JsonValue>
 ): void {
     const payload: CustomEventPayload = {
         eventName,
@@ -61,8 +62,8 @@ export function dispatchCustomEvent(
 /**
  * Setup complete event
  */
-export function dispatchSetupComplete(bot: any, from: string, personality: any): void {
-    dispatchCustomEvent(bot, CUSTOM_EVENTS.SETUP_COMPLETE, from, {
+export function dispatchSetupComplete(bot: BotInstance | unknown, from: string, personality: Personality): void {
+    dispatchCustomEvent(bot as BotInstance, CUSTOM_EVENTS.SETUP_COMPLETE, from, {
         botName: personality.bot_name,
         timezone: personality.default_timezone,
         language: personality.default_language,
@@ -72,7 +73,7 @@ export function dispatchSetupComplete(bot: any, from: string, personality: any):
 /**
  * Transcription complete event
  */
-export function dispatchTranscriptionComplete(bot: any, from: string, transcription: string): void {
+export function dispatchTranscriptionComplete(bot: BotInstance, from: string, transcription: string): void {
     dispatchCustomEvent(bot, CUSTOM_EVENTS.TRANSCRIPTION_COMPLETE, from, {
         transcription: transcription.substring(0, 100), // First 100 chars for logging
         length: transcription.length,
@@ -82,17 +83,17 @@ export function dispatchTranscriptionComplete(bot: any, from: string, transcript
 /**
  * Image analysis complete event
  */
-export function dispatchImageAnalysisComplete(bot: any, from: string, analysis: any): void {
+export function dispatchImageAnalysisComplete(bot: BotInstance, from: string, analysis: { content?: string }): void {
     dispatchCustomEvent(bot, CUSTOM_EVENTS.IMAGE_ANALYSIS_COMPLETE, from, {
-        hasContent: analysis.content?.length > 0,
-        contentLength: analysis.content?.length || 0,
+        hasContent: (analysis.content?.length ?? 0) > 0,
+        contentLength: analysis.content?.length ?? 0,
     })
 }
 
 /**
  * AI response generated event
  */
-export function dispatchAIResponseGenerated(bot: any, from: string, responseLength: number, durationMs: number): void {
+export function dispatchAIResponseGenerated(bot: BotInstance, from: string, responseLength: number, durationMs: number): void {
     dispatchCustomEvent(bot, CUSTOM_EVENTS.AI_RESPONSE_GENERATED, from, {
         responseLength,
         durationMs,
@@ -103,7 +104,7 @@ export function dispatchAIResponseGenerated(bot: any, from: string, responseLeng
  * User whitelisted event
  */
 export function dispatchUserWhitelisted(
-    bot: any,
+    bot: BotInstance,
     from: string,
     targetId: string,
     type: 'group' | 'number',
@@ -119,7 +120,7 @@ export function dispatchUserWhitelisted(
 /**
  * Maintenance mode toggled event
  */
-export function dispatchMaintenanceModeToggled(bot: any, enabled: boolean, triggeredBy: string): void {
+export function dispatchMaintenanceModeToggled(bot: BotInstance, enabled: boolean, triggeredBy: string): void {
     const eventName = enabled ? CUSTOM_EVENTS.MAINTENANCE_MODE_ENABLED : CUSTOM_EVENTS.MAINTENANCE_MODE_DISABLED
 
     dispatchCustomEvent(bot, eventName, triggeredBy, {
@@ -130,7 +131,7 @@ export function dispatchMaintenanceModeToggled(bot: any, enabled: boolean, trigg
 /**
  * Rate limit exceeded event
  */
-export function dispatchRateLimitExceeded(bot: any, from: string, count: number, maxRequests: number): void {
+export function dispatchRateLimitExceeded(bot: BotInstance, from: string, count: number, maxRequests: number): void {
     dispatchCustomEvent(bot, CUSTOM_EVENTS.RATE_LIMIT_EXCEEDED, from, {
         count,
         maxRequests,
@@ -142,7 +143,7 @@ export function dispatchRateLimitExceeded(bot: any, from: string, count: number,
  * Feature toggled event
  */
 export function dispatchFeatureToggled(
-    bot: any,
+    bot: BotInstance,
     feature: string,
     enabled: boolean,
     triggeredBy: string

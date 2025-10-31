@@ -245,7 +245,7 @@ export async function sendWithInlineButtons(
             options?.media,
             {
                 ...options?.metadata,
-                buttons: inlineKeyboard,
+                buttons: inlineKeyboard as unknown as import('~/types').ExtendedJsonValue,
                 button_type: 'inline',
             }
         )
@@ -349,7 +349,7 @@ export async function sendWithReplyButtons(
             options?.media,
             {
                 ...options?.metadata,
-                buttons: replyKeyboard,
+                buttons: replyKeyboard as unknown as import('~/types').ExtendedJsonValue,
                 button_type: 'reply',
                 keyboard_options: {
                     one_time: options?.oneTime,

@@ -35,7 +35,7 @@ export interface RequiredServiceExtensions extends Required<ServiceExtensions> {
  * Bot utils with optional extensions (for general use)
  * Used during initialization or in contexts where extensions might not be available
  */
-export type BotUtils = BotMethods<any, any> & {
+export type BotUtils = BotMethods<TelegramProvider, Database> & {
     extensions?: ServiceExtensions
 }
 
@@ -51,7 +51,7 @@ export type BotUtils = BotMethods<any, any> & {
  * })
  * ```
  */
-export type BotUtilsWithExtensions = BotMethods<any, any> & {
+export type BotUtilsWithExtensions = BotMethods<TelegramProvider, Database> & {
     extensions: RequiredServiceExtensions
 }
 
@@ -105,3 +105,27 @@ export interface OutgoingMessagePayload {
     answer: string
     from: string
 }
+
+// JSON-safe types for metadata
+export type JsonPrimitive = string | number | boolean | null
+export type JsonObject = { [key: string]: JsonValue }
+export type JsonArray = JsonValue[]
+export type JsonValue = JsonPrimitive | JsonObject | JsonArray
+
+// Extended JSON value that allows objects without index signatures (for buttons, etc.)
+export type ExtendedJsonValue = JsonValue | Record<string, unknown> | Array<Record<string, unknown>>
+
+// Database row types (generic, can be extended by repositories)
+export interface DatabaseRow {
+    [key: string]: JsonValue | Date | undefined
+}
+
+// Bot instance type for custom events
+export interface BotInstance {
+    dispatch?: (event: string, ctx: Partial<BotCtx>) => Promise<void> | void
+    [key: string]: JsonValue | Function | undefined
+}
+
+// Personality type (re-export for convenience)
+export type { Personality } from '~/database/schemas/personality'
+export type { Message } from '~/database/schemas/message'

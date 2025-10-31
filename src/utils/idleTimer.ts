@@ -6,6 +6,9 @@
  */
 
 import type { BotMethods } from '@builderbot/bot/dist/types'
+import type { BotCtx, BotUtils } from '~/types'
+import { TelegramProvider } from '@builderbot-plugins/telegram'
+import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 
 interface IdleTimer {
     timerId: NodeJS.Timeout
@@ -23,8 +26,8 @@ class IdleTimerManager {
      * @param onTimeout Optional custom timeout handler
      */
     start(
-        ctx: any,
-        gotoFlow: BotMethods<any, any>['gotoFlow'],
+        ctx: BotCtx,
+        gotoFlow: BotMethods<TelegramProvider, Database>['gotoFlow'],
         timeoutMs: number,
         onTimeout?: () => Promise<void>
     ): void {
@@ -58,8 +61,8 @@ class IdleTimerManager {
      * @param onTimeout Optional custom timeout handler
      */
     reset(
-        ctx: any,
-        gotoFlow: BotMethods<any, any>['gotoFlow'],
+        ctx: BotCtx,
+        gotoFlow: BotMethods<TelegramProvider, Database>['gotoFlow'],
         timeoutMs: number,
         onTimeout?: () => Promise<void>
     ): void {
@@ -75,7 +78,7 @@ class IdleTimerManager {
      * Stop the inactivity timer
      * @param ctx Bot context
      */
-    stop(ctx: any): void {
+    stop(ctx: BotCtx): void {
         const contextId = ctx.from
         const timer = this.timers.get(contextId)
 
@@ -91,7 +94,7 @@ class IdleTimerManager {
      * @param ctx Bot context
      * @returns true if timer is active
      */
-    isActive(ctx: any): boolean {
+    isActive(ctx: BotCtx): boolean {
         return this.timers.has(ctx.from)
     }
 
@@ -112,17 +115,17 @@ export const idleTimer = new IdleTimerManager()
 
 // Convenience functions for easier usage in flows
 export const startIdleTimer = (
-    ctx: any,
-    gotoFlow: BotMethods<any, any>['gotoFlow'],
+    ctx: BotCtx,
+    gotoFlow: BotMethods<TelegramProvider, Database>['gotoFlow'],
     timeoutMs: number,
     onTimeout?: () => Promise<void>
 ) => idleTimer.start(ctx, gotoFlow, timeoutMs, onTimeout)
 
 export const resetIdleTimer = (
-    ctx: any,
-    gotoFlow: BotMethods<any, any>['gotoFlow'],
+    ctx: BotCtx,
+    gotoFlow: BotMethods<TelegramProvider, Database>['gotoFlow'],
     timeoutMs: number,
     onTimeout?: () => Promise<void>
 ) => idleTimer.reset(ctx, gotoFlow, timeoutMs, onTimeout)
 
-export const stopIdleTimer = (ctx: any) => idleTimer.stop(ctx)
+export const stopIdleTimer = (ctx: BotCtx) => idleTimer.stop(ctx)
