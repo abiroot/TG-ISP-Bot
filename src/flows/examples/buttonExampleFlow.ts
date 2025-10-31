@@ -7,7 +7,7 @@
  * Trigger: /buttons
  */
 
-import { addKeyword, EVENTS } from '@builderbot/bot'
+import { addKeyword, EVENTS, utils } from '@builderbot/bot'
 import { sendWithInlineButtons, sendWithReplyButtons, editButtonsOnly } from '~/utils/flowHelpers'
 import {
     createCallbackButton,
@@ -33,10 +33,10 @@ export const buttonExampleFlow = addKeyword<any, any>(['/buttons', 'buttons'])
     .addAnswer('🎮 *Button Examples*\n\nThis flow demonstrates all button types and patterns.', {
         delay: 100,
     })
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '📋 <b>Choose a category to explore:</b>',
             [
                 [createCallbackButton('📱 Inline Keyboards', 'demo_inline')],
@@ -54,10 +54,10 @@ export const buttonExampleFlow = addKeyword<any, any>(['/buttons', 'buttons'])
 // ============================================================================
 
 export const inlineKeyboardDemoFlow = addKeyword<any, any>('BUTTON_DEMO_INLINE').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '📱 <b>Inline Keyboard Demo</b>\n\n' +
                 'Inline keyboards appear directly below messages. ' +
                 'They stay with the message and can trigger callbacks.\n\n' +
@@ -85,10 +85,10 @@ export const inlineKeyboardDemoFlow = addKeyword<any, any>('BUTTON_DEMO_INLINE')
 // ============================================================================
 
 export const replyKeyboardDemoFlow = addKeyword<any, any>('BUTTON_DEMO_REPLY').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithReplyButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '⌨️ <b>Reply Keyboard Demo</b>\n\n' +
                 'Reply keyboards replace the regular keyboard. ' +
                 'When you tap a button, it sends that text as a message.\n\n' +
@@ -239,10 +239,10 @@ export const counterResetFlow = addKeyword<any, any>('BUTTON_COUNTER_RESET').add
 // ============================================================================
 
 export const confirmationDemoFlow = addKeyword<any, any>('BUTTON_DEMO_CONFIRM').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '✅ <b>Confirmation Demo</b>\n\n' +
                 'Buttons are great for confirmations. This prevents accidental actions.\n\n' +
                 'Try the examples below:',
@@ -259,10 +259,10 @@ export const confirmationDemoFlow = addKeyword<any, any>('BUTTON_DEMO_CONFIRM').
 
 // Confirmation handlers
 export const confirmDeleteFlow = addKeyword<any, any>('BUTTON_CONFIRM_DELETE').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '⚠️ <b>Confirm Deletion</b>\n\n' +
                 'Are you sure you want to delete this item?\n' +
                 'This action cannot be undone!',
@@ -289,10 +289,10 @@ export const confirmDeleteNoFlow = addKeyword<any, any>('BUTTON_DELETE_NO').addA
 // ============================================================================
 
 export const specialButtonsDemoFlow = addKeyword<any, any>('BUTTON_DEMO_SPECIAL').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '🔗 <b>Special Buttons Demo</b>\n\n' +
                 'Telegram supports various special button types:\n\n' +
                 '• URL buttons open links\n' +
@@ -319,10 +319,10 @@ export const specialButtonsDemoFlow = addKeyword<any, any>('BUTTON_DEMO_SPECIAL'
 // ============================================================================
 
 export const demoBackFlow = addKeyword<any, any>('BUTTON_DEMO_BACK').addAction(
-    async (ctx, { flowDynamic }) => {
+    async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '📋 <b>Choose a category to explore:</b>',
             [
                 [createCallbackButton('📱 Inline Keyboards', 'demo_inline')],

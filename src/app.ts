@@ -198,7 +198,7 @@ async function main() {
     const { toolExecutionAuditService } = await import('~/services/toolExecutionAuditService')
 
     // Create bot with queue configuration and extensions
-    const { handleCtx, httpServer } = await createBot(
+    const botInstance = await createBot(
         {
             flow: adapterFlow,
             provider: adapterProvider,
@@ -271,7 +271,7 @@ async function main() {
                 const chatId = callbackQuery.message?.chat?.id
                 const userId = callbackQuery.from.id
 
-                loggers.telegram.debug(
+                loggers.telegram.info(
                     { callbackData, chatId, userId },
                     'Received callback_query event'
                 )
@@ -288,23 +288,23 @@ async function main() {
                 // This allows flows to handle button clicks via addKeyword('BUTTON_...')
                 const eventName = `BUTTON_${prefix.toUpperCase()}`
 
-                loggers.telegram.debug(
+                loggers.telegram.info(
                     { eventName, prefix, data, chatId },
                     'Dispatching button event to flows'
                 )
 
-                // Create a synthetic message context for the button click
-                const syntheticCtx = {
+                // Manually emit message event to simulate dispatch
+                // We can't use bot.dispatch() outside HTTP context, so we replicate its behavior
+                // The issue is that setEvent() uses dynamic encryption keys that we don't have access to
+                // WORKAROUND: Emit directly to provider's message event without encryption
+                // and use raw string event names in flows instead of utils.setEvent()
+                adapterProvider.emit('message', {
                     from: chatId?.toString() || userId.toString(),
-                    body: eventName, // Event name for keyword matching
+                    body: eventName, // Send event name as body (flows will match with raw string)
                     name: callbackQuery.from.first_name || 'User',
-                    pushName: callbackQuery.from.first_name || 'User',
-                    _callback_query: callbackQuery, // Original callback query
-                    _button_data: data, // Parsed data after colon
-                }
-
-                // Handle the context through the bot's flow system
-                await (handleCtx as any)(syntheticCtx)
+                    _callback_query: callbackQuery, // Original callback query for flow access
+                    _button_data: data, // Parsed data after colon for convenience
+                })
             } catch (error) {
                 loggers.telegram.error({ err: error }, 'Failed to handle callback_query')
                 // Try to answer callback query even on error
@@ -336,7 +336,7 @@ async function main() {
 
     // Start HTTP server
     // Note: TwilioProvider doesn't have initHttpServer method, using httpServer from createBot
-    httpServer(PORT)
+    botInstance.httpServer(PORT)
 
     // Start RAG embedding worker service
     try {

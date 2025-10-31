@@ -201,7 +201,29 @@ export async function sendWithInlineButtons(
     options?: ButtonMessageOptions
 ): Promise<void> {
     try {
+        // Validate inputs
+        if (!message || typeof message !== 'string') {
+            throw new Error('Message text is required and must be a string')
+        }
+
+        if (message.length > 4096) {
+            throw new Error(`Message text too long (${message.length} characters, max 4096)`)
+        }
+
+        if (!buttons || !Array.isArray(buttons)) {
+            throw new Error('Buttons must be a 2D array of button configurations')
+        }
+
         const provider = utils.provider as TelegramProvider
+
+        if (!provider?.vendor?.telegram?.sendMessage) {
+            throw new Error(
+                'Telegram provider not available - ensure you pass the full utils object including provider. ' +
+                'Use: async (ctx, { flowDynamic, provider }) => { ... } and pass utils instead of { flowDynamic } as any'
+            )
+        }
+
+        // Convert and validate buttons (throws if invalid)
         const inlineKeyboard = createInlineKeyboard(buttons)
 
         // Build message options
@@ -274,7 +296,29 @@ export async function sendWithReplyButtons(
     } & ButtonMessageOptions
 ): Promise<void> {
     try {
+        // Validate inputs
+        if (!message || typeof message !== 'string') {
+            throw new Error('Message text is required and must be a string')
+        }
+
+        if (message.length > 4096) {
+            throw new Error(`Message text too long (${message.length} characters, max 4096)`)
+        }
+
+        if (!buttons || !Array.isArray(buttons)) {
+            throw new Error('Buttons must be a 2D array of button configurations')
+        }
+
         const provider = utils.provider as TelegramProvider
+
+        if (!provider?.vendor?.telegram?.sendMessage) {
+            throw new Error(
+                'Telegram provider not available - ensure you pass the full utils object including provider. ' +
+                'Use: async (ctx, { flowDynamic, provider }) => { ... } and pass utils instead of { flowDynamic } as any'
+            )
+        }
+
+        // Convert and validate buttons (throws if invalid)
         const replyKeyboard = createReplyKeyboard(buttons)
 
         // Build keyboard markup

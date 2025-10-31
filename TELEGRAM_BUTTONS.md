@@ -176,10 +176,10 @@ import { sendWithInlineButtons } from '~/utils/flowHelpers'
 import { createCallbackButton, createUrlButton } from '~/utils/telegramButtons'
 
 export const myFlow = addKeyword<any, any>('start')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '🎮 Choose an action:',
             [
                 [createCallbackButton('✅ Confirm', 'action_confirm')],
@@ -191,10 +191,14 @@ export const myFlow = addKeyword<any, any>('start')
     })
 ```
 
+**IMPORTANT:** Pass the full `utils` object (not `{ flowDynamic } as any`). The button helpers need access to `utils.provider` to send messages via Telegram.
+
 ### 2. Handle Button Clicks
 
 ```typescript
 // Listen for callback with prefix "action_confirm"
+// IMPORTANT: Use raw string event names (NOT utils.setEvent())
+// The global callback_query handler dispatches these as unencrypted event names
 export const confirmFlow = addKeyword<any, any>('BUTTON_ACTION_CONFIRM')
     .addAction(async (ctx, { flowDynamic }) => {
         await flowDynamic('✅ Action confirmed!')
@@ -351,7 +355,7 @@ await sendWithInlineButtons(
 ```typescript
 await sendWithInlineButtons(
     ctx,
-    { flowDynamic } as any,
+    utils,
     '<b>Customer Actions:</b>',
     [
         [createCallbackButton('🔄 Refresh', 'refresh_123')],
@@ -389,7 +393,7 @@ await sendWithReplyButtons(
 ```typescript
 await sendWithReplyButtons(
     ctx,
-    { flowDynamic } as any,
+    utils,
     'Choose an option:',
     [
         [createTextButton('Main Menu'), createTextButton('Settings')],
@@ -494,11 +498,14 @@ await answerCallbackQuery(callbackQuery.id, utils)
 
 1. User clicks button with callback_data `'user_info:123456'`
 2. Telegram sends `callback_query` event to bot
-3. Global handler in `app.ts` (line 213-261):
+3. Global handler in `app.ts` (line 265-314):
    - Parses callback data → `prefix: 'user_info'`, `data: '123456'`
-   - Dispatches custom event `BUTTON_USER_INFO`
-   - Passes `'123456'` as `ctx.body`
-4. Flow listens for `BUTTON_USER_INFO` via `addKeyword()`
+   - Creates event name `BUTTON_USER_INFO`
+   - Emits 'message' event to provider with raw event name as body
+   - Passes `'123456'` as `ctx._button_data`
+4. Flow listens for `BUTTON_USER_INFO` via `addKeyword('BUTTON_USER_INFO')`
+
+**IMPORTANT:** Do NOT use `utils.setEvent()` for button handler flows. Use raw string event names because the callback_query handler emits unencrypted event names (not encrypted via setEvent()). `utils.setEvent()` is only for use with `bot.dispatch()` in HTTP/API contexts.
 
 ### Creating Handler Flows
 
@@ -506,14 +513,15 @@ await answerCallbackQuery(callbackQuery.id, utils)
 // Button sends callback_data: 'action_confirm'
 export const confirmFlow = addKeyword<any, any>('BUTTON_ACTION_CONFIRM')
     .addAction(async (ctx, { flowDynamic }) => {
-        // ctx.body is empty for simple callbacks
+        // ctx.body will be 'BUTTON_ACTION_CONFIRM'
+        // ctx._button_data is empty string for simple callbacks
         await flowDynamic('✅ Confirmed!')
     })
 
 // Button sends callback_data: 'user:123456'
 export const userFlow = addKeyword<any, any>('BUTTON_USER')
     .addAction(async (ctx, { flowDynamic }) => {
-        const userId = ctx.body  // '123456'
+        const userId = (ctx as any)._button_data  // '123456'
         await flowDynamic(`User ID: ${userId}`)
     })
 ```
@@ -558,10 +566,10 @@ Callback data is converted to event names automatically:
 ```typescript
 // Initial action - show confirmation
 export const deleteItemFlow = addKeyword<any, any>('delete item')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '⚠️ Are you sure you want to delete this item?',
             createConfirmKeyboard('Deletion', 'delete_yes', 'delete_no')
         )
@@ -586,10 +594,10 @@ export const deleteNoFlow = addKeyword<any, any>('BUTTON_DELETE_NO')
 ```typescript
 // Main menu
 export const mainMenuFlow = addKeyword<any, any>('menu')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '📋 Main Menu:',
             [
                 [createCallbackButton('👤 User Info', 'menu_user')],
@@ -601,10 +609,10 @@ export const mainMenuFlow = addKeyword<any, any>('menu')
 
 // User info submenu
 export const userInfoMenuFlow = addKeyword<any, any>('BUTTON_MENU_USER')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '👤 User Information:',
             [
                 [createCallbackButton('📊 View Profile', 'user_profile')],
@@ -678,7 +686,8 @@ export const counterIncFlow = addKeyword<any, any>('BUTTON_COUNTER_INC')
 
 ```typescript
 export const showPageFlow = addKeyword<any, any>('BUTTON_PAGE')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
+        const { flowDynamic } = utils
         const page = parseInt(ctx.body || '1', 10)
         const totalPages = 10
 
@@ -686,7 +695,7 @@ export const showPageFlow = addKeyword<any, any>('BUTTON_PAGE')
 
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             content,
             createPaginationKeyboard(page, totalPages, 'page')
         )
@@ -697,7 +706,8 @@ export const showPageFlow = addKeyword<any, any>('BUTTON_PAGE')
 
 ```typescript
 export const maintenanceModeFlow = addKeyword<any, any>('enable maintenance')
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
+        const { flowDynamic } = utils
         // Check admin permissions first
         const { adminCheck } = await import('~/middleware/adminCheck')
         const isAdmin = await adminCheck(ctx)
@@ -708,7 +718,7 @@ export const maintenanceModeFlow = addKeyword<any, any>('enable maintenance')
 
         await sendWithInlineButtons(
             ctx,
-            { flowDynamic } as any,
+            utils,
             '⚠️ <b>Enable Maintenance Mode?</b>\n\n' +
             'This will block all non-admin users from using the bot.',
             createConfirmKeyboard('Maintenance Mode', 'maintenance_yes', 'maintenance_no'),
@@ -852,18 +862,23 @@ export const myFlow = addKeyword<any, any>('BUTTON_MY_ACTION')
 
 ### Button Click Not Working
 
-**Symptom:** Clicking button does nothing or shows loading spinner forever.
+**Symptom:** Clicking button does nothing or shows loading spinner forever, OR welcomeFlow is triggered instead of button handler.
 
 **Causes:**
-1. No flow listening for the event
-2. Flow not registered in `app.ts`
-3. Callback data format incorrect
+1. Using `utils.setEvent()` instead of raw string (MOST COMMON)
+2. No flow listening for the event
+3. Flow not registered in `app.ts`
+4. Callback data format incorrect
 
 **Solution:**
 
 ```typescript
-// 1. Create handler flow with correct event name
-export const myFlow = addKeyword<any, any>('BUTTON_MY_ACTION')  // Must match callback data
+// 1. Use RAW STRING (NOT utils.setEvent())
+// ❌ WRONG - This won't work for callback queries
+export const myFlow = addKeyword<any, any>(utils.setEvent('BUTTON_MY_ACTION'))
+
+// ✅ CORRECT - Use raw string
+export const myFlow = addKeyword<any, any>('BUTTON_MY_ACTION')
     .addAction(async (ctx, { flowDynamic }) => {
         await flowDynamic('Button clicked!')
     })
@@ -873,13 +888,16 @@ import { myFlow } from '~/flows/myFlow'
 
 const adapterFlow = createFlow([
     // ...
-    myFlow,  // Add here
+    myFlow,  // Add here BEFORE welcomeFlow
     // ...
+    welcomeFlow, // Must be last
 ])
 
 // 3. Use correct callback data format
 createCallbackButton('My Action', 'my_action')  // Dispatches BUTTON_MY_ACTION
 ```
+
+**Why utils.setEvent() doesn't work:** BuilderBot's `setEvent()` uses AES-256-CBC encryption with dynamic keys that are only accessible within the `bot.dispatch()` API (HTTP/API contexts). The callback_query handler emits raw unencrypted event names to the provider, so flows must listen with raw strings.
 
 ### Callback Query Expired Error
 
@@ -961,7 +979,7 @@ if (message.length > 4000) {
 ```typescript
 await sendWithInlineButtons(
     ctx,
-    { flowDynamic } as any,  // Cast to any
+    utils,  // Cast to any
     'Message',
     buttons
 )
@@ -1058,7 +1076,7 @@ await flowDynamic([
 ```typescript
 await sendWithInlineButtons(
     ctx,
-    { flowDynamic } as any,
+    utils,
     '📋 Quick Actions:',
     [
         [createCallbackButton('1️⃣ Check Status', 'action_status')],

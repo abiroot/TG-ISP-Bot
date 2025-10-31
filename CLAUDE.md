@@ -432,12 +432,46 @@ This bot is built specifically for Telegram using the Bot API.
 - **Fast Local Testing**: Direct connection without tunnels
 - **Reliable**: Stable connection with automatic reconnection
 
+### Button System (Telegram Inline Keyboards)
+
+The bot includes a comprehensive button system for Telegram inline keyboards.
+
+**Architecture:**
+- Global `callback_query` handler in `src/app.ts:265-314` routes all button clicks to flows
+- Button utilities in `src/utils/telegramButtons.ts` (TypeScript-safe button builders)
+- Flow helpers in `src/utils/flowHelpers.ts` for sending/editing buttons
+- Example flows in `src/flows/examples/buttonExampleFlow.ts`
+
+**Button Click Flow:**
+1. User clicks button with `callback_data: 'action_confirm:123'`
+2. Telegram sends `callback_query` event
+3. Global handler parses `action_confirm` → creates event `BUTTON_ACTION_CONFIRM`
+4. Handler emits raw event name to provider (no encryption)
+5. Flow listens with `addKeyword('BUTTON_ACTION_CONFIRM')`
+6. Access data via `ctx._button_data` (value: '123')
+
+**CRITICAL: Use Raw String Event Names**
+```typescript
+// ❌ WRONG - utils.setEvent() uses encryption only available in bot.dispatch()
+export const myFlow = addKeyword(utils.setEvent('BUTTON_MY_ACTION'))
+
+// ✅ CORRECT - Use raw strings for callback_query events
+export const myFlow = addKeyword('BUTTON_MY_ACTION')
+```
+
+**Why:** BuilderBot's `utils.setEvent()` uses AES-256-CBC encryption with dynamic runtime keys (`sal-key-${Date.now()}`). This encryption is only accessible via `bot.dispatch()` in HTTP/API contexts. The callback_query handler emits unencrypted event names to the provider, so flows MUST use raw strings.
+
+**Button Examples:**
+- See `src/flows/examples/buttonExampleFlow.ts` for complete working examples
+- See `TELEGRAM_BUTTONS.md` for comprehensive button system documentation
+
 ## Additional Documentation
 
 - **DEVELOPMENT.md** - Development setup instructions
 - **DATABASE_SCHEMA.md** - Schema details, indexes, scaling strategy
 - **MESSAGE_STORAGE.md** - Message logging system and query examples
 - **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
+- **TELEGRAM_BUTTONS.md** - Complete button system guide (inline keyboards, callback queries)
 - **TESTING.md** - Testing setup and examples
 
 ## VitoDeploy Production Deployment

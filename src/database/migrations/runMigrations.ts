@@ -25,7 +25,7 @@ export async function runMigrations(): Promise<void> {
     try {
         for (const migration of migrations) {
             console.log(`  → Running migration: ${migration}`)
-            const migrationPath = join(__dirname, 'database', 'migrations', migration)
+            const migrationPath = join(__dirname, migration)
             const migrationSQL = readFileSync(migrationPath, 'utf-8')
             await pool.query(migrationSQL)
             console.log(`  ✓ Migration completed: ${migration}`)
