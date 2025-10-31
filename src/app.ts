@@ -249,8 +249,18 @@ async function main() {
     })
 
     // Global callback_query handler - handle all button clicks
-    // Note: Must be after bot creation to have access to handleCtx
-    adapterProvider.vendor.on('callback_query', async (callbackCtx) => {
+    // Note: vendor might not be immediately available, so we wrap in a try-catch
+    try {
+        if (!adapterProvider.vendor) {
+            // Vendor not available yet, wait and retry
+            await new Promise(resolve => setTimeout(resolve, 2000))
+            if (!adapterProvider.vendor) {
+                loggers.telegram.warn('adapterProvider.vendor is still undefined after waiting - button callbacks will not work')
+                throw new Error('Vendor not available')
+            }
+        }
+
+        adapterProvider.vendor.on('callback_query', async (callbackCtx) => {
         try {
             const callbackQuery = callbackCtx.callbackQuery
             if (!('data' in callbackQuery)) return
@@ -304,7 +314,12 @@ async function main() {
                 // Ignore error
             }
         }
-    })
+        })
+
+        loggers.telegram.info('Callback query handler registered successfully')
+    } catch (error) {
+        loggers.telegram.error({ err: error }, 'Failed to register callback query handler - buttons will not work')
+    }
 
     // Health check endpoint
     adapterProvider.server.get('/health', (req, res) => {
