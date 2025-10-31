@@ -250,16 +250,17 @@ async function main() {
 
     // Global callback_query handler - routes button clicks to flows via event system
     // IMPORTANT: Must wait for vendor to be initialized (happens in initVendor() which is async)
-    // We listen for the 'ready' event which is emitted after vendor initialization completes
+    // The TelegramProvider from @builderbot-plugins/telegram initializes vendor in initVendor()
+    // but doesn't emit a 'ready' event. We need to poll until vendor is available.
 
-    // Wait for provider to emit 'ready' event before registering callback handler
-    adapterProvider.on('ready', () => {
+    const registerCallbackHandler = () => {
         if (!adapterProvider.vendor) {
-            loggers.telegram.error('Vendor is still undefined after ready event - this should not happen')
+            // Vendor not ready yet, try again in 500ms
+            setTimeout(registerCallbackHandler, 500)
             return
         }
 
-        loggers.telegram.info('Provider ready - registering global callback_query handler')
+        loggers.telegram.info('Vendor initialized - registering global callback_query handler')
 
         adapterProvider.vendor.on('callback_query', async (callbackCtx) => {
             try {
@@ -316,7 +317,10 @@ async function main() {
         })
 
         loggers.telegram.info('Callback query handler registered successfully')
-    })
+    }
+
+    // Start polling for vendor availability
+    registerCallbackHandler()
 
     // Health check endpoint
     adapterProvider.server.get('/health', (req, res) => {
