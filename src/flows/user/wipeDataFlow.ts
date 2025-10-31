@@ -1,7 +1,7 @@
 import { addKeyword } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
-import { runUserMiddleware } from '~/middleware/pipeline'
+// import { runUserMiddleware } from '~/middleware/pipeline'
 import { messageRepository } from '~/database/repositories/messageRepository'
 import { personalityRepository } from '~/database/repositories/personalityRepository'
 import { embeddingRepository } from '~/database/repositories/embeddingRepository'
@@ -30,10 +30,6 @@ export const wipeDataFlow = addKeyword<TelegramProvider, Database>(
     }
 )
     .addAction(async (ctx, utils) => {
-        // Run user middleware (whitelist, rate limit, maintenance checks)
-        const result = await runUserMiddleware(ctx, utils)
-        if (!result.allowed) return
-
         const userIdentifier = ctx.from
 
         flowLogger.info({ userIdentifier }, 'User initiated data wipe request')

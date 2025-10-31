@@ -1,0 +1,325 @@
+/**
+ * User Management Service (v2)
+ *
+ * Consolidated service that merges:
+ * - personalityService.ts
+ * - whitelistService.ts
+ * - userService.ts
+ *
+ * Handles:
+ * - Personality management (bot configuration per context)
+ * - Whitelist management (access control)
+ * - User data management (GDPR, data deletion)
+ *
+ * Benefits:
+ * - Single source of truth for user-related operations
+ * - Better transaction support
+ * - Clearer responsibility boundaries
+ */
+
+import { pool } from '~/config/database'
+import { personalityRepository } from '~/database/repositories/personalityRepository'
+import { whitelistRepository } from '~/database/repositories/whitelistRepository'
+import { messageRepository } from '~/database/repositories/messageRepository'
+import { embeddingRepository } from '~/database/repositories/embeddingRepository'
+import { admins } from '~/config/admins'
+import { createFlowLogger } from '~/utils/logger'
+import { getContextId } from '~/utils/contextId'
+import type { Personality, CreatePersonality, UpdatePersonality } from '~/database/schemas/personality'
+
+const userMgmtLogger = createFlowLogger('user-management')
+
+/**
+ * User Management Service
+ *
+ * Centralized service for all user-related operations
+ */
+export class UserManagementService {
+    /**
+     * PERSONALITY MANAGEMENT
+     */
+
+    /**
+     * Get context ID from phone/group ID
+     */
+    getContextId(from: string | number): string {
+        return getContextId(from)
+    }
+
+    /**
+     * Get personality for a context
+     */
+    async getPersonality(contextId: string): Promise<Personality | null> {
+        try {
+            return await personalityRepository.getByContextId(contextId)
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId }, 'Failed to get personality')
+            throw error
+        }
+    }
+
+    /**
+     * Create personality for a context
+     */
+    async createPersonality(data: CreatePersonality): Promise<Personality> {
+        try {
+            const personality = await personalityRepository.create(data)
+            userMgmtLogger.info({ contextId: data.context_id }, 'Personality created')
+            return personality
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId: data.context_id }, 'Failed to create personality')
+            throw error
+        }
+    }
+
+    /**
+     * Update personality for a context
+     */
+    async updatePersonality(contextId: string, updates: UpdatePersonality): Promise<Personality | null> {
+        try {
+            const personality = await personalityRepository.update(contextId, updates)
+            userMgmtLogger.info({ contextId }, 'Personality updated')
+            return personality
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId }, 'Failed to update personality')
+            throw error
+        }
+    }
+
+    /**
+     * Delete personality for a context
+     */
+    async deletePersonality(contextId: string): Promise<boolean> {
+        try {
+            const personality = await personalityRepository.getByContextId(contextId)
+            if (!personality) return false
+
+            const deleted = await personalityRepository.delete(personality.id)
+            userMgmtLogger.info({ contextId }, 'Personality deleted')
+            return deleted
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId }, 'Failed to delete personality')
+            throw error
+        }
+    }
+
+    /**
+     * WHITELIST MANAGEMENT
+     */
+
+    /**
+     * Check if a user/group is whitelisted
+     */
+    async isWhitelisted(from: string): Promise<boolean> {
+        try {
+            // Check if it's a group (starts with -)
+            const isGroup = from.startsWith('-')
+
+            if (isGroup) {
+                return await whitelistRepository.isGroupWhitelisted(from)
+            } else {
+                return await whitelistRepository.isUserWhitelisted(from)
+            }
+        } catch (error) {
+            userMgmtLogger.error({ err: error, from }, 'Failed to check whitelist')
+            return false
+        }
+    }
+
+    /**
+     * Whitelist a group
+     */
+    async whitelistGroup(groupId: string, whitelistedBy: string, notes?: string): Promise<void> {
+        try {
+            await whitelistRepository.addGroup({ group_id: groupId, whitelisted_by: whitelistedBy, notes })
+            userMgmtLogger.info({ groupId, whitelistedBy }, 'Group whitelisted')
+        } catch (error) {
+            userMgmtLogger.error({ err: error, groupId }, 'Failed to whitelist group')
+            throw error
+        }
+    }
+
+    /**
+     * Whitelist a user
+     */
+    async whitelistUser(userIdentifier: string, whitelistedBy: string, notes?: string): Promise<void> {
+        try {
+            await whitelistRepository.addUser({ user_identifier: userIdentifier, whitelisted_by: whitelistedBy, notes })
+            userMgmtLogger.info({ userIdentifier, whitelistedBy }, 'User whitelisted')
+        } catch (error) {
+            userMgmtLogger.error({ err: error, userIdentifier }, 'Failed to whitelist user')
+            throw error
+        }
+    }
+
+    /**
+     * Remove group from whitelist
+     */
+    async removeGroupFromWhitelist(groupId: string): Promise<boolean> {
+        try {
+            const removed = await whitelistRepository.removeGroup(groupId)
+            userMgmtLogger.info({ groupId, removed }, 'Group removed from whitelist')
+            return removed
+        } catch (error) {
+            userMgmtLogger.error({ err: error, groupId }, 'Failed to remove group')
+            throw error
+        }
+    }
+
+    /**
+     * Remove user from whitelist
+     */
+    async removeUserFromWhitelist(userIdentifier: string): Promise<boolean> {
+        try {
+            const removed = await whitelistRepository.removeUser(userIdentifier)
+            userMgmtLogger.info({ userIdentifier, removed }, 'User removed from whitelist')
+            return removed
+        } catch (error) {
+            userMgmtLogger.error({ err: error, userIdentifier }, 'Failed to remove user')
+            throw error
+        }
+    }
+
+    /**
+     * Get all whitelisted groups
+     */
+    async getWhitelistedGroups() {
+        try {
+            return await whitelistRepository.getAllGroups()
+        } catch (error) {
+            userMgmtLogger.error({ err: error }, 'Failed to get whitelisted groups')
+            throw error
+        }
+    }
+
+    /**
+     * Get all whitelisted users
+     */
+    async getWhitelistedUsers() {
+        try {
+            return await whitelistRepository.getAllUsers()
+        } catch (error) {
+            userMgmtLogger.error({ err: error }, 'Failed to get whitelisted users')
+            throw error
+        }
+    }
+
+    /**
+     * ADMIN MANAGEMENT
+     */
+
+    /**
+     * Check if user is admin
+     */
+    isAdmin(userIdentifier: string): boolean {
+        return admins.includes(userIdentifier)
+    }
+
+    /**
+     * Get all admin user identifiers
+     */
+    getAdmins(): string[] {
+        return [...admins]
+    }
+
+    /**
+     * USER DATA MANAGEMENT (GDPR)
+     */
+
+    /**
+     * Delete all user data (GDPR compliance)
+     * Deletes: messages, embeddings, personality
+     */
+    async deleteAllUserData(userIdentifier: string): Promise<{
+        messagesDeleted: number
+        embeddingsDeleted: number
+        personalityDeleted: boolean
+    }> {
+        try {
+            userMgmtLogger.info({ userIdentifier }, 'Starting complete user data deletion')
+
+            // Delete messages
+            const messagesDeleted = await messageRepository.deleteByUser(userIdentifier)
+
+            // Delete embeddings
+            const contextId = this.getContextId(userIdentifier)
+            const embeddingsDeleted = await embeddingRepository.deleteByContextId(contextId)
+
+            // Delete personality
+            const personalityDeleted = await this.deletePersonality(contextId)
+
+            const result = {
+                messagesDeleted,
+                embeddingsDeleted,
+                personalityDeleted,
+            }
+
+            userMgmtLogger.info({ userIdentifier, result }, 'User data deletion completed')
+
+            return result
+        } catch (error) {
+            userMgmtLogger.error({ err: error, userIdentifier }, 'Failed to delete user data')
+            throw error
+        }
+    }
+
+    /**
+     * Delete conversation history for a context (keeps personality)
+     */
+    async deleteConversationHistory(contextId: string): Promise<{
+        messagesDeleted: number
+        embeddingsDeleted: number
+    }> {
+        try {
+            userMgmtLogger.info({ contextId }, 'Starting conversation history deletion')
+
+            const messagesDeleted = await messageRepository.deleteByContextId(contextId)
+            const embeddingsDeleted = await embeddingRepository.deleteByContextId(contextId)
+
+            const result = { messagesDeleted, embeddingsDeleted }
+
+            userMgmtLogger.info({ contextId, result }, 'Conversation history deletion completed')
+
+            return result
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId }, 'Failed to delete conversation history')
+            throw error
+        }
+    }
+
+    /**
+     * Get user data statistics
+     */
+    async getUserDataStats(contextId: string): Promise<{
+        messageCount: number
+        embeddingCount: number
+        hasPersonality: boolean
+        isWhitelisted: boolean
+        isAdmin: boolean
+    }> {
+        try {
+            const [messageCount, embeddingStats, personality, isWhitelisted] = await Promise.all([
+                messageRepository.getMessageCount(contextId),
+                embeddingRepository.getStats(contextId),
+                personalityRepository.getByContextId(contextId),
+                this.isWhitelisted(contextId),
+            ])
+
+            return {
+                messageCount,
+                embeddingCount: embeddingStats.total_chunks,
+                hasPersonality: !!personality,
+                isWhitelisted,
+                isAdmin: this.isAdmin(contextId),
+            }
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId }, 'Failed to get user data stats')
+            throw error
+        }
+    }
+}
+
+/**
+ * Singleton instance
+ */
+export const userManagementService = new UserManagementService()

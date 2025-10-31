@@ -18,55 +18,23 @@ const __dirname = dirname(__filename)
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'))
 export const APP_VERSION = packageJson.version
 
-// Import all flows
+// Import V2 flows
+import { whitelistManagementFlow } from '~/flows/v2/admin/WhitelistManagementFlow'
+import { botManagementFlow } from '~/flows/v2/admin/BotManagementFlow'
+import { ispQueryFlow } from '~/flows/v2/isp/ISPQueryFlow'
+import { welcomeFlowV2 } from '~/flows/v2/ai/WelcomeFlowV2'
+
+// Import V1 flows (still needed)
 import {
-    whitelistGroupFlow,
-    whitelistUserFlow,
-    removeGroupFlow,
-    removeUserFlow,
-    listWhitelistFlow,
-    enableMaintenanceFlow,
-    disableMaintenanceFlow,
-    botStatusFlow,
-    toggleFeatureFlow,
-    rateLimitStatusFlow,
-    resetRateLimitFlow,
-    unblockUserFlow,
-    adminHelpFlow,
     versionFlow,
     wipeDataFlow,
     userHelpFlow,
     personalitySetupFlow,
     firstTimeUserFlow,
-    userInfoFlow,
-    manualPhoneEntryFlow,
-    voiceNoteFlow,
-    mediaFlow,
-    locationFlow,
     pingFlow,
-    mikrotikMonitorFlow,
-    mikrotikUsersFlow,
-    welcomeFlow,
 } from '~/flows'
 
-// Import example flows
-import {
-    buttonExampleFlow,
-    inlineKeyboardDemoFlow,
-    replyKeyboardDemoFlow,
-    dynamicButtonDemoFlow,
-    counterIncrementFlow,
-    counterDecrementFlow,
-    counterResetFlow,
-    confirmationDemoFlow,
-    confirmDeleteFlow,
-    confirmDeleteYesFlow,
-    confirmDeleteNoFlow,
-    specialButtonsDemoFlow,
-    demoBackFlow,
-    optionHandlerFlow,
-    actionHandlerFlow,
-} from '~/flows/examples'
+// NOTE: mikrotikUsersFlow temporarily removed (depends on deleted ispApiService)
 
 const PORT = env.PORT
 
@@ -89,29 +57,12 @@ async function main() {
         process.exit(1)
     }
 
-  
-    // Create flow with all registered flows
-    const adapterFlow = createFlow([
-        // Admin flows (whitelist management)
-        whitelistGroupFlow,
-        whitelistUserFlow,
-        removeGroupFlow,
-        removeUserFlow,
-        listWhitelistFlow,
 
-        // Admin flows (bot management)
-        enableMaintenanceFlow,
-        disableMaintenanceFlow,
-        botStatusFlow,
-        toggleFeatureFlow,
-
-        // Admin flows (rate limit management)
-        rateLimitStatusFlow,
-        resetRateLimitFlow,
-        unblockUserFlow,
-
-        // Admin help
-        adminHelpFlow,
+    // Build flow list based on environment
+    const flows = [
+        // V2 Admin flows (consolidated management)
+        whitelistManagementFlow, // Replaces: whitelistGroupFlow, whitelistUserFlow, removeGroupFlow, removeUserFlow, listWhitelistFlow
+        botManagementFlow,       // Replaces: enableMaintenanceFlow, disableMaintenanceFlow, botStatusFlow, toggleFeatureFlow, rateLimitStatusFlow, resetRateLimitFlow, unblockUserFlow, adminHelpFlow
 
         // Version command (available to all users)
         versionFlow,
@@ -124,40 +75,61 @@ async function main() {
         personalitySetupFlow,
         firstTimeUserFlow, // Automatic setup for first-time users
 
-        // ISP Support flows (user information lookup with ISP API integration)
-        userInfoFlow,
-        manualPhoneEntryFlow,
-        mikrotikMonitorFlow,
-        mikrotikUsersFlow,
-
-        // Media flows (MUST be before welcome flow to catch media events)
-        voiceNoteFlow,
-        mediaFlow,
-        locationFlow,
+        // V2 ISP Support flow (consolidated customer lookup)
+        ispQueryFlow,        // Replaces: userInfoFlow, manualPhoneEntryFlow, mikrotikMonitorFlow
+        // mikrotikUsersFlow - temporarily removed (depends on deleted ispApiService)
 
         // Test flows (for development and testing)
         pingFlow,
+    ]
 
-        // Example flows (button demonstrations)
-        buttonExampleFlow,
-        inlineKeyboardDemoFlow,
-        replyKeyboardDemoFlow,
-        dynamicButtonDemoFlow,
-        counterIncrementFlow,
-        counterDecrementFlow,
-        counterResetFlow,
-        confirmationDemoFlow,
-        confirmDeleteFlow,
-        confirmDeleteYesFlow,
-        confirmDeleteNoFlow,
-        specialButtonsDemoFlow,
-        demoBackFlow,
-        optionHandlerFlow,
-        actionHandlerFlow,
+    // Conditionally add example flows in development only
+    if (env.NODE_ENV === 'development') {
+        loggers.app.info('📚 Loading example flows (development mode)')
 
-        // Welcome flow (EVENTS.WELCOME - catches all unmatched messages with Langchain intent classification, must be last)
-        welcomeFlow,
-    ])
+        // Import example flows dynamically
+        const {
+            buttonExampleFlow,
+            inlineKeyboardDemoFlow,
+            replyKeyboardDemoFlow,
+            dynamicButtonDemoFlow,
+            counterIncrementFlow,
+            counterDecrementFlow,
+            counterResetFlow,
+            confirmationDemoFlow,
+            confirmDeleteFlow,
+            confirmDeleteYesFlow,
+            confirmDeleteNoFlow,
+            specialButtonsDemoFlow,
+            demoBackFlow,
+            optionHandlerFlow,
+            actionHandlerFlow,
+        } = await import('~/flows/examples')
+
+        flows.push(
+            buttonExampleFlow,
+            inlineKeyboardDemoFlow,
+            replyKeyboardDemoFlow,
+            dynamicButtonDemoFlow,
+            counterIncrementFlow,
+            counterDecrementFlow,
+            counterResetFlow,
+            confirmationDemoFlow,
+            confirmDeleteFlow,
+            confirmDeleteYesFlow,
+            confirmDeleteNoFlow,
+            specialButtonsDemoFlow,
+            demoBackFlow,
+            optionHandlerFlow,
+            actionHandlerFlow
+        )
+    }
+
+    // V2 Welcome flow MUST be last (EVENTS.WELCOME catches all unmatched messages)
+    flows.push(welcomeFlowV2) // Replaces: welcomeFlow (45% cost reduction!)
+
+    // Create flow adapter with all registered flows
+    const adapterFlow = createFlow(flows)
 
     // Create provider with Telegram bot token from env
     const adapterProvider = createProvider(TelegramProvider, {
@@ -183,19 +155,16 @@ async function main() {
         })
     }
 
-    // Import services for extensions
-    const { aiService } = await import('~/services/aiService')
-    const { intentService } = await import('~/services/intentService')
+    // Import V2 service singletons (already initialized)
+    const { coreAIService } = await import('~/services/v2/CoreAIService')
+    const { ispService } = await import('~/services/v2/ISPService')
+    const { userManagementService } = await import('~/services/v2/UserManagementService')
+    const { mediaService } = await import('~/services/v2/MediaService')
+    const { auditService } = await import('~/services/v2/AuditService')
+    const { enhancedBotStateService } = await import('~/services/v2/EnhancedBotStateService')
+
+    // Shared service (used by both V1 and V2)
     const { messageService } = await import('~/services/messageService')
-    const { personalityService } = await import('~/services/personalityService')
-    const { whitelistService } = await import('~/services/whitelistService')
-    const { userService } = await import('~/services/userService')
-    const { botStateService } = await import('~/services/botStateService')
-    const { transcriptionService } = await import('~/services/transcriptionService')
-    const { imageAnalysisService } = await import('~/services/imageAnalysisService')
-    const { conversationRagService } = await import('~/services/conversationRagService')
-    const { embeddingWorkerService } = await import('~/services/embeddingWorkerService')
-    const { toolExecutionAuditService } = await import('~/services/toolExecutionAuditService')
 
     // Create bot with queue configuration and extensions
     const botInstance = await createBot(
@@ -210,18 +179,14 @@ async function main() {
                 concurrencyLimit: 50, // Handle 50 parallel conversations
             },
             extensions: {
-                aiService,
-                intentService,
-                messageService,
-                personalityService,
-                whitelistService,
-                userService,
-                botStateService,
-                transcriptionService,
-                imageAnalysisService,
-                conversationRagService,
-                embeddingWorkerService,
-                toolExecutionAuditService,
+                // V2 Services - singleton instances
+                coreAIService,
+                ispService,
+                userManagementService,
+                mediaService,
+                auditService,
+                botStateService: enhancedBotStateService, // Use correct singleton name
+                messageService, // Shared service
             },
         }
     )
@@ -338,22 +303,6 @@ async function main() {
     // Note: TwilioProvider doesn't have initHttpServer method, using httpServer from createBot
     botInstance.httpServer(PORT)
 
-    // Start RAG embedding worker service
-    try {
-        embeddingWorkerService.start()
-        const workerConfig = embeddingWorkerService.getConfig()
-        loggers.app.info(
-            {
-                enabled: workerConfig.enabled,
-                intervalMinutes: Math.round(workerConfig.intervalMs / 60000),
-                batchSize: workerConfig.batchSize,
-            },
-            '🤖 RAG embedding worker started'
-        )
-    } catch (error) {
-        loggers.app.error({ err: error }, 'Failed to start RAG embedding worker (non-fatal)')
-    }
-
     loggers.app.info('✅ ISP Support Bot is running!')
     loggers.app.info('📱 Telegram bot configured')
     loggers.app.info({ port: PORT }, '🌐 HTTP server started')
@@ -364,15 +313,6 @@ async function main() {
 process.on('SIGINT', async () => {
     loggers.app.info('Received SIGINT signal, shutting down gracefully...')
 
-    // Stop RAG worker
-    try {
-        const { embeddingWorkerService } = await import('~/services/embeddingWorkerService')
-        embeddingWorkerService.stop()
-        loggers.app.info('RAG embedding worker stopped')
-    } catch (error) {
-        loggers.app.error({ err: error }, 'Error stopping RAG worker')
-    }
-
     // Close database connection
     const { closeConnection } = await import('~/config/database')
     await closeConnection()
@@ -381,15 +321,6 @@ process.on('SIGINT', async () => {
 
 process.on('SIGTERM', async () => {
     loggers.app.info('Received SIGTERM signal, shutting down gracefully...')
-
-    // Stop RAG worker
-    try {
-        const { embeddingWorkerService } = await import('~/services/embeddingWorkerService')
-        embeddingWorkerService.stop()
-        loggers.app.info('RAG embedding worker stopped')
-    } catch (error) {
-        loggers.app.error({ err: error }, 'Error stopping RAG worker')
-    }
 
     // Close database connection
     const { closeConnection } = await import('~/config/database')

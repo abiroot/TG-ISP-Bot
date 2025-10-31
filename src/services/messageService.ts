@@ -1,25 +1,30 @@
 import { messageRepository } from '~/database/repositories/messageRepository'
 import { CreateMessage, Message, MessageDirection } from '~/database/schemas/message'
-import { personalityService } from './personalityService'
-import { userService } from './userService'
 import { isAdmin } from '~/config/admins'
 import { v4 as uuidv4 } from 'uuid'
+import { getContextId, getContextType } from '~/utils/contextId'
 
 export class MessageService {
+    /**
+     * Get context ID from user identifier
+     */
+    private getContextId(from: string | number): string {
+        return getContextId(from)
+    }
+
+    /**
+     * Get context type (group or private)
+     */
+    private getContextType(from: string | number): 'group' | 'private' {
+        return getContextType(from)
+    }
+
     /**
      * Log an incoming message
      */
     async logIncomingMessage(ctx: any, metadata?: Record<string, any>): Promise<Message> {
-        const contextId = personalityService.getContextId(ctx.from)
-        const contextType = personalityService.getContextType(ctx.from)
-
-        // Extract and store user information (username, etc.)
-        // This enables username whitelisting functionality
-        try {
-            await userService.extractAndStoreUserMapping(ctx)
-        } catch (error) {
-            console.warn('⚠️  Failed to extract user mapping:', error)
-        }
+        const contextId = this.getContextId(ctx.from)
+        const contextType = this.getContextType(ctx.from)
 
         // Check if message is a command
         const messageBody = (ctx.body || '').trim().toLowerCase()
@@ -65,7 +70,7 @@ export class MessageService {
         messageId?: string,
         metadata?: Record<string, any>
     ): Promise<Message> {
-        const contextType = personalityService.getContextType(contextId)
+        const contextType = this.getContextType(contextId)
 
         const messageData: CreateMessage = {
             message_id: messageId || uuidv4(),
@@ -94,7 +99,7 @@ export class MessageService {
         messageId?: string,
         metadata?: Record<string, any>
     ): Promise<Message> {
-        const contextType = personalityService.getContextType(contextId)
+        const contextType = this.getContextType(contextId)
 
         const messageData: CreateMessage = {
             message_id: messageId || uuidv4(),
@@ -216,7 +221,7 @@ export class MessageService {
      * @returns Created message with tool metadata
      */
     async storeAIResponseWithTools(contextId: string, userPhone: string, result: any): Promise<Message> {
-        const contextType = personalityService.getContextType(contextId)
+        const contextType = this.getContextType(contextId)
 
         // Extract ALL tool calls from ALL steps (not just final step)
         // AI SDK v5 stores tool calls in result.steps[].toolCalls, NOT in result.toolCalls

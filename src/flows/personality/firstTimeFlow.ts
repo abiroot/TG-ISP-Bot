@@ -1,7 +1,7 @@
 import { addKeyword, EVENTS } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
-import { personalityService } from '~/services/personalityService'
+// import { userManagementService } from '~/services/userManagementService'
 import { startIdleTimer, resetIdleTimer, stopIdleTimer } from '~/utils/idleTimer'
 import { dispatchSetupComplete } from '~/utils/customEvents'
 import { createFlowLogger } from '~/utils/logger'
@@ -137,13 +137,14 @@ export const firstTimeUserFlow = addKeyword<TelegramProvider, Database>('__FIRST
             flowLogger.debug({ from: ctx.from, language: input }, 'Language captured')
         }
     )
-    .addAction(async (ctx, { state, flowDynamic, provider, endFlow }) => {
-        const contextId = personalityService.getContextId(ctx.from)
-        const contextType = personalityService.getContextType(ctx.from)
+    .addAction(async (ctx, { state, flowDynamic, provider, endFlow, extensions }) => {
+        const { userManagementService } = extensions!
+        const contextId = userManagementService.getContextId(ctx.from)
+        const contextType = userManagementService.getContextType(ctx.from)
 
         try {
             // Create new personality
-            const personality = await personalityService.createPersonality({
+            const personality = await userManagementService.createPersonality({
                 context_id: contextId,
                 context_type: contextType,
                 bot_name: state.get('bot_name'),

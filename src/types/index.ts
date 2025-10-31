@@ -10,18 +10,16 @@ export type BotCtx = BotContext
  * Use this type when defining extensions at bot creation
  */
 export interface ServiceExtensions {
-    aiService?: typeof import('~/services/aiService').aiService
-    intentService?: typeof import('~/services/intentService').intentService
+    // V2 Services - primary names only
+    coreAIService?: typeof import('~/services/v2/CoreAIService').CoreAIService
+    ispService?: typeof import('~/services/v2/ISPService').ISPService
+    userManagementService?: typeof import('~/services/v2/UserManagementService').UserManagementService
+    mediaService?: typeof import('~/services/v2/MediaService').MediaService
+    auditService?: typeof import('~/services/v2/AuditService').AuditService
+    botStateService?: typeof import('~/services/v2/EnhancedBotStateService').EnhancedBotStateService
+
+    // Shared service
     messageService?: typeof import('~/services/messageService').messageService
-    personalityService?: typeof import('~/services/personalityService').personalityService
-    whitelistService?: typeof import('~/services/whitelistService').whitelistService
-    userService?: typeof import('~/services/userService').userService
-    botStateService?: typeof import('~/services/botStateService').botStateService
-    transcriptionService?: typeof import('~/services/transcriptionService').transcriptionService
-    imageAnalysisService?: typeof import('~/services/imageAnalysisService').imageAnalysisService
-    conversationRagService?: typeof import('~/services/conversationRagService').conversationRagService
-    embeddingWorkerService?: typeof import('~/services/embeddingWorkerService').embeddingWorkerService
-    toolExecutionAuditService?: typeof import('~/services/toolExecutionAuditService').toolExecutionAuditService
 }
 
 /**

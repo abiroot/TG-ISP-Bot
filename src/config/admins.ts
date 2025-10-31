@@ -41,6 +41,9 @@ export const ADMIN_IDS: string[] = [
     // Example: '123456789', '987654321'
 ]
 
+// Backward compatibility export (for v2 services)
+export const admins = ADMIN_IDS
+
 /**
  * Check if a Telegram user ID is an admin
  */

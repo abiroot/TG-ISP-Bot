@@ -6,7 +6,7 @@ export default defineConfig({
         globals: true,
         environment: 'node',
         setupFiles: ['./tests/setup/globalSetup.ts'],
-        testTimeout: 30000, // 30s for E2E tests with AI SDK
+        testTimeout: 30000, // 30s for tests with AI SDK
         hookTimeout: 10000,
         include: ['tests/**/*.test.ts'],
         exclude: ['node_modules', 'dist'],

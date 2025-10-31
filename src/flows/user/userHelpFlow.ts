@@ -1,7 +1,6 @@
 import { addKeyword } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
-import { runUserMiddleware } from '~/middleware/pipeline'
 import { isAdmin } from '~/config/admins'
 import { createFlowLogger } from '~/utils/logger'
 
@@ -10,16 +9,12 @@ const flowLogger = createFlowLogger('user-help')
 /**
  * User Help Flow
  * Shows all available user commands
- * Accessible to all whitelisted users
+ * Accessible to all users
  */
 export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/help'], {
     sensitive: false,
 })
     .addAction(async (ctx, utils) => {
-        // Run user middleware (whitelist, rate limit, maintenance checks)
-        const result = await runUserMiddleware(ctx, utils)
-        if (!result.allowed) return
-
         flowLogger.info({ user: ctx.from }, 'User requested help')
 
         const userIsAdmin = isAdmin(ctx.from)

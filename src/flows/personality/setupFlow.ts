@@ -1,7 +1,6 @@
 import { addKeyword } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
-import { personalityService } from '~/services/personalityService'
 import { startIdleTimer, resetIdleTimer, stopIdleTimer } from '~/utils/idleTimer'
 import { dispatchSetupComplete, CUSTOM_EVENTS } from '~/utils/customEvents'
 
@@ -14,10 +13,12 @@ export const personalitySetupFlow = addKeyword<TelegramProvider, Database>(
     ['setup personality', '/setup personality', 'setup', '/setup'],
     { sensitive: false }
 )
-    .addAction(async (ctx, { flowDynamic, endFlow, state, gotoFlow }) => {
+    .addAction(async (ctx, { flowDynamic, endFlow, state, gotoFlow, extensions }) => {
+        const { userManagementService } = extensions!
+
         // Check if personality already exists
-        const contextId = personalityService.getContextId(ctx.from)
-        const existing = await personalityService.getPersonality(contextId)
+        const contextId = userManagementService.getContextId(ctx.from)
+        const existing = await userManagementService.getPersonality(contextId)
 
         await state.update({ _existing: existing ? 'yes' : 'no' })
 
@@ -158,19 +159,20 @@ export const personalitySetupFlow = addKeyword<TelegramProvider, Database>(
             await state.update({ default_language: input })
         }
     )
-    .addAction(async (ctx, { state, flowDynamic, provider }) => {
-        const contextId = personalityService.getContextId(ctx.from)
-        const contextType = personalityService.getContextType(ctx.from)
+    .addAction(async (ctx, { state, flowDynamic, provider, extensions }) => {
+        const { userManagementService } = extensions!
+        const contextId = userManagementService.getContextId(ctx.from)
+        const contextType = userManagementService.getContextType(ctx.from)
 
         // Check if personality exists - update or create
-        const existing = await personalityService.getPersonality(contextId)
+        const existing = await userManagementService.getPersonality(contextId)
 
         try {
             let personality
 
             if (existing) {
                 // Update existing personality
-                personality = await personalityService.updatePersonality(contextId, {
+                personality = await userManagementService.updatePersonality(contextId, {
                     bot_name: state.get('bot_name'),
                     default_timezone: state.get('default_timezone'),
                     default_language: state.get('default_language'),
@@ -194,7 +196,7 @@ You can update this anytime by sending "/setup" again.
                 dispatchSetupComplete(provider, ctx.from, personality)
             } else {
                 // Create new personality
-                personality = await personalityService.createPersonality({
+                personality = await userManagementService.createPersonality({
                     context_id: contextId,
                     context_type: contextType,
                     bot_name: state.get('bot_name'),

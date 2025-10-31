@@ -58,10 +58,20 @@ export const loggers = {
 }
 
 /**
- * Create logger for a specific flow
+ * Create logger for a specific flow (memoized)
  */
+const flowLoggerCache = new Map<string, pino.Logger>()
+
 export const createFlowLogger = (flowName: string) => {
-    return createContextLogger({ module: 'flow', flow: flowName })
+    // Return cached logger if it exists
+    if (flowLoggerCache.has(flowName)) {
+        return flowLoggerCache.get(flowName)!
+    }
+
+    // Create new logger and cache it
+    const flowLogger = createContextLogger({ module: 'flow', flow: flowName })
+    flowLoggerCache.set(flowName, flowLogger)
+    return flowLogger
 }
 
 /**

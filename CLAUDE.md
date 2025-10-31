@@ -49,6 +49,8 @@ npm start
 - Always use `provider.vendor.telegram.sendMessage()` directly when you need HTML formatting
 - Example: `await provider.vendor.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' })`
 - See `src/utils/telegramFormatting.ts` for helper functions
+- **IMPORTANT:** Always escape user-generated content using `html.escape()` to prevent XSS
+- See `docs/HTML_ESCAPING_GUIDELINES.md` for complete escaping guidelines
 
 ## Core Architecture
 
