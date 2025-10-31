@@ -18,7 +18,7 @@
   },
   "keywords": [],
   "dependencies": {
-    "@ai-sdk/google": "^2.0.23",
+    "@ai-sdk/google": "^2.0.26",
     "@ai-sdk/openai": "^2.0.43",
     "@builderbot-plugins/telegram": "^2.0.0",
     "@builderbot/bot": "^1.3.4",

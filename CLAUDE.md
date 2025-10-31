@@ -10,8 +10,8 @@ Telegram chatbot built with BuilderBot framework (https://builderbot.vercel.app/
 - **BuilderBot** (v1.3.4) - Flow-based chatbot framework
 - **Telegram Bot API** - Message provider via @builderbot-plugins/telegram
 - **PostgreSQL** + **pgvector** - Database with full message history & vector embeddings
-- **AI SDK v5** + GPT-4o-mini - AI conversations (OpenAI/Google AI support)
-- **Langchain** - Intent classification & RAG (Retrieval Augmented Generation)
+- **AI SDK v5** + **Gemini 2.0 Flash** - AI conversations (Google AI)
+- **OpenAI** - Embeddings only (text-embedding-3-small for RAG)
 - **TypeScript** (ES2022 modules)
 - **Rollup** - Production bundling
 
@@ -44,6 +44,12 @@ npm start
 - The bot connects directly to Telegram without requiring webhook tunnels
 - Simple development experience with direct Telegram API connection
 
+**CRITICAL - Telegram HTML Formatting:**
+- BuilderBot's `provider.sendMessage()` does NOT forward the `parse_mode` parameter to Telegram
+- Always use `provider.vendor.telegram.sendMessage()` directly when you need HTML formatting
+- Example: `await provider.vendor.telegram.sendMessage(chatId, text, { parse_mode: 'HTML' })`
+- See `src/utils/telegramFormatting.ts` for helper functions
+
 ## Core Architecture
 
 ### Three-Adapter Pattern (BuilderBot)
@@ -61,15 +67,13 @@ const { aiService, messageService, personalityService } = extensions
 ```
 
 Available extensions (defined in `src/app.ts:122-157`):
-- `aiService` - GPT-4o-mini integration via Vercel AI SDK (with RAG support)
-- `intentService` - Langchain-based intent classification for intelligent routing
+- `coreAIService` - Gemini 2.0 Flash integration via Vercel AI SDK (chat, RAG, tool calling)
+- `mediaService` - Vision analysis (Gemini 2.0 Flash) and voice transcription (Whisper)
 - `messageService` - Message CRUD operations
 - `personalityService` - Bot configuration management
 - `whitelistService` - Access control
 - `botStateService` - Bot state (maintenance mode, feature flags)
-- `transcriptionService` - Voice note transcription
-- `imageAnalysisService` - Image analysis with structured output
-- `conversationRagService` - RAG (Retrieval Augmented Generation) for unlimited conversation memory
+- `ispToolsService` - ISP API integration tools for AI tool calling
 - `embeddingWorkerService` - Background worker for automatic embedding generation
 
 ### Flow System
@@ -279,12 +283,13 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `POSTGRES_DB_HOST`, `POSTGRES_DB_USER`, `POSTGRES_DB_NAME`, `POSTGRES_DB_PORT`
 - `POSTGRES_DB_PASSWORD` (can be empty string)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token from BotFather
-- `OPENAI_API_KEY`
+- `GOOGLE_API_KEY` - Google AI API key for Gemini 2.0 Flash (get from https://aistudio.google.com/apikey)
+- `OPENAI_API_KEY` - OpenAI API key (used only for embeddings: text-embedding-3-small)
 
 **Optional:**
 - `PORT` (default: 3008)
 - `NODE_ENV` (development/production/test)
-- `GOOGLE_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY` - For Google AI (Gemini) support
+- `GOOGLE_GENERATIVE_AI_API_KEY` - Alternative to GOOGLE_API_KEY (same value)
 
 **RAG Configuration (Optional):**
 - `RAG_ENABLED` (default: true) - Enable/disable RAG feature
