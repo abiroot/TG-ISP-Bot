@@ -34,28 +34,28 @@ CREATE TABLE IF NOT EXISTS tool_execution_audit (
 );
 
 -- Index for querying by user (most common query pattern)
-CREATE INDEX idx_tool_audit_user_created
+CREATE INDEX IF NOT EXISTS idx_tool_audit_user_created
 ON tool_execution_audit(user_telegram_id, created_at DESC);
 
 -- Index for querying by tool name
-CREATE INDEX idx_tool_audit_tool_created
+CREATE INDEX IF NOT EXISTS idx_tool_audit_tool_created
 ON tool_execution_audit(tool_name, created_at DESC);
 
 -- Index for querying by context (conversation tracking)
-CREATE INDEX idx_tool_audit_context_created
+CREATE INDEX IF NOT EXISTS idx_tool_audit_context_created
 ON tool_execution_audit(context_id, created_at DESC);
 
 -- Index for querying by status (error monitoring)
-CREATE INDEX idx_tool_audit_status_created
+CREATE INDEX IF NOT EXISTS idx_tool_audit_status_created
 ON tool_execution_audit(execution_status, created_at DESC)
 WHERE execution_status = 'error';
 
 -- Index for time-based queries (analytics)
-CREATE INDEX idx_tool_audit_created_at
+CREATE INDEX IF NOT EXISTS idx_tool_audit_created_at
 ON tool_execution_audit(created_at DESC);
 
 -- Composite index for user + tool queries
-CREATE INDEX idx_tool_audit_user_tool
+CREATE INDEX IF NOT EXISTS idx_tool_audit_user_tool
 ON tool_execution_audit(user_telegram_id, tool_name, created_at DESC);
 
 COMMENT ON TABLE tool_execution_audit IS 'Audit log for all tool executions (ISP API, etc.) for compliance and security';
