@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "start": "node ./dist/app.js",
-    "lint": "eslint . --no-ignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
     "dev": "npm run lint && tsx ./scripts/dev.ts",
     "dev:simple": "npm run lint && nodemon ./src/app.ts",
     "build": "npx rollup -c",

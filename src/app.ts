@@ -49,6 +49,25 @@ import {
     welcomeFlow,
 } from '~/flows'
 
+// Import example flows
+import {
+    buttonExampleFlow,
+    inlineKeyboardDemoFlow,
+    replyKeyboardDemoFlow,
+    dynamicButtonDemoFlow,
+    counterIncrementFlow,
+    counterDecrementFlow,
+    counterResetFlow,
+    confirmationDemoFlow,
+    confirmDeleteFlow,
+    confirmDeleteYesFlow,
+    confirmDeleteNoFlow,
+    specialButtonsDemoFlow,
+    demoBackFlow,
+    optionHandlerFlow,
+    actionHandlerFlow,
+} from '~/flows/examples'
+
 const PORT = env.PORT
 
 
@@ -118,6 +137,23 @@ async function main() {
 
         // Test flows (for development and testing)
         pingFlow,
+
+        // Example flows (button demonstrations)
+        buttonExampleFlow,
+        inlineKeyboardDemoFlow,
+        replyKeyboardDemoFlow,
+        dynamicButtonDemoFlow,
+        counterIncrementFlow,
+        counterDecrementFlow,
+        counterResetFlow,
+        confirmationDemoFlow,
+        confirmDeleteFlow,
+        confirmDeleteYesFlow,
+        confirmDeleteNoFlow,
+        specialButtonsDemoFlow,
+        demoBackFlow,
+        optionHandlerFlow,
+        actionHandlerFlow,
 
         // Welcome flow (EVENTS.WELCOME - catches all unmatched messages with Langchain intent classification, must be last)
         welcomeFlow,
@@ -209,6 +245,64 @@ async function main() {
             await MessageLogger.logOutgoing(from, from, answer)
         } catch (error) {
             loggers.telegram.error({ err: error }, 'Failed to log outgoing message via event')
+        }
+    })
+
+    // Global callback_query handler - handle all button clicks
+    // Note: Must be after bot creation to have access to handleCtx
+    adapterProvider.vendor.on('callback_query', async (callbackCtx) => {
+        try {
+            const callbackQuery = callbackCtx.callbackQuery
+            if (!('data' in callbackQuery)) return
+
+            const callbackData = callbackQuery.data
+            const chatId = callbackQuery.message?.chat?.id
+            const userId = callbackQuery.from.id
+
+            loggers.telegram.debug(
+                { callbackData, chatId, userId },
+                'Received callback_query event'
+            )
+
+            // Always answer callback query to remove loading state
+            await callbackCtx.answerCbQuery()
+
+            // Parse callback data (format: "prefix:data" or just "data")
+            const parts = callbackData.split(':')
+            const prefix = parts.length > 1 ? parts[0] : callbackData
+            const data = parts.length > 1 ? parts.slice(1).join(':') : ''
+
+            // Route callback to appropriate custom event
+            // This allows flows to handle button clicks via addKeyword('EVENT_NAME')
+            const eventName = `BUTTON_${prefix.toUpperCase()}`
+
+            loggers.telegram.debug(
+                { eventName, prefix, data, chatId },
+                'Dispatching button event to flows'
+            )
+
+            // Create a synthetic message context for the button click
+            // The body must contain the event name for keyword matching
+            // Additional data is stored in ctx for flows to access
+            const syntheticCtx = {
+                from: chatId?.toString() || userId.toString(),
+                body: eventName, // Event name for keyword matching (e.g., 'BUTTON_ACTION_CONFIRM')
+                name: callbackQuery.from.first_name || 'User',
+                pushName: callbackQuery.from.first_name || 'User',
+                _callback_query: callbackQuery, // Original callback query
+                _button_data: data, // Parsed data after colon
+            }
+
+            // Handle the context through the bot's flow system
+            await (handleCtx as any)(syntheticCtx)
+        } catch (error) {
+            loggers.telegram.error({ err: error }, 'Failed to handle callback_query')
+            // Try to answer callback query even on error to remove loading state
+            try {
+                await callbackCtx.answerCbQuery('⚠️ An error occurred')
+            } catch {
+                // Ignore error
+            }
         }
     })
 

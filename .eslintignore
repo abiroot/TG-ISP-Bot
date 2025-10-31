@@ -1,0 +1,12 @@
+# Build output
+dist/
+
+# Dependencies
+node_modules/
+
+# Test files (if you want to exclude them)
+**/*.test.ts
+**/*.spec.ts
+**/__tests__/
+**/e2e/
+**/mock/
