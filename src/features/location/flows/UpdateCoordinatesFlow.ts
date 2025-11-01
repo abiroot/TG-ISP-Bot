@@ -27,6 +27,7 @@ import {
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
 import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
+import { storeConfirmationData, retrieveConfirmationData } from '~/core/utils/buttonStateStore'
 
 const logger = createFlowLogger('update-coordinates-flow')
 
@@ -294,15 +295,25 @@ export const locationUserModeFlow = addKeyword<TelegramProvider, Database>('BUTT
             `Invalid usernames will be reported after attempting update.`
 
         // Encode state data in button callback for reliability
-        // Format: loc_confirm:yes|lat:X|lon:Y|u:user1,user2
+        // If data is too large (>64 bytes), use temporary store
         const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
+
+        let confirmCallbackData: string
+        if (encodedData.length > 55) { // Leave room for "loc_confirm:" prefix
+            // Store in temporary memory store and use short reference
+            const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
+            confirmCallbackData = `loc_confirm:ref:${stateId}`
+            logger.debug({ stateId, dataLength: encodedData.length }, 'Using state store for large data')
+        } else {
+            confirmCallbackData = `loc_confirm:${encodedData}`
+        }
 
         await sendWithInlineButtons(
             ctx,
             { extensions, provider, state, flowDynamic } as any,
             summary,
             [
-                [createCallbackButton('✅ Confirm Update', `loc_confirm:${encodedData}`)],
+                [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
                 [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
             ],
             { parseMode: 'HTML' }
@@ -336,31 +347,48 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
             logger.info({ from: ctx.from }, 'State missing, attempting to parse from button data')
 
             try {
-                // Parse format: yes|lat:X|lon:Y|u:user1,user2
-                const parts = buttonData.split('|')
+                // Check if this is a reference to stored data (format: ref:stateId)
+                if (buttonData.startsWith('yes:ref:') || buttonData.startsWith('ref:')) {
+                    const stateId = buttonData.replace(/^(yes:)?ref:/, '')
+                    logger.debug({ stateId }, 'Retrieving data from store')
 
-                if (parts.length < 4) {
-                    throw new Error('Invalid button data format')
-                }
-
-                // Extract data from parts
-                const dataMap: Record<string, string> = {}
-                for (const part of parts.slice(1)) { // Skip 'yes'
-                    const [key, value] = part.split(':', 2)
-                    if (key && value) {
-                        dataMap[key] = value
+                    const storedData = retrieveConfirmationData(ctx.from, stateId)
+                    if (!storedData) {
+                        throw new Error('Stored data not found or expired')
                     }
+
+                    latitude = storedData.latitude
+                    longitude = storedData.longitude
+                    usernames = storedData.usernames
+
+                    logger.info({ latitude, longitude, usernames }, 'Successfully retrieved data from store')
+                } else {
+                    // Parse format: yes|lat:X|lon:Y|u:user1,user2
+                    const parts = buttonData.split('|')
+
+                    if (parts.length < 4) {
+                        throw new Error('Invalid button data format')
+                    }
+
+                    // Extract data from parts
+                    const dataMap: Record<string, string> = {}
+                    for (const part of parts.slice(1)) { // Skip 'yes'
+                        const [key, value] = part.split(':', 2)
+                        if (key && value) {
+                            dataMap[key] = value
+                        }
+                    }
+
+                    latitude = parseFloat(dataMap.lat)
+                    longitude = parseFloat(dataMap.lon)
+                    usernames = dataMap.u ? dataMap.u.split(',').filter(u => u.trim()) : []
+
+                    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude) || usernames.length === 0) {
+                        throw new Error('Invalid parsed data')
+                    }
+
+                    logger.info({ latitude, longitude, usernames }, 'Successfully parsed data from button')
                 }
-
-                latitude = parseFloat(dataMap.lat)
-                longitude = parseFloat(dataMap.lon)
-                usernames = dataMap.u ? dataMap.u.split(',').filter(u => u.trim()) : []
-
-                if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude) || usernames.length === 0) {
-                    throw new Error('Invalid parsed data')
-                }
-
-                logger.info({ latitude, longitude, usernames }, 'Successfully parsed data from button')
             } catch (error) {
                 logger.error({ err: error, buttonData }, 'Failed to parse button data')
                 await provider.vendor.telegram.sendMessage(

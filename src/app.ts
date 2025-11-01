@@ -47,7 +47,7 @@ import {
 import {
     webhookLocationRequestFlow,
     webhookLocationSkipFlow,
-    webhookLocationMethodFlow,
+    webhookLocationCancelFlow,
 } from '~/features/location/flows/WebhookLocationRequestFlow'
 
 // Import menu flows
@@ -146,7 +146,7 @@ async function main() {
         locationDirectUserModeFlow, // Direct location sharing username capture
         webhookLocationRequestFlow, // Webhook-triggered location request
         webhookLocationSkipFlow, // Webhook skip button handler
-        webhookLocationMethodFlow, // Webhook location method selection
+        webhookLocationCancelFlow, // Webhook cancel handler
         locationHandlerFlow, // Direct location sharing (EVENTS.LOCATION)
         updateCoordinatesFlow, // Main entry flow
 

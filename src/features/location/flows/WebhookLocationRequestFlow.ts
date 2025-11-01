@@ -28,7 +28,7 @@ const logger = createFlowLogger('webhook-location-request-flow')
  * Button format: webhook_loc_req:{client_username}
  */
 export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>('BUTTON_WEBHOOK_LOC_REQ')
-    .addAction(async (ctx, { state, extensions, provider, flowDynamic, endFlow }) => {
+    .addAction(async (ctx, { state, globalState, extensions, provider, flowDynamic, endFlow }) => {
         const clientUsername = ctx._button_data as string
 
         logger.info({ from: ctx.from, clientUsername }, 'Webhook location request started')
@@ -53,26 +53,39 @@ export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>
             return endFlow()
         }
 
-        // Store client username and webhook trigger flag in state
+        // Store client username and webhook trigger flag in state AND globalState
+        // GlobalState persists across flow transitions (needed for EVENTS.LOCATION)
         await state.update({
             clientUsername,
             triggeredBy: 'webhook',
             userMode: 'single', // Always single user for webhook
         })
 
-        // Show location method selection
-        await sendWithInlineButtons(
+        // Also store in globalState with user-specific key to persist across flows
+        await globalState.update({
+            [`webhook_${ctx.from}`]: {
+                clientUsername,
+                triggeredBy: 'webhook',
+                timestamp: Date.now(),
+            },
+        })
+
+        logger.debug({ userId: ctx.from, clientUsername }, 'Stored webhook context in globalState')
+
+        // Import button helpers
+        const { sendWithReplyButtons } = await import('~/core/utils/flowHelpers')
+        const { createLocationButton, createTextButton } = await import('~/core/utils/telegramButtons')
+
+        // Show location sharing request with reply keyboard
+        await sendWithReplyButtons(
             ctx,
             { extensions, provider, state, flowDynamic } as any,
             `<b>📍 Update Location for Customer</b>\n\n` +
                 `<b>Customer:</b> <code>${html.escape(clientUsername)}</code>\n\n` +
-                `How would you like to provide the coordinates?`,
-            [
-                [createCallbackButton('📍 Share Location', 'webhook_loc_method:location')],
-                [createCallbackButton('⌨️ Enter Manually', 'webhook_loc_method:manual')],
-                [createCallbackButton('❌ Cancel', 'webhook_loc_method:cancel')],
-            ],
-            { parseMode: 'HTML' }
+                `Please share the customer's current location using the button below, ` +
+                `or tap the attachment icon and select "Location".`,
+            [[createLocationButton('📍 Share Location')], [createTextButton('❌ Cancel')]],
+            { oneTime: true, resize: true, parseMode: 'HTML' }
         )
     })
 
@@ -90,71 +103,23 @@ export const webhookLocationSkipFlow = addKeyword<TelegramProvider, Database>('B
     })
 
 /**
- * Handle location method selection from webhook flow
- * Redirects to existing location flows with pre-filled customer username
+ * Handle "Cancel" text during webhook location sharing
+ * Uses specific button text to avoid conflicts with other flows
  */
-export const webhookLocationMethodFlow = addKeyword<TelegramProvider, Database>('BUTTON_WEBHOOK_LOC_METHOD')
-    .addAction(async (ctx, { state, extensions, provider, flowDynamic, gotoFlow, endFlow }) => {
-        const method = ctx._button_data as string
+export const webhookLocationCancelFlow = addKeyword<TelegramProvider, Database>(['❌ Cancel'])
+    .addAction(async (ctx, { state, provider, endFlow }) => {
+        // Only handle if we're in a webhook flow
+        const triggeredBy = await state.get<string>('triggeredBy')
+        const clientUsername = await state.get<string>('clientUsername')
 
-        // Handle cancellation
-        if (method === 'cancel') {
+        if (triggeredBy === 'webhook' && clientUsername) {
             await state.clear()
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
-                '❌ <b>Operation cancelled.</b>',
+                '❌ <b>Location update cancelled.</b>\n\nYou can update it later with /setlocation',
                 { parse_mode: 'HTML' }
             )
             return endFlow()
         }
-
-        // Import existing location flows
-        const { locationMethodLocationFlow } = await import('~/features/location/flows/UpdateCoordinatesFlow')
-        const { locationHandlerFlow } = await import('~/features/location/flows/LocationHandlerFlow')
-
-        // Dispatch to appropriate flow based on method
-        if (method === 'location') {
-            // User chose to share location
-            await state.update({
-                inputMethod: 'location',
-                awaitingInput: 'coordinates',
-            })
-
-            // Show reply keyboard with location button (same as locationMethodLocationFlow)
-            const { sendWithReplyButtons } = await import('~/core/utils/flowHelpers')
-            const { createLocationButton, createTextButton } = await import('~/core/utils/telegramButtons')
-
-            await sendWithReplyButtons(
-                ctx,
-                { extensions, provider, state, flowDynamic } as any,
-                '📍 <b>Share Your Location</b>\n\n' +
-                    'Tap the button below to share the customer\'s current location, or use the Telegram attachment menu.',
-                [[createLocationButton('📍 Share Location')], [createTextButton('❌ Cancel')]],
-                { oneTime: true, resize: true, parseMode: 'HTML' }
-            )
-
-            // Location will be handled by locationHandlerFlow (EVENTS.LOCATION)
-            // After location is received, it will prompt for username
-            // We need to override username prompt to auto-fill from webhook
-        } else if (method === 'manual') {
-            // User chose manual entry - delegate to existing flow
-            await state.update({
-                inputMethod: 'manual',
-                awaitingInput: 'coordinates',
-            })
-
-            await provider.vendor.telegram.sendMessage(
-                ctx.from,
-                '⌨️ <b>Enter Coordinates</b>\n\n' +
-                    'Please enter the coordinates in this format:\n' +
-                    '<code>latitude, longitude</code>\n\n' +
-                    '<b>Example:</b> <code>33.8547, 35.8623</code>\n\n' +
-                    'Or type <b>cancel</b> to abort.',
-                { parse_mode: 'HTML' }
-            )
-
-            // Coordinate capture will be handled by locationMethodLocationFlow's .addAnswer() chain
-            // After coordinates are captured, it will prompt for username selection
-            // We need to skip username prompt and go directly to confirmation
-        }
     })
+

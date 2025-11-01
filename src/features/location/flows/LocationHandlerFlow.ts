@@ -21,6 +21,7 @@ import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
 import { html } from '~/core/utils/telegramFormatting'
 import { validateIspUsername, parseUsernameList } from '~/core/utils/validators'
+import { storeConfirmationData } from '~/core/utils/buttonStateStore'
 
 const logger = createFlowLogger('location-handler-flow')
 
@@ -28,7 +29,7 @@ const logger = createFlowLogger('location-handler-flow')
  * Direct location share handler
  */
 export const locationHandlerFlow = addKeyword<TelegramProvider, Database>(EVENTS.LOCATION)
-    .addAction(async (ctx, { state, extensions, provider, flowDynamic, endFlow }) => {
+    .addAction(async (ctx, { state, globalState, extensions, provider, flowDynamic, endFlow }) => {
         const { userManagementService } = extensions!
 
         logger.info({ from: ctx.from }, 'Location message received')
@@ -108,19 +109,81 @@ export const locationHandlerFlow = addKeyword<TelegramProvider, Database>(EVENTS
             longitude,
         })
 
-        // Prompt for user mode selection
-        await sendWithInlineButtons(
-            ctx,
-            { extensions, provider, state, flowDynamic } as any,
-            `✅ <b>Location Received</b>\n\n` +
-                `📍 <code>${latitude.toFixed(6)}, ${longitude.toFixed(6)}</code>\n\n` +
-                `Update for single or multiple customers?`,
-            [
-                [createCallbackButton('👤 Single User', 'loc_direct_mode:single')],
-                [createCallbackButton('👥 Multiple Users', 'loc_direct_mode:multiple')],
-            ],
-            { parseMode: 'HTML' }
-        )
+        // Check if this is a webhook-triggered flow
+        // First try state, then globalState (which persists across flows)
+        let triggeredBy = await state.get<string>('triggeredBy')
+        let clientUsername = await state.get<string>('clientUsername')
+
+        // If not in state, check globalState
+        if (!triggeredBy || !clientUsername) {
+            const webhookData = await globalState.get<{ clientUsername: string; triggeredBy: string; timestamp: number }>(
+                `webhook_${ctx.from}`
+            )
+            if (webhookData) {
+                triggeredBy = webhookData.triggeredBy
+                clientUsername = webhookData.clientUsername
+                // Also update local state for consistency
+                await state.update({ triggeredBy, clientUsername, userMode: 'single' })
+                logger.debug({ webhookData }, 'Retrieved webhook context from globalState')
+            }
+        }
+
+        logger.debug({ triggeredBy, clientUsername, from: ctx.from }, 'Checking webhook context')
+
+        if (triggeredBy === 'webhook' && clientUsername) {
+            // Clear globalState for this user after retrieving
+            await globalState.update({ [`webhook_${ctx.from}`]: null })
+            // Webhook flow: Skip user mode selection, go directly to confirmation
+            logger.info({ clientUsername, latitude, longitude }, 'Webhook location - auto-filling username')
+
+            const usernames = [clientUsername]
+            await state.update({ usernames })
+
+            const summary =
+                `<b>📍 Update Summary</b>\n\n` +
+                `<b>Coordinates:</b>\n` +
+                `📍 <code>${latitude}, ${longitude}</code>\n\n` +
+                `<b>Customer:</b>\n` +
+                `• ${html.escape(clientUsername)}\n\n` +
+                `⚡ Location will be updated in ISP system and local database.`
+
+            // Encode state data (use store if too large)
+            const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
+            let confirmCallbackData: string
+
+            if (encodedData.length > 55) {
+                const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
+                confirmCallbackData = `loc_confirm:ref:${stateId}`
+                logger.debug({ stateId }, 'Using state store for webhook confirmation')
+            } else {
+                confirmCallbackData = `loc_confirm:${encodedData}`
+            }
+
+            await sendWithInlineButtons(
+                ctx,
+                { extensions, provider, state, flowDynamic } as any,
+                summary,
+                [
+                    [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
+                    [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
+                ],
+                { parseMode: 'HTML' }
+            )
+        } else {
+            // Normal flow: Prompt for user mode selection
+            await sendWithInlineButtons(
+                ctx,
+                { extensions, provider, state, flowDynamic } as any,
+                `✅ <b>Location Received</b>\n\n` +
+                    `📍 <code>${latitude.toFixed(6)}, ${longitude.toFixed(6)}</code>\n\n` +
+                    `Update for single or multiple customers?`,
+                [
+                    [createCallbackButton('👤 Single User', 'loc_direct_mode:single')],
+                    [createCallbackButton('👥 Multiple Users', 'loc_direct_mode:multiple')],
+                ],
+                { parseMode: 'HTML' }
+            )
+        }
     })
 
 /**
@@ -251,15 +314,25 @@ export const locationDirectUserModeFlow = addKeyword<TelegramProvider, Database>
             `Invalid usernames will be reported after attempting update.`
 
         // Encode state data in button callback for reliability
-        // Format: loc_confirm:yes|lat:X|lon:Y|u:user1,user2
+        // If data is too large (>64 bytes), use temporary store
         const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
+
+        let confirmCallbackData: string
+        if (encodedData.length > 55) { // Leave room for "loc_confirm:" prefix
+            // Store in temporary memory store and use short reference
+            const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
+            confirmCallbackData = `loc_confirm:ref:${stateId}`
+            logger.debug({ stateId, dataLength: encodedData.length }, 'Using state store for large data')
+        } else {
+            confirmCallbackData = `loc_confirm:${encodedData}`
+        }
 
         await sendWithInlineButtons(
             ctx,
             { extensions, provider, state, flowDynamic } as any,
             summary,
             [
-                [createCallbackButton('✅ Confirm Update', `loc_confirm:${encodedData}`)],
+                [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
                 [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
             ],
             { parseMode: 'HTML' }
