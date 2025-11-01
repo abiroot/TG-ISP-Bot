@@ -391,41 +391,45 @@ async function main() {
 
     // Payment collection webhook endpoint
     // POST /webhook/collector_payment
-    // Body: { worker_username: string, client_username: string }
+    // Body: { tg_username: string, client_username: string, worker_username?: string }
     adapterProvider.server.post('/webhook/collector_payment', async (req: any, res) => {
         try {
             // BuilderBot/Polka parses body automatically
-            const { worker_username, client_username } = req.body || {}
+            const { worker_username, tg_username, client_username } = req.body || {}
+
+            // Prefer tg_username, fallback to worker_username for backward compatibility
+            const username = tg_username || worker_username
 
             // Validate input
-            if (!worker_username || !client_username) {
+            if (!username || !client_username) {
                 res.writeHead(400, { 'Content-Type': 'application/json' })
                 return res.end(
                     JSON.stringify({
                         success: false,
-                        error: 'Missing required fields: worker_username and client_username',
+                        error: 'Missing required fields: tg_username (or worker_username) and client_username',
                     })
                 )
             }
 
             loggers.app.info(
-                { worker_username, client_username },
+                { tg_username, worker_username, client_username, used_username: username },
                 'Payment collection webhook received'
             )
 
-            // Look up worker's Telegram ID
+            // Look up worker's Telegram ID using tg_username (preferred) or worker_username
             const { telegramUserService } = await import('~/core/services/telegramUserService')
             const workerTelegramId = await telegramUserService.getTelegramIdByUsername(
-                worker_username
+                username
             )
 
             if (!workerTelegramId) {
-                loggers.app.warn({ worker_username }, 'Worker not found in user mapping')
+                loggers.app.warn({ tg_username, worker_username, used_username: username }, 'Worker not found in user mapping')
                 res.writeHead(404, { 'Content-Type': 'application/json' })
                 return res.end(
                     JSON.stringify({
                         success: false,
                         error: 'Worker not found',
+                        tg_username,
                         worker_username,
                     })
                 )
@@ -454,11 +458,12 @@ async function main() {
             await MessageLogger.logOutgoing(workerTelegramId, workerTelegramId, message, undefined, {
                 webhook: 'collector_payment',
                 client_username,
-                worker_username,
+                tg_username,
+                worker_username, // Keep for backward compatibility
             })
 
             loggers.app.info(
-                { worker_username, workerTelegramId, client_username },
+                { tg_username, worker_username, workerTelegramId, client_username },
                 'Payment notification sent successfully'
             )
 
@@ -466,7 +471,8 @@ async function main() {
             return res.end(
                 JSON.stringify({
                     success: true,
-                    worker_username,
+                    tg_username,
+                    worker_username, // Keep for backward compatibility
                     telegram_id: workerTelegramId,
                     message_sent: true,
                 })
