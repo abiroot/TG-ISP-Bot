@@ -30,12 +30,27 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
 
         const telegramId = ctx.from
 
+        // Extract user data from Telegram update (BuilderBot doesn't always populate ctx.name)
+        let firstName: string | undefined = ctx.name
+        let lastName: string | undefined = undefined
+        let telegramUsername: string | undefined = (ctx as any).username
+
+        // Fallback: Extract from raw Telegram update if ctx.name is missing
+        if (!firstName) {
+            const messageCtx = (ctx as any).messageCtx
+            if (messageCtx?.update?.message?.from) {
+                const telegramUser = messageCtx.update.message.from
+                firstName = telegramUser.first_name
+                lastName = telegramUser.last_name
+                telegramUsername = telegramUser.username || telegramUsername
+            }
+        }
+
         // Check if user already exists in mapping
         const existingUser = await telegramUserService.getUserByTelegramId(telegramId)
 
-        // If ctx.name is missing but user exists, just update last_seen (via upsert with existing data)
-        if (!ctx.name && existingUser) {
-            // Re-upsert with existing data to update timestamp
+        // If no name data available but user exists, just update timestamp
+        if (!firstName && existingUser) {
             await telegramUserService.upsertUser({
                 username: existingUser.username,
                 telegram_id: telegramId,
@@ -46,20 +61,18 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
 
             logger.debug(
                 { telegramId, username: existingUser.username },
-                'User mapping timestamp updated (name not in ctx)'
+                'User mapping timestamp updated (no name data)'
             )
             return
         }
 
-        // If ctx.name is missing and no existing user, skip (nothing to capture)
-        if (!ctx.name) {
-            logger.debug({ telegramId }, 'Skipping user mapping - no name in ctx and no existing user')
+        // If no name data and no existing user, skip
+        if (!firstName) {
+            logger.debug({ telegramId }, 'Skipping user mapping - no name data available')
             return
         }
 
-        const firstName = ctx.name
-
-        // Derive username from name (remove spaces, convert to lowercase)
+        // Derive username from first name (remove spaces, convert to lowercase)
         // For example: "Josiane Youssef" -> "josianeyoussef"
         const username = firstName.toLowerCase().replace(/\s+/g, '')
 
@@ -68,21 +81,17 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
             return
         }
 
-        // Attempt to get telegram_username from ctx if available
-        // BuilderBot's ctx might have additional fields from Telegram
-        const telegramUsername = (ctx as any).username || undefined
-
         // Upsert user mapping (create or update if exists)
         await telegramUserService.upsertUser({
             username,
             telegram_id: telegramId,
             telegram_username: telegramUsername,
             first_name: firstName,
-            last_name: undefined, // BuilderBot doesn't expose last_name in ctx
+            last_name: lastName,
         })
 
         logger.debug(
-            { username, telegramId, telegramUsername },
+            { username, telegramId, telegramUsername, firstName, lastName },
             'User mapping captured/updated'
         )
     } catch (error) {
