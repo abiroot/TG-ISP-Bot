@@ -1,5 +1,6 @@
 import { messageService } from '~/core/services/messageService'
 import type { BotCtx, ExtendedJsonValue } from '~/types'
+import { loggers } from '~/core/utils/logger'
 
 /**
  * Global message logger for event-based message logging
@@ -19,7 +20,7 @@ export class MessageLogger {
         try {
             await messageService.logIncomingMessage(ctx)
         } catch (error) {
-            console.error('Failed to log incoming message:', error)
+            loggers.telegram.error({ err: error }, 'Failed to log incoming message')
         }
     }
 
@@ -36,7 +37,7 @@ export class MessageLogger {
         try {
             await messageService.logOutgoingMessage(contextId, recipient, content, messageId, metadata)
         } catch (error) {
-            console.error('Failed to log outgoing message:', error)
+            loggers.telegram.error({ err: error }, 'Failed to log outgoing message')
         }
     }
 
@@ -63,7 +64,7 @@ export class MessageLogger {
                 metadata
             )
         } catch (error) {
-            console.error('Failed to log media message:', error)
+            loggers.telegram.error({ err: error }, 'Failed to log media message')
         }
     }
 }

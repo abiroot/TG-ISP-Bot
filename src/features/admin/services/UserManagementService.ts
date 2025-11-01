@@ -22,25 +22,22 @@ import { personalityRepository } from '~/database/repositories/personalityReposi
 import { whitelistRepository } from '~/database/repositories/whitelistRepository'
 import { messageRepository } from '~/database/repositories/messageRepository'
 import { embeddingRepository } from '~/database/repositories/embeddingRepository'
+import { telegramUserRepository } from '~/database/repositories/telegramUserRepository'
+import { toolExecutionAuditRepository } from '~/database/repositories/toolExecutionAuditRepository'
 import { admins } from '~/config/admins'
 import { createFlowLogger } from '~/core/utils/logger'
-import { getContextId } from '~/core/utils/contextId'
-import type { Personality, CreatePersonality, UpdatePersonality } from '~/database/schemas/personality'
+import { ServiceError } from '~/core/errors/ServiceError'
+import { getContextId, getContextType } from '~/core/utils/contextId'
+import type { Personality, CreatePersonality, UpdatePersonality, ContextType } from '~/database/schemas/personality'
 
 const userMgmtLogger = createFlowLogger('user-management')
 
 /**
  * User Management Service Error with structured error codes
  */
-export class UserManagementServiceError extends Error {
-    constructor(
-        message: string,
-        public readonly code: string,
-        public readonly cause?: unknown,
-        public readonly retryable: boolean = false
-    ) {
-        super(message)
-        this.name = 'UserManagementServiceError'
+export class UserManagementServiceError extends ServiceError {
+    constructor(message: string, code: string, cause?: unknown, retryable: boolean = false) {
+        super('UserManagementService', message, code, cause, retryable)
     }
 }
 
@@ -53,13 +50,6 @@ export class UserManagementService {
     /**
      * PERSONALITY MANAGEMENT
      */
-
-    /**
-     * Get context ID from phone/group ID
-     */
-    getContextId(from: string | number): string {
-        return getContextId(from)
-    }
 
     /**
      * Get personality for a context
@@ -91,6 +81,38 @@ export class UserManagementService {
             throw new UserManagementServiceError(
                 'Failed to create personality',
                 'PERSONALITY_CREATE_ERROR',
+                error,
+                true // Database errors may be transient
+            )
+        }
+    }
+
+    /**
+     * Upsert personality (create or update)
+     * If personality exists, updates it. If not, creates new one.
+     */
+    async upsertPersonality(data: CreatePersonality): Promise<Personality> {
+        try {
+            const existing = await personalityRepository.getByContextId(data.context_id)
+
+            if (existing) {
+                // Update existing personality
+                const updated = await personalityRepository.update(data.context_id, {
+                    bot_name: data.bot_name,
+                })
+                userMgmtLogger.info({ contextId: data.context_id }, 'Personality updated')
+                return updated!
+            } else {
+                // Create new personality
+                const personality = await personalityRepository.create(data)
+                userMgmtLogger.info({ contextId: data.context_id }, 'Personality created')
+                return personality
+            }
+        } catch (error) {
+            userMgmtLogger.error({ err: error, contextId: data.context_id }, 'Failed to upsert personality')
+            throw new UserManagementServiceError(
+                'Failed to upsert personality',
+                'PERSONALITY_UPSERT_ERROR',
                 error,
                 true // Database errors may be transient
             )
@@ -264,12 +286,15 @@ export class UserManagementService {
 
     /**
      * Delete all user data (GDPR compliance)
-     * Deletes: messages, embeddings, personality
+     * Deletes: messages, embeddings, personality, user mapping, tool audit logs, whitelist entry
      */
     async deleteAllUserData(userIdentifier: string): Promise<{
         messagesDeleted: number
         embeddingsDeleted: number
         personalityDeleted: boolean
+        userMappingDeleted: boolean
+        auditLogsDeleted: number
+        whitelistDeleted: boolean
     }> {
         try {
             userMgmtLogger.info({ userIdentifier }, 'Starting complete user data deletion')
@@ -278,16 +303,28 @@ export class UserManagementService {
             const messagesDeleted = await messageRepository.deleteByUser(userIdentifier)
 
             // Delete embeddings
-            const contextId = this.getContextId(userIdentifier)
+            const contextId = getContextId(userIdentifier)
             const embeddingsDeleted = await embeddingRepository.deleteByContextId(contextId)
 
             // Delete personality
             const personalityDeleted = await this.deletePersonality(contextId)
 
+            // Delete telegram user mapping (GDPR compliance)
+            const userMappingDeleted = await telegramUserRepository.deleteByTelegramId(userIdentifier)
+
+            // Delete tool execution audit logs (GDPR compliance)
+            const auditLogsDeleted = await toolExecutionAuditRepository.deleteByUser(userIdentifier)
+
+            // Delete from whitelist if present
+            const whitelistDeleted = await whitelistRepository.removeUser(userIdentifier)
+
             const result = {
                 messagesDeleted,
                 embeddingsDeleted,
                 personalityDeleted,
+                userMappingDeleted,
+                auditLogsDeleted,
+                whitelistDeleted,
             }
 
             userMgmtLogger.info({ userIdentifier, result }, 'User data deletion completed')

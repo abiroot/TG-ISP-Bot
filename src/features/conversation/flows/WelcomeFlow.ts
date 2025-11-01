@@ -14,7 +14,11 @@ import { addKeyword, EVENTS } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { createFlowLogger } from '~/core/utils/logger'
-import { CoreAIServiceError } from '~/features/conversation/services/CoreAIService'
+import { CoreAIServiceError, AIResponse } from '~/features/conversation/services/CoreAIService'
+import { withRetry } from '~/core/utils/flowRetry'
+import { sendFormattedMessage } from '~/core/utils/telegramFormatting'
+import { getContextId } from '~/core/utils/contextId'
+import { LoadingIndicator } from '~/core/utils/loadingIndicator'
 
 const flowLogger = createFlowLogger('welcome')
 
@@ -23,40 +27,39 @@ const flowLogger = createFlowLogger('welcome')
  * Uses EVENTS.WELCOME (BuilderBot catch-all)
  */
 export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME)
-    .addAction(async (ctx, { flowDynamic, gotoFlow, extensions, provider }) => {
+    .addAction(async (ctx, utils) => {
+        const { flowDynamic, gotoFlow, extensions, provider } = utils
         const { coreAIService, userManagementService, ispService, botStateService } = extensions!
 
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Welcome flow triggered')
 
         // Check if personality exists
-        const contextId = userManagementService.getContextId(ctx.from)
+        const contextId = getContextId(ctx.from)
         const personality = await userManagementService.getPersonality(contextId)
 
         if (!personality) {
-            flowLogger.info({ from: ctx.from }, 'First-time user - routing to setup')
+            flowLogger.info({ from: ctx.from }, 'First-time user - routing to onboarding')
 
-            await flowDynamic(
-                '👋 Welcome! Let me get to know you better.\n\n' +
-                '⏱️ _This setup will timeout after 5 minutes._'
-            )
-
-            // Route to personality setup flow
-            const { firstTimeUserFlow } = await import('~/features/conversation/flows/FirstTimeUserFlow')
-            return gotoFlow(firstTimeUserFlow)
+            // Route to new onboarding flow (button-based modern UI)
+            const { onboardingWelcomeFlow } = await import('~/features/onboarding/flows')
+            return gotoFlow(onboardingWelcomeFlow)
         }
 
         // Check if AI is enabled
         if (!(await botStateService.isFeatureEnabled('ai_responses'))) {
-            await flowDynamic('⚠️ AI responses are currently disabled.')
+            await sendFormattedMessage(ctx, utils, '⚠️ AI responses are currently disabled.')
             return
         }
 
         // Check maintenance mode (already handled by middleware, but safety check)
         if (await botStateService.isMaintenanceMode()) {
             const message = await botStateService.getMaintenanceMessage()
-            await flowDynamic(message)
+            await sendFormattedMessage(ctx, utils, message)
             return
         }
+
+        // Send loading indicator
+        const loadingMsg = await LoadingIndicator.show(provider, ctx.from)
 
         try {
             // Get recent conversation history for better context
@@ -73,32 +76,44 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
             // 3. Executes tool and generates response
             // No separate intent classification needed!
 
-            const response = await coreAIService.chat(
-                {
-                    contextId,
-                    userPhone: ctx.from,
-                    userName: ctx.name,
-                    personality,
-                    recentMessages: [
+            const response: AIResponse = await withRetry(
+                () =>
+                    coreAIService.chat(
                         {
-                            id: Date.now().toString(),
-                            message_id: ctx.id || Date.now().toString(),
-                            context_id: contextId,
-                            context_type: String(ctx.from).startsWith('-') ? 'group' : 'private',
-                            direction: 'incoming',
-                            sender: ctx.from,
-                            content: ctx.body,
-                            status: 'sent',
-                            metadata: {},
-                            created_at: new Date(),
-                            is_deleted: false,
-                            is_bot_command: false,
-                            is_admin_command: false,
+                            contextId,
+                            userPhone: ctx.from,
+                            userName: ctx.name,
+                            personality,
+                            recentMessages: [
+                                {
+                                    id: Date.now().toString(),
+                                    message_id: ctx.id || Date.now().toString(),
+                                    context_id: contextId,
+                                    context_type: String(ctx.from).startsWith('-') ? 'group' : 'private',
+                                    direction: 'incoming',
+                                    sender: ctx.from,
+                                    content: ctx.body,
+                                    status: 'sent',
+                                    metadata: {},
+                                    created_at: new Date(),
+                                    is_deleted: false,
+                                    is_bot_command: false,
+                                    is_admin_command: false,
+                                },
+                            ],
                         },
-                    ],
-                },
-                ispService.getTools() // Make ISP tools available
+                        ispService.getTools() // Make ISP tools available
+                    ),
+                {
+                    maxRetries: 2,
+                    delayMs: 2000,
+                    exponentialBackoff: true,
+                    onRetry: LoadingIndicator.createRetryHandler(provider, loadingMsg, 3),
+                }
             )
+
+            // Delete loading indicator before sending response
+            await LoadingIndicator.hide(provider, loadingMsg)
 
             // Send response with HTML formatting via telegram API directly
             // Note: provider.sendMessage() doesn't forward parse_mode, so we use telegram API directly
@@ -135,6 +150,9 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 )
             }
         } catch (error) {
+            // Delete loading indicator on error
+            await LoadingIndicator.hide(provider, loadingMsg)
+
             // AI SDK v5 Enhanced Error Handling
             if (error instanceof CoreAIServiceError) {
                 flowLogger.error(
@@ -152,52 +170,84 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                     case 'API_CALL_ERROR':
                         if (error.retryable) {
                             await flowDynamic(
-                                '⚠️ The AI service is experiencing issues. Please try again in a moment.'
+                                '⚠️ <b>AI Service Temporarily Unavailable</b>\n\n' +
+                                    'The AI service is experiencing issues after multiple retries.\n\n' +
+                                    '<i>Please try again in a moment.</i>'
                             )
                         } else {
                             await flowDynamic(
-                                '❌ Unable to connect to the AI service. Please contact support if this persists.'
+                                '❌ <b>AI Service Error</b>\n\n' +
+                                    'Unable to connect to the AI service.\n\n' +
+                                    '<b>Possible reasons:</b>\n' +
+                                    '• Service maintenance\n' +
+                                    '• Network connectivity issues\n' +
+                                    '• API quota exceeded\n\n' +
+                                    '<i>Please contact support if this persists.</i>'
                             )
                         }
                         break
 
                     case 'NO_SUCH_TOOL':
                         await flowDynamic(
-                            '⚠️ The AI tried to use a tool that doesn\'t exist. This has been logged for investigation.'
+                            '⚠️ <b>Tool Error</b>\n\n' +
+                                'The AI tried to use a tool that doesn\'t exist.\n\n' +
+                                '<i>This has been logged for investigation.</i>'
                         )
                         break
 
                     case 'INVALID_TOOL_INPUT':
                         await flowDynamic(
-                            '⚠️ There was an issue processing your request. Please try rephrasing it.'
+                            '⚠️ <b>Request Processing Error</b>\n\n' +
+                                'There was an issue processing your request.\n\n' +
+                                '<b>Try:</b>\n' +
+                                '• Rephrasing your question\n' +
+                                '• Being more specific\n' +
+                                '• Using different keywords'
                         )
                         break
 
                     case 'NO_CONTENT_GENERATED':
-                        await flowDynamic('⚠️ The AI didn\'t generate a response. Please try again.')
+                        await flowDynamic(
+                            '⚠️ <b>No Response Generated</b>\n\n' +
+                                'The AI didn\'t generate a response.\n\n' +
+                                '<i>Please try again with a different question.</i>'
+                        )
                         break
 
                     case 'TYPE_VALIDATION_ERROR':
                         await flowDynamic(
-                            '⚠️ The AI response was invalid. This issue has been logged.'
+                            '⚠️ <b>Response Validation Error</b>\n\n' +
+                                'The AI response was invalid.\n\n' +
+                                '<i>This issue has been logged.</i>'
                         )
                         break
 
                     case 'RETRY_EXHAUSTED':
                         await flowDynamic(
-                            '❌ The AI service is temporarily unavailable after multiple attempts. Please try again later.'
+                            '❌ <b>Service Temporarily Unavailable</b>\n\n' +
+                                'The AI service is unavailable after multiple attempts.\n\n' +
+                                '<b>What to do:</b>\n' +
+                                '• Wait a few minutes\n' +
+                                '• Try again later\n' +
+                                '• Contact support if urgent'
                         )
                         break
 
                     default:
                         await flowDynamic(
-                            '❌ Sorry, I encountered an error. Please try again or contact support.'
+                            '❌ <b>Unexpected Error</b>\n\n' +
+                                'Sorry, I encountered an error.\n\n' +
+                                '<i>Please try again or contact support.</i>'
                         )
                 }
             } else {
                 // Unknown error
                 flowLogger.error({ err: error, from: ctx.from }, 'AI response failed with unknown error')
-                await flowDynamic('❌ Sorry, I encountered an unexpected error. Please try again.')
+                await flowDynamic(
+                    '❌ <b>Unexpected Error</b>\n\n' +
+                        'Sorry, I encountered an unexpected error.\n\n' +
+                        '<i>Please try again.</i>'
+                )
             }
         }
     })

@@ -20,9 +20,6 @@ export interface Message {
     error_message?: string
     metadata: Record<string, any>
     created_at: Date
-    delivered_at?: Date
-    read_at?: Date
-    reply_to_message_id?: string
     is_bot_command: boolean
     is_admin_command: boolean
     command_name?: string
@@ -45,7 +42,6 @@ export interface CreateMessage {
     status?: MessageStatus
     error_message?: string
     metadata?: Record<string, any>
-    reply_to_message_id?: string
     is_bot_command?: boolean
     is_admin_command?: boolean
     command_name?: string
@@ -54,8 +50,6 @@ export interface CreateMessage {
 export interface UpdateMessage {
     status?: MessageStatus
     error_message?: string
-    delivered_at?: Date
-    read_at?: Date
     metadata?: Record<string, any>
 }
 

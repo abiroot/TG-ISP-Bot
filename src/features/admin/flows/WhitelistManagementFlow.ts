@@ -20,6 +20,23 @@ import { normalizeGroupId } from '~/core/utils/contextId'
 const flowLogger = createFlowLogger('whitelist-mgmt')
 
 /**
+ * Validates if input is a valid Telegram identifier
+ * Accepts: numeric user IDs, usernames with/without @
+ */
+function isValidTelegramIdentifier(input: string): boolean {
+    // Remove @ prefix if present
+    const cleaned = input.startsWith('@') ? input.slice(1) : input
+
+    // Telegram username: 5-32 characters, alphanumeric + underscores, no consecutive underscores
+    const usernameRegex = /^[a-zA-Z0-9_]{5,32}$/
+
+    // Numeric Telegram user ID (typically 9-10 digits)
+    const numericIdRegex = /^\d{5,15}$/
+
+    return usernameRegex.test(cleaned) || numericIdRegex.test(cleaned)
+}
+
+/**
  * Whitelist Management Flow - Single flow with sub-actions
  */
 export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
@@ -48,11 +65,11 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
             return handleListWhitelist(ctx, flowDynamic, userManagementService)
         } else if (input.includes('remove')) {
             await state.update({ action: 'remove' })
-            await flowDynamic('🗑️ **Remove from Whitelist**\n\nReply with:\n• "group" to remove current group\n• Phone number to remove user (e.g., +1234567890)')
+            await flowDynamic('🗑️ **Remove from Whitelist**\n\nReply with:\n• "group" to remove current group\n• Telegram username to remove user (e.g., @username or SOLamyy)')
             return
         } else {
             await state.update({ action: 'add' })
-            await flowDynamic('➕ **Add to Whitelist**\n\nReply with:\n• "group" to whitelist current group\n• Phone number to whitelist user (e.g., +1234567890)')
+            await flowDynamic('➕ **Add to Whitelist**\n\nReply with:\n• "group" to whitelist current group\n• Telegram username to whitelist user (e.g., @username or SOLamyy)')
             return
         }
     })
@@ -75,17 +92,20 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
                     await userManagementService.removeGroupFromWhitelist(groupId)
                     await flowDynamic(`✅ Group ${groupId} has been removed from whitelist!`)
                 }
-            } else if (input.match(/^\+?\d{6,15}$/)) {
-                // Handle phone number
+            } else if (isValidTelegramIdentifier(input)) {
+                // Handle Telegram username or user ID
+                // Remove @ prefix if present
+                const cleanedInput = input.startsWith('@') ? input.slice(1) : input
+
                 if (action === 'add') {
-                    await userManagementService.whitelistUser(input, ctx.from, 'Added via bot')
-                    await flowDynamic(`✅ User ${input} has been whitelisted!`)
+                    await userManagementService.whitelistUser(cleanedInput, ctx.from, 'Added via bot')
+                    await flowDynamic(`✅ User ${cleanedInput} has been whitelisted!`)
                 } else {
-                    await userManagementService.removeUserFromWhitelist(input)
-                    await flowDynamic(`✅ User ${input} has been removed from whitelist!`)
+                    await userManagementService.removeUserFromWhitelist(cleanedInput)
+                    await flowDynamic(`✅ User ${cleanedInput} has been removed from whitelist!`)
                 }
             } else {
-                await flowDynamic('❌ Invalid input. Please provide "group" or a phone number.')
+                await flowDynamic('❌ Invalid input. Please provide "group" or a Telegram username (e.g., @username or SOLamyy).')
                 return
             }
 

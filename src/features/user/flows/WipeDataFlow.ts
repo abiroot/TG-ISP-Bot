@@ -5,6 +5,7 @@ import { messageRepository } from '~/database/repositories/messageRepository'
 import { personalityRepository } from '~/database/repositories/personalityRepository'
 import { embeddingRepository } from '~/database/repositories/embeddingRepository'
 import { createFlowLogger } from '~/core/utils/logger'
+import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
 
 const flowLogger = createFlowLogger('wipedata')
 
@@ -47,41 +48,54 @@ You are about to *permanently delete* ALL your data:
 To confirm, please type exactly:
 *DELETE ALL MY DATA*
 
-Or type "cancel" to abort.`
+Or type "cancel" to abort.
+
+⏱️ _You have 1 minute to confirm._`
         )
+
+        // Start confirmation timeout (1 minute)
+        await startIdleTimer(ctx, utils.state, TIMEOUT_PRESETS.CONFIRMATION, async () => {
+            await utils.state.clear()
+            await utils.flowDynamic('⏰ Confirmation timeout. Data deletion cancelled for your safety.')
+            return utils.endFlow()
+        })
     })
     .addAnswer('', { capture: true }, async (ctx, utils) => {
-        const confirmation = ctx.body.trim()
-        const userIdentifier = ctx.from
+        try {
+            const confirmation = ctx.body.trim()
+            const userIdentifier = ctx.from
 
-        // Check for cancellation
-        if (confirmation.toLowerCase() === 'cancel') {
-            flowLogger.info({ userIdentifier }, 'User cancelled data wipe')
-            await utils.flowDynamic('✅ Data deletion cancelled. Your data is safe.')
-            return
-        }
+            // Check for cancellation
+            if (confirmation.toLowerCase() === 'cancel') {
+                flowLogger.info({ userIdentifier }, 'User cancelled data wipe')
+                await clearIdleTimer(ctx.from)
+                await utils.flowDynamic('✅ Data deletion cancelled. Your data is safe.')
+                return
+            }
 
-        // Check for exact confirmation phrase
-        if (confirmation !== 'DELETE ALL MY DATA') {
-            flowLogger.warn({ userIdentifier, providedText: confirmation }, 'Incorrect confirmation phrase')
-            await utils.flowDynamic(
-                `❌ Incorrect confirmation phrase.
+            // Check for exact confirmation phrase
+            if (confirmation !== 'DELETE ALL MY DATA') {
+                flowLogger.warn({ userIdentifier, providedText: confirmation }, 'Incorrect confirmation phrase')
+                await utils.flowDynamic(
+                    `❌ Incorrect confirmation phrase.
 
 You typed: "${confirmation}"
 
 Please type exactly: *DELETE ALL MY DATA*
 
 Or type "cancel" to abort.`
-            )
-            return utils.fallBack()
-        }
+                )
+                return utils.fallBack()
+            }
 
-        // User confirmed - proceed with deletion
-        flowLogger.warn({ userIdentifier }, 'User confirmed data wipe - proceeding with deletion')
+            // Clear timer - user confirmed
+            await clearIdleTimer(ctx.from)
 
-        await utils.flowDynamic('🔄 Deleting your data... Please wait.')
+            // User confirmed - proceed with deletion
+            flowLogger.warn({ userIdentifier }, 'User confirmed data wipe - proceeding with deletion')
 
-        try {
+            await utils.flowDynamic('🔄 Deleting your data... Please wait.')
+
             // Delete all data in parallel
             const [messagesDeleted, personalitiesDeleted, embeddingsDeleted] = await Promise.all([
                 messageRepository.deleteByUser(userIdentifier),
@@ -113,9 +127,26 @@ Your account is now clean. You can start fresh or stop using the bot.
 If you want to continue using the bot, please set up your personality again with /setup personality.`
             )
         } catch (error) {
-            flowLogger.error({ err: error, userIdentifier }, 'Failed to wipe user data')
+            // Always clear timer on error
+            await clearIdleTimer(ctx.from)
+
+            flowLogger.error({ err: error, userIdentifier: ctx.from }, 'Failed to wipe user data')
+
             await utils.flowDynamic(
-                `❌ Error occurred while deleting your data. Please contact support or try again later.`
+                `❌ <b>Data Deletion Failed</b>
+
+An error occurred while deleting your data.
+
+<b>Possible reasons:</b>
+• Database temporarily unavailable
+• Network connectivity issues
+• System maintenance in progress
+
+<b>Next steps:</b>
+• Try again in a few moments
+• Contact support if this persists
+
+<i>Note: Some data may have been partially deleted. Contact support for assistance.</i>`
             )
         }
     })

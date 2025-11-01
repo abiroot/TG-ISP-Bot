@@ -274,6 +274,25 @@ export class ToolExecutionAuditRepository {
             throw error
         }
     }
+
+    /**
+     * Delete all audit logs for a user (GDPR compliance)
+     */
+    async deleteByUser(userTelegramId: string): Promise<number> {
+        try {
+            const result = await pool.query(
+                `DELETE FROM tool_execution_audit
+                 WHERE user_telegram_id = $1`,
+                [userTelegramId]
+            )
+
+            logger.info({ deletedCount: result.rowCount, userTelegramId }, 'Deleted user audit logs')
+            return result.rowCount ?? 0
+        } catch (error) {
+            logger.error({ err: error, userTelegramId }, 'Failed to delete user audit logs')
+            throw error
+        }
+    }
 }
 
 // Export singleton instance

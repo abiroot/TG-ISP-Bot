@@ -7,6 +7,7 @@
 
 import { telegramUserRepository } from '~/database/repositories/telegramUserRepository'
 import { createFlowLogger } from '~/core/utils/logger'
+import { ServiceError } from '~/core/errors/ServiceError'
 import type {
     TelegramUserMapping,
     CreateTelegramUserMapping,
@@ -18,15 +19,9 @@ const logger = createFlowLogger('telegram-user-service')
 /**
  * Telegram User Service Error
  */
-export class TelegramUserServiceError extends Error {
-    constructor(
-        message: string,
-        public readonly code: string,
-        public readonly cause?: unknown,
-        public readonly retryable: boolean = false
-    ) {
-        super(message)
-        this.name = 'TelegramUserServiceError'
+export class TelegramUserServiceError extends ServiceError {
+    constructor(message: string, code: string, cause?: unknown, retryable: boolean = false) {
+        super('TelegramUserService', message, code, cause, retryable)
     }
 }
 

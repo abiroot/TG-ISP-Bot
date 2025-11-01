@@ -28,12 +28,34 @@ import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
 import { wipeDataFlow } from '~/features/user/flows/WipeDataFlow'
 
 // Import conversation flows
-import { personalitySetupFlow } from '~/features/conversation/flows/PersonalitySetupFlow'
-import { firstTimeUserFlow } from '~/features/conversation/flows/FirstTimeUserFlow'
 import { welcomeFlow } from '~/features/conversation/flows/WelcomeFlow'
 
 // Import ISP flows
 import { ispQueryFlow } from '~/features/isp/flows/ISPQueryFlow'
+
+// Import menu flows
+import {
+    mainMenuFlow,
+    menuBackFlow,
+    userInfoMenuFlow,
+    checkCustomerFlow,
+    accountStatusFlow,
+    networkInfoFlow,
+    settingsMenuFlow,
+    updatePersonalityFlow,
+    helpMenuFlow,
+    helpStartFlow,
+    helpCommandsFlow,
+    helpISPFlow,
+    privacyMenuFlow,
+    viewDataFlow,
+    deleteDataFlow,
+} from '~/features/menu/flows'
+
+// Import onboarding flows (simple 1-step: name only)
+import {
+    onboardingWelcomeFlow,
+} from '~/features/onboarding/flows'
 
 // Import test flows
 import { pingFlow } from '~/examples/test'
@@ -67,13 +89,37 @@ async function main() {
         botManagementFlow,
         versionFlow, // Version command (available to all users)
 
+        // Onboarding flows (simple 3-step setup)
+        // Button handlers MUST come before trigger flows
+        onboardingWelcomeFlow, // Entry flow
+
+        // Menu system (button-based navigation)
+        // IMPORTANT: Button handler flows MUST come before mainMenuFlow
+        // to prevent 'menu' keyword from matching button events
+        menuBackFlow,
+        // User Info submenu
+        userInfoMenuFlow,
+        checkCustomerFlow,
+        accountStatusFlow,
+        networkInfoFlow,
+        // Settings submenu
+        settingsMenuFlow,
+        updatePersonalityFlow,
+        // Help submenu
+        helpMenuFlow,
+        helpStartFlow,
+        helpCommandsFlow,
+        helpISPFlow,
+        // Privacy submenu
+        privacyMenuFlow,
+        viewDataFlow,
+        deleteDataFlow,
+        // Main menu LAST (after all button handlers)
+        mainMenuFlow,
+
         // User flows (help, data wipe)
         userHelpFlow,
         wipeDataFlow,
-
-        // Conversation/Personality flows
-        personalitySetupFlow,
-        firstTimeUserFlow, // Automatic setup for first-time users
 
         // ISP Support flow (customer lookup)
         ispQueryFlow,
@@ -161,6 +207,7 @@ async function main() {
     const { mediaService } = await import('~/features/media/services/MediaService')
     const { auditService } = await import('~/features/audit/services/AuditService')
     const { botStateService } = await import('~/features/admin/services/BotStateService')
+    const { onboardingStateService } = await import('~/features/onboarding/services/OnboardingStateService')
 
     // Core shared services
     const { messageService } = await import('~/core/services/messageService')
@@ -185,6 +232,7 @@ async function main() {
                 mediaService,
                 auditService,
                 botStateService,
+                onboardingStateService,
                 messageService,
             },
         }

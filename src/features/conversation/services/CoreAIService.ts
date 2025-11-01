@@ -36,8 +36,8 @@ import { Message } from '~/database/schemas/message'
 import { embeddingRepository } from '~/database/repositories/embeddingRepository'
 import { messageService } from '~/core/services/messageService'
 import { TextChunker, ChunkOptions } from '~/features/conversation/utils/textChunker'
-// import { TokenCounter } from '~/core/utils/tokenCounter' // Removed - utility deleted
 import { createFlowLogger } from '~/core/utils/logger'
+import { ServiceError } from '~/core/errors/ServiceError'
 import type { SimilaritySearchResult } from '~/database/schemas/conversationEmbedding'
 
 const aiLogger = createFlowLogger('core-ai-service')
@@ -45,15 +45,9 @@ const aiLogger = createFlowLogger('core-ai-service')
 /**
  * AI SDK v5 Error types for proper error handling
  */
-export class CoreAIServiceError extends Error {
-    constructor(
-        message: string,
-        public readonly code: string,
-        public readonly cause?: unknown,
-        public readonly retryable: boolean = false
-    ) {
-        super(message)
-        this.name = 'CoreAIServiceError'
+export class CoreAIServiceError extends ServiceError {
+    constructor(message: string, code: string, cause?: unknown, retryable: boolean = false) {
+        super('CoreAIService', message, code, cause, retryable)
     }
 }
 
@@ -449,10 +443,10 @@ export class CoreAIService {
     private generateSystemPrompt(context: ConversationContext, ragContext?: string): string {
         const { personality, userPhone } = context
 
-        // Calculate today's date in user's timezone
+        // Calculate today's date in UTC (default timezone)
         const now = new Date()
         const formatter = new Intl.DateTimeFormat('en-CA', {
-            timeZone: personality.default_timezone,
+            timeZone: 'UTC',
             year: 'numeric',
             month: '2-digit',
             day: '2-digit',
@@ -463,7 +457,7 @@ export class CoreAIService {
         const day = parts.find((p) => p.type === 'day')?.value || ''
         const todayLocal = `${year}-${month}-${day}`
 
-        const basePrompt = `⏰ CURRENT DATE: <b>${todayLocal}</b> (${personality.default_timezone} timezone)
+        const basePrompt = `⏰ CURRENT DATE: <b>${todayLocal}</b> (UTC timezone)
 
 You are ${personality.bot_name}, an intelligent ISP support assistant.
 
@@ -511,8 +505,6 @@ EXAMPLES:
 ❌ WRONG: "User **John Doe** is \`online\`" (will show as literal text)
 
 📋 GUIDELINES:
-- Language: ${personality.default_language}
-- Timezone: ${personality.default_timezone}
 - Be concise but thorough
 - Use emojis for better readability
 - Provide specific information when available
@@ -647,8 +639,6 @@ Use this context to provide personalized responses that reference our actual con
                     maxRetries: 2,
                 })
 
-                const metadata = TextChunker.extractChunkMetadata(chunk.messages)
-
                 await embeddingRepository.create({
                     context_id: contextId,
                     context_type: messages[0].context_type,
@@ -658,7 +648,6 @@ Use this context to provide personalized responses that reference our actual con
                     chunk_index: latestIndex + chunk.chunkIndex + 1,
                     timestamp_start: chunk.timestampStart,
                     timestamp_end: chunk.timestampEnd,
-                    metadata,
                 })
             }
 

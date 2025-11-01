@@ -1,9 +1,9 @@
 import { pool } from '~/config/database'
 import {
     WhitelistedGroup,
-    WhitelistedNumber,
+    WhitelistedUser,
     CreateWhitelistedGroup,
-    CreateWhitelistedNumber,
+    CreateWhitelistedUser,
 } from '../schemas/whitelist'
 
 export class WhitelistRepository {
@@ -47,15 +47,15 @@ export class WhitelistRepository {
 
     async isUserWhitelisted(userIdentifier: string): Promise<boolean> {
         const result = await pool.query(
-            'SELECT EXISTS(SELECT 1 FROM whitelisted_numbers WHERE user_identifier = $1 AND is_active = TRUE)',
+            'SELECT EXISTS(SELECT 1 FROM whitelisted_users WHERE user_identifier = $1 AND is_active = TRUE)',
             [userIdentifier]
         )
         return result.rows[0].exists
     }
 
-    async addUser(data: CreateWhitelistedNumber): Promise<WhitelistedNumber> {
+    async addUser(data: CreateWhitelistedUser): Promise<WhitelistedUser> {
         const result = await pool.query(
-            `INSERT INTO whitelisted_numbers (user_identifier, whitelisted_by, notes)
+            `INSERT INTO whitelisted_users (user_identifier, whitelisted_by, notes)
              VALUES ($1, $2, $3)
              ON CONFLICT (user_identifier) DO UPDATE SET is_active = TRUE, updated_at = CURRENT_TIMESTAMP
              RETURNING *`,
@@ -66,15 +66,15 @@ export class WhitelistRepository {
 
     async removeUser(userIdentifier: string): Promise<boolean> {
         const result = await pool.query(
-            'UPDATE whitelisted_numbers SET is_active = FALSE WHERE user_identifier = $1',
+            'UPDATE whitelisted_users SET is_active = FALSE WHERE user_identifier = $1',
             [userIdentifier]
         )
         return result.rowCount ? result.rowCount > 0 : false
     }
 
-    async getAllUsers(): Promise<WhitelistedNumber[]> {
+    async getAllUsers(): Promise<WhitelistedUser[]> {
         const result = await pool.query(
-            'SELECT * FROM whitelisted_numbers WHERE is_active = TRUE ORDER BY whitelisted_at DESC'
+            'SELECT * FROM whitelisted_users WHERE is_active = TRUE ORDER BY whitelisted_at DESC'
         )
         return result.rows
     }

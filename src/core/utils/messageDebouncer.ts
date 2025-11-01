@@ -5,6 +5,10 @@
  * Based on BuilderBot best practices for handling "fast entries"
  */
 
+import { createFlowLogger } from './logger'
+
+const logger = createFlowLogger('messageDebouncer')
+
 interface MessageQueueItem {
     messages: string[]
     timerId: NodeJS.Timeout
@@ -38,7 +42,7 @@ class MessageDebouncerManager {
             }, gapTime)
 
             existing.timerId = timerId
-            console.log(`🔄 Message accumulated for ${contextId} (${existing.messages.length} messages)`)
+            logger.debug({ contextId, messageCount: existing.messages.length }, 'Message accumulated')
         } else {
             // First message - create new queue entry
             const timerId = setTimeout(async () => {
@@ -50,7 +54,7 @@ class MessageDebouncerManager {
                 timerId,
                 callback,
             })
-            console.log(`📥 First message queued for ${contextId}`)
+            logger.debug({ contextId }, 'First message queued')
         }
     }
 
@@ -65,10 +69,10 @@ class MessageDebouncerManager {
         }
 
         try {
-            console.log(`⚡ Processing ${queueItem.messages.length} accumulated message(s) for ${contextId}`)
+            logger.info({ contextId, messageCount: queueItem.messages.length }, 'Processing accumulated messages')
             await queueItem.callback(queueItem.messages)
         } catch (error) {
-            console.error(`❌ Error processing message queue for ${contextId}:`, error)
+            logger.error({ err: error, contextId }, 'Error processing message queue')
         } finally {
             // Clean up
             this.queues.delete(contextId)
@@ -84,7 +88,7 @@ class MessageDebouncerManager {
         if (queueItem) {
             clearTimeout(queueItem.timerId)
             this.queues.delete(contextId)
-            console.log(`🚫 Queue cancelled for ${contextId}`)
+            logger.debug({ contextId }, 'Queue cancelled')
         }
     }
 
@@ -110,7 +114,7 @@ class MessageDebouncerManager {
             clearTimeout(queueItem.timerId)
         }
         this.queues.clear()
-        console.log('🧹 All message queues cleared')
+        logger.info('All message queues cleared')
     }
 }
 

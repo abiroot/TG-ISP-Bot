@@ -2,14 +2,14 @@
  * Context ID Manager
  *
  * Centralized utility for handling context IDs consistently across the application.
- * Context IDs are used to identify conversation contexts (users or groups).
+ * Context IDs are used to identify conversation contexts (Telegram users or groups).
  *
  * Format:
- * - Private chats: User phone/ID as-is (e.g., "1234567890")
- * - Group chats: Group ID as-is (e.g., "-1001234567890")
+ * - Private chats: Telegram user ID as-is (e.g., "1234567890")
+ * - Group chats: Telegram group ID as-is (e.g., "-1001234567890")
  *
  * NOTE: Old pattern used prefixes like "group_" and "user_" but this is unnecessary
- * since group IDs always start with "-" and user IDs never do.
+ * since Telegram group IDs always start with "-" and user IDs never do.
  */
 
 /**
@@ -18,9 +18,9 @@
 export type ContextType = 'group' | 'private'
 
 /**
- * Get context ID from user/group identifier
+ * Get context ID from Telegram user/group identifier
  *
- * @param from - User phone/ID or group ID
+ * @param from - Telegram user ID or group ID
  * @returns Context ID (same as input, normalized to string)
  */
 export function getContextId(from: string | number): string {
@@ -28,9 +28,9 @@ export function getContextId(from: string | number): string {
 }
 
 /**
- * Get context type from identifier
+ * Get context type from Telegram identifier
  *
- * @param from - User phone/ID or group ID
+ * @param from - Telegram user ID or group ID
  * @returns 'group' if ID starts with '-', otherwise 'private'
  */
 export function getContextType(from: string | number): ContextType {

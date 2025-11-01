@@ -152,7 +152,7 @@ const result = await runMediaMiddleware(ctx, utils)
 **Five main tables:**
 
 1. **`whitelisted_groups`** - Group access control
-2. **`whitelisted_numbers`** - User access control
+2. **`whitelisted_users`** - User access control (Telegram usernames/IDs)
 3. **`personalities`** - Bot configuration per context (group/private)
 4. **`messages`** - Complete message history with 13 optimized indexes
 5. **`conversation_embeddings`** - Vector embeddings for RAG (pgvector)
@@ -190,15 +190,15 @@ Never import services directly in flows - always use extensions.
 - Includes conversation history for context-aware classification
 
 **Intent Categories:**
-1. `USER_INFO` - User requesting customer information by phone number
-2. `ACCOUNT_STATUS` - User asking about account status or online status
+1. `USER_INFO` - Telegram user requesting ISP customer information (searches by phone number)
+2. `ACCOUNT_STATUS` - Asking about ISP account status or online status
 3. `TECHNICAL_SUPPORT` - Technical issues, IP, MAC address, connection problems
 4. `BILLING_QUERY` - Billing, account price, expiry dates
 5. `NETWORK_INFO` - Network speeds, access points, NAS hosts
-6. `CUSTOMER_SEARCH` - User trying to find/search for a customer
+6. `CUSTOMER_SEARCH` - Trying to find/search for an ISP customer
 7. `GREETING` - Simple greetings
 8. `APPRECIATION` - Expressing thanks or gratitude
-9. `HELP` - User needs help/guidance
+9. `HELP` - Needs help/guidance
 10. `UNKNOWN` - Cannot determine intent (falls back to AI with tools)
 
 **Flow Routing** (`src/flows/ai/chatFlow.ts`):
@@ -225,11 +225,12 @@ if (intentResult.confidence >= 0.7) {
 
 **ISP Support Flows:**
 - `userInfoFlow` - Main ISP support flow with automatic phone number extraction
-  - Uses AI to extract phone numbers from natural language
+  - Uses AI to extract ISP customer phone numbers from natural language
   - Fetches real-time data from ISP management system
   - Provides formatted customer information, account status, and technical details
+  - **Note**: Phone numbers here are ISP customer data, NOT Telegram user identifiers
 - `manualPhoneEntryFlow` - Fallback flow when phone number cannot be detected
-  - Prompts user to manually enter phone number
+  - Prompts Telegram user to manually enter ISP customer phone number
   - Same ISP API integration as userInfoFlow
 
 **Benefits:**

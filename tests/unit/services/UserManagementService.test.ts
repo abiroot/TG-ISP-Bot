@@ -18,13 +18,13 @@ vi.mock('~/database/repositories/personalityRepository', () => ({
 vi.mock('~/database/repositories/whitelistRepository', () => ({
     whitelistRepository: {
         isGroupWhitelisted: vi.fn(),
-        isNumberWhitelisted: vi.fn(),
-        whitelistGroup: vi.fn(),
-        whitelistNumber: vi.fn(),
+        isUserWhitelisted: vi.fn(),
+        addGroup: vi.fn(),
+        addUser: vi.fn(),
         removeGroup: vi.fn(),
-        removeNumber: vi.fn(),
+        removeUser: vi.fn(),
         getAllGroups: vi.fn().mockResolvedValue([]),
-        getAllNumbers: vi.fn().mockResolvedValue([]),
+        getAllUsers: vi.fn().mockResolvedValue([]),
     },
 }))
 
@@ -135,7 +135,7 @@ describe('UserManagementService', () => {
     describe('Whitelist Management', () => {
         it('should check if user is whitelisted', async () => {
             const { whitelistRepository } = await import('~/database/repositories/whitelistRepository')
-            vi.mocked(whitelistRepository.isNumberWhitelisted).mockResolvedValue(true)
+            vi.mocked(whitelistRepository.isUserWhitelisted).mockResolvedValue(true)
 
             const isWhitelisted = await userMgmtService.isWhitelisted('+1234567890')
 
@@ -156,11 +156,11 @@ describe('UserManagementService', () => {
 
             await userMgmtService.whitelistUser('+1234567890', 'admin', 'Test note')
 
-            expect(whitelistRepository.whitelistNumber).toHaveBeenCalledWith(
-                '+1234567890',
-                'admin',
-                'Test note'
-            )
+            expect(whitelistRepository.addUser).toHaveBeenCalledWith({
+                user_identifier: '+1234567890',
+                whitelisted_by: 'admin',
+                notes: 'Test note'
+            })
         })
 
         it('should whitelist a group', async () => {
@@ -168,16 +168,16 @@ describe('UserManagementService', () => {
 
             await userMgmtService.whitelistGroup('-123456789', 'admin', 'Test group')
 
-            expect(whitelistRepository.whitelistGroup).toHaveBeenCalledWith(
-                '-123456789',
-                'admin',
-                'Test group'
-            )
+            expect(whitelistRepository.addGroup).toHaveBeenCalledWith({
+                group_id: '-123456789',
+                whitelisted_by: 'admin',
+                notes: 'Test group'
+            })
         })
 
         it('should remove user from whitelist', async () => {
             const { whitelistRepository } = await import('~/database/repositories/whitelistRepository')
-            vi.mocked(whitelistRepository.removeNumber).mockResolvedValue(true)
+            vi.mocked(whitelistRepository.removeUser).mockResolvedValue(true)
 
             const removed = await userMgmtService.removeUserFromWhitelist('+1234567890')
 

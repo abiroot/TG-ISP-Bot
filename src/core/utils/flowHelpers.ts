@@ -128,29 +128,6 @@ export function getContextId(ctx: any): string {
     return ctx.from
 }
 
-/**
- * Format phone number for display
- *
- * Helper to consistently format phone numbers for messages
- */
-export function formatPhoneNumber(phoneNumber: string): string {
-    // Remove all non-numeric characters
-    const cleaned = phoneNumber.replace(/\D/g, '')
-
-    // Format as +961 XX XXX XXX (Lebanese format) if it matches
-    if (cleaned.length === 11 && cleaned.startsWith('961')) {
-        return `+${cleaned.slice(0, 3)} ${cleaned.slice(3, 5)} ${cleaned.slice(5, 8)} ${cleaned.slice(8)}`
-    }
-
-    // Format as +XXX XX XXX XXXX (international format) if it starts with country code
-    if (cleaned.length >= 10) {
-        return `+${cleaned}`
-    }
-
-    // Return as-is if doesn't match known formats
-    return phoneNumber
-}
-
 // ============================================================================
 // Button Helpers
 // ============================================================================

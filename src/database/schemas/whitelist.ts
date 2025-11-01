@@ -9,7 +9,7 @@ export interface WhitelistedGroup {
     updated_at: Date
 }
 
-export interface WhitelistedNumber {
+export interface WhitelistedUser {
     id: string
     user_identifier: string
     whitelisted_by: string
@@ -26,7 +26,7 @@ export interface CreateWhitelistedGroup {
     notes?: string
 }
 
-export interface CreateWhitelistedNumber {
+export interface CreateWhitelistedUser {
     user_identifier: string
     whitelisted_by: string
     notes?: string

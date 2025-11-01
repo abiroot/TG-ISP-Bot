@@ -18,7 +18,6 @@ export interface ConversationEmbedding {
     chunk_index: number // Sequence number in conversation
     timestamp_start: Date
     timestamp_end: Date
-    metadata: Record<string, any> // JSONB metadata
     created_at: Date
     updated_at: Date
 }
@@ -35,7 +34,6 @@ export interface CreateConversationEmbedding {
     chunk_index: number
     timestamp_start: Date
     timestamp_end: Date
-    metadata?: Record<string, any>
 }
 
 /**
@@ -46,7 +44,6 @@ export interface UpdateConversationEmbedding {
     embedding?: number[]
     message_ids?: string[]
     timestamp_end?: Date
-    metadata?: Record<string, any>
 }
 
 /**
@@ -81,7 +78,6 @@ export interface SimilaritySearchOptions {
     before_date?: Date // Only search embeddings before this date
     top_k?: number // Number of results to return (default: 5)
     min_similarity?: number // Minimum similarity threshold (0-1)
-    metadata_filter?: Record<string, any> // Filter by metadata fields
 }
 
 /**
@@ -93,18 +89,4 @@ export interface EmbeddingStats {
     latest_timestamp: Date | null
     total_messages: number // Sum of all message_ids array lengths
     avg_chunk_size: number // Average number of messages per chunk
-}
-
-/**
- * Chunk metadata that can be stored in the metadata JSONB field
- */
-export interface ChunkMetadata {
-    topics?: string[] // Extracted topics from conversation
-    entities?: string[] // Named entities (people, places, things)
-    sentiment?: 'positive' | 'negative' | 'neutral' // Overall sentiment
-    language?: string // Detected language
-    has_media?: boolean // Whether chunk contains media messages
-    has_commands?: boolean // Whether chunk contains bot commands
-    message_count?: number // Number of messages in chunk
-    [key: string]: any // Allow additional custom metadata
 }

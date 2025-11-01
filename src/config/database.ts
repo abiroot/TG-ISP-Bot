@@ -1,5 +1,6 @@
 import { Pool } from 'pg'
 import { env } from './env'
+import { loggers } from '~/core/utils/logger'
 
 // Create a PostgreSQL connection pool
 export const pool = new Pool({
@@ -11,7 +12,7 @@ export const pool = new Pool({
 })
 
 pool.on('error', (err) => {
-    console.error('💥 Unexpected error on idle client', err)
+    loggers.app.fatal({ err }, 'Unexpected error on idle client')
     process.exit(-1)
 })
 
@@ -23,10 +24,10 @@ export async function testConnection(): Promise<boolean> {
         const client = await pool.connect()
         await client.query('SELECT NOW()')
         client.release()
-        console.log('✅ Database connection successful')
+        loggers.app.info('Database connection successful')
         return true
     } catch (error) {
-        console.error('❌ Database connection failed:', error)
+        loggers.app.error({ err: error }, 'Database connection failed')
         return false
     }
 }
@@ -36,5 +37,5 @@ export async function testConnection(): Promise<boolean> {
  */
 export async function closeConnection(): Promise<void> {
     await pool.end()
-    console.log('🔌 Database connection closed')
+    loggers.app.info('Database connection closed')
 }

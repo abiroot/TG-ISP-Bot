@@ -15,12 +15,7 @@ export async function runMigrations(): Promise<void> {
 
     const migrations = [
         '001_init.sql',
-        '002_bot_state.sql',
-        '008_add_pgvector_extension.sql',
-        '010_seed_whitelist.sql',
-        '011_add_user_identifiers.sql',
-        '013_tool_execution_audit.sql',
-        '014_telegram_user_mapping.sql',
+        '002_cleanup_function.sql',
     ]
 
     try {

@@ -23,6 +23,7 @@ import { z } from 'zod'
 import { env } from '~/config/env'
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
+import { ServiceError } from '~/core/errors/ServiceError'
 import type { Personality } from '~/database/schemas/personality'
 
 const ispLogger = createFlowLogger('isp-service')
@@ -30,15 +31,9 @@ const ispLogger = createFlowLogger('isp-service')
 /**
  * ISP Service Error with structured error codes
  */
-export class ISPServiceError extends Error {
-    constructor(
-        message: string,
-        public readonly code: string,
-        public readonly cause?: unknown,
-        public readonly retryable: boolean = false
-    ) {
-        super(message)
-        this.name = 'ISPServiceError'
+export class ISPServiceError extends ServiceError {
+    constructor(message: string, code: string, cause?: unknown, retryable: boolean = false) {
+        super('ISPService', message, code, cause, retryable)
     }
 }
 

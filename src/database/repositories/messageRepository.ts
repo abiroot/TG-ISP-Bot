@@ -18,9 +18,9 @@ export class MessageRepository {
             `INSERT INTO messages (
                 message_id, context_id, context_type, direction, sender, recipient,
                 content, media_url, media_type, media_content_type, media_size,
-                status, error_message, metadata, reply_to_message_id,
+                status, error_message, metadata,
                 is_bot_command, is_admin_command, command_name
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
             RETURNING *`,
             [
                 data.message_id,
@@ -37,7 +37,6 @@ export class MessageRepository {
                 data.status || 'sent',
                 data.error_message || null,
                 JSON.stringify(data.metadata || {}, getCircularReplacer()),
-                data.reply_to_message_id || null,
                 data.is_bot_command || false,
                 data.is_admin_command || false,
                 data.command_name || null,
@@ -77,14 +76,6 @@ export class MessageRepository {
         if (data.error_message !== undefined) {
             fields.push(`error_message = $${paramIndex++}`)
             values.push(data.error_message)
-        }
-        if (data.delivered_at) {
-            fields.push(`delivered_at = $${paramIndex++}`)
-            values.push(data.delivered_at)
-        }
-        if (data.read_at) {
-            fields.push(`read_at = $${paramIndex++}`)
-            values.push(data.read_at)
         }
         if (data.metadata) {
             fields.push(`metadata = $${paramIndex++}`)

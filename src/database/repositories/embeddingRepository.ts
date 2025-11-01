@@ -21,8 +21,8 @@ export class EmbeddingRepository {
         const result = await pool.query(
             `INSERT INTO conversation_embeddings (
                 context_id, context_type, chunk_text, embedding, message_ids,
-                chunk_index, timestamp_start, timestamp_end, metadata
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+                chunk_index, timestamp_start, timestamp_end
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
             RETURNING *`,
             [
                 data.context_id,
@@ -33,7 +33,6 @@ export class EmbeddingRepository {
                 data.chunk_index,
                 data.timestamp_start,
                 data.timestamp_end,
-                JSON.stringify(data.metadata || {}),
             ]
         )
         return this.parseEmbedding(result.rows[0])
@@ -132,12 +131,6 @@ export class EmbeddingRepository {
             params.push(options.before_date)
         }
 
-        if (options.metadata_filter) {
-            // JSONB containment operator
-            query += ` AND metadata @> $${paramIndex++}::jsonb`
-            params.push(JSON.stringify(options.metadata_filter))
-        }
-
         // Apply similarity threshold
         if (minSimilarity > 0) {
             query += ` AND (1 - (embedding <=> $1::vector)) >= ${minSimilarity}`
@@ -181,11 +174,6 @@ export class EmbeddingRepository {
         if (data.timestamp_end !== undefined) {
             fields.push(`timestamp_end = $${paramIndex++}`)
             values.push(data.timestamp_end)
-        }
-
-        if (data.metadata !== undefined) {
-            fields.push(`metadata = $${paramIndex++}`)
-            values.push(JSON.stringify(data.metadata))
         }
 
         if (fields.length === 0) return null
@@ -275,7 +263,6 @@ export class EmbeddingRepository {
             chunk_index: row.chunk_index,
             timestamp_start: new Date(row.timestamp_start),
             timestamp_end: new Date(row.timestamp_end),
-            metadata: typeof row.metadata === 'string' ? JSON.parse(row.metadata) : row.metadata,
             created_at: new Date(row.created_at),
             updated_at: new Date(row.updated_at),
         }

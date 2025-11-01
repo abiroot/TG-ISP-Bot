@@ -3,28 +3,17 @@ import { CreateMessage, Message, MessageDirection } from '~/database/schemas/mes
 import { isAdmin } from '~/config/admins'
 import { v4 as uuidv4 } from 'uuid'
 import { getContextId, getContextType } from '~/core/utils/contextId'
+import { createFlowLogger } from '~/core/utils/logger'
+
+const logger = createFlowLogger('messageService')
 
 export class MessageService {
-    /**
-     * Get context ID from user identifier
-     */
-    private getContextId(from: string | number): string {
-        return getContextId(from)
-    }
-
-    /**
-     * Get context type (group or private)
-     */
-    private getContextType(from: string | number): 'group' | 'private' {
-        return getContextType(from)
-    }
-
     /**
      * Log an incoming message
      */
     async logIncomingMessage(ctx: any, metadata?: Record<string, any>): Promise<Message> {
-        const contextId = this.getContextId(ctx.from)
-        const contextType = this.getContextType(ctx.from)
+        const contextId = getContextId(ctx.from)
+        const contextType = getContextType(ctx.from)
 
         // Check if message is a command
         const messageBody = (ctx.body || '').trim().toLowerCase()
@@ -53,7 +42,7 @@ export class MessageService {
 
         // Check for duplicate messages
         if (ctx.id && (await messageRepository.exists(ctx.id))) {
-            console.log(`⚠️  Duplicate message detected: ${ctx.id}`)
+            logger.warn({ messageId: ctx.id }, 'Duplicate message detected')
             return (await messageRepository.getByMessageId(ctx.id))!
         }
 
@@ -70,7 +59,7 @@ export class MessageService {
         messageId?: string,
         metadata?: Record<string, any>
     ): Promise<Message> {
-        const contextType = this.getContextType(contextId)
+        const contextType = getContextType(contextId)
 
         const messageData: CreateMessage = {
             message_id: messageId || uuidv4(),
@@ -99,7 +88,7 @@ export class MessageService {
         messageId?: string,
         metadata?: Record<string, any>
     ): Promise<Message> {
-        const contextType = this.getContextType(contextId)
+        const contextType = getContextType(contextId)
 
         const messageData: CreateMessage = {
             message_id: messageId || uuidv4(),
@@ -221,7 +210,7 @@ export class MessageService {
      * @returns Created message with tool metadata
      */
     async storeAIResponseWithTools(contextId: string, userPhone: string, result: any): Promise<Message> {
-        const contextType = this.getContextType(contextId)
+        const contextType = getContextType(contextId)
 
         // Extract ALL tool calls from ALL steps (not just final step)
         // AI SDK v5 stores tool calls in result.steps[].toolCalls, NOT in result.toolCalls
@@ -361,13 +350,13 @@ export class MessageService {
                         }
                     }
                 } catch (msgError) {
-                    console.warn(`⚠️  Error processing message ${msg.id} in history:`, msgError)
+                    logger.warn({ err: msgError, messageId: msg.id }, 'Error processing message in history')
                 }
             }
 
             return modelMessages
         } catch (error) {
-            console.error(`❌ Failed to reconstruct conversation history for ${contextId}:`, error)
+            logger.error({ err: error, contextId }, 'Failed to reconstruct conversation history')
             return []
         }
     }
@@ -397,6 +386,17 @@ export class MessageService {
         }
 
         return null
+    }
+
+    /**
+     * Get message count for a context
+     * Used for data privacy and user data management
+     *
+     * @param contextId - Conversation context identifier
+     * @returns Total message count
+     */
+    async getMessageCount(contextId: string): Promise<number> {
+        return await messageRepository.getMessageCount(contextId)
     }
 }
 

@@ -12,15 +12,13 @@ export class PersonalityRepository {
 
     async create(data: CreatePersonality): Promise<Personality> {
         const result = await pool.query(
-            `INSERT INTO personalities (context_id, context_type, bot_name, default_timezone, default_language, created_by)
-             VALUES ($1, $2, $3, $4, $5, $6)
+            `INSERT INTO personalities (context_id, context_type, bot_name, created_by)
+             VALUES ($1, $2, $3, $4)
              RETURNING *`,
             [
                 data.context_id,
                 data.context_type,
                 data.bot_name,
-                data.default_timezone,
-                data.default_language,
                 data.created_by,
             ]
         )
@@ -35,14 +33,6 @@ export class PersonalityRepository {
         if (data.bot_name) {
             fields.push(`bot_name = $${paramIndex++}`)
             values.push(data.bot_name)
-        }
-        if (data.default_timezone) {
-            fields.push(`default_timezone = $${paramIndex++}`)
-            values.push(data.default_timezone)
-        }
-        if (data.default_language) {
-            fields.push(`default_language = $${paramIndex++}`)
-            values.push(data.default_language)
         }
 
         if (fields.length === 0) return null

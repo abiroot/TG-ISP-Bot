@@ -22,6 +22,7 @@ import { generateText, Output } from 'ai'
 import { z } from 'zod'
 import { env } from '~/config/env'
 import { createFlowLogger } from '~/core/utils/logger'
+import { ServiceError } from '~/core/errors/ServiceError'
 import { createReadStream } from 'fs'
 import { unlink } from 'fs/promises'
 
@@ -30,15 +31,9 @@ const mediaLogger = createFlowLogger('media-service')
 /**
  * Media Service Error with structured error codes
  */
-export class MediaServiceError extends Error {
-    constructor(
-        message: string,
-        public readonly code: string,
-        public readonly cause?: unknown,
-        public readonly retryable: boolean = false
-    ) {
-        super(message)
-        this.name = 'MediaServiceError'
+export class MediaServiceError extends ServiceError {
+    constructor(message: string, code: string, cause?: unknown, retryable: boolean = false) {
+        super('MediaService', message, code, cause, retryable)
     }
 }
 

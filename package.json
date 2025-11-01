@@ -14,6 +14,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:ui": "vitest --ui",
+    "db:reset": "tsx ./scripts/db-reset.ts --local",
+    "db:reset:prod": "tsx ./scripts/db-reset.ts --production",
+    "admin:ids": "tsx ./scripts/getAdminIds.ts",
     "prepare": "husky"
   },
   "keywords": [],

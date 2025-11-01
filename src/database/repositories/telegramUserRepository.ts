@@ -129,6 +129,16 @@ export class TelegramUserRepository {
     }
 
     /**
+     * Delete user mapping by Telegram ID (GDPR)
+     */
+    async deleteByTelegramId(telegramId: string): Promise<boolean> {
+        const result = await pool.query('DELETE FROM telegram_user_mapping WHERE telegram_id = $1', [
+            telegramId,
+        ])
+        return result.rowCount ? result.rowCount > 0 : false
+    }
+
+    /**
      * Check if username exists in mapping
      */
     async usernameExists(username: string): Promise<boolean> {

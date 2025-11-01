@@ -1,24 +1,18 @@
 /**
  * Admin Telegram user IDs configuration
  *
- * IMPORTANT: This supports two modes:
+ * SECURITY BEST PRACTICE: Use numeric Telegram IDs for production
  *
- * 1. **NUMERIC IDS** (RECOMMENDED for security):
- *    - Use actual Telegram numeric IDs: '123456789', '987654321'
- *    - These IDs never change and cannot be hijacked
- *    - To get numeric IDs: Check database table 'user_identifiers' or bot logs
+ * Numeric IDs are:
+ * - Permanent and never change
+ * - Cannot be hijacked by username changes
+ * - More secure for production systems
  *
- * 2. **USERNAMES** (Convenience, less secure):
- *    - Use Telegram usernames: 'username' or '@username'
- *    - Mapped to numeric IDs via user_identifiers table
- *    - WARNING: Users can change their username, requiring database update
- *
- * Current Implementation:
- * - adminCheck middleware first tries direct ID match
- * - If not matched, looks up username in user_identifiers table
- * - Returns the mapped Telegram ID for comparison
- *
- * Best Practice: Use numeric IDs for production systems
+ * How to get numeric Telegram IDs:
+ * 1. Send a message to the bot from your Telegram account
+ * 2. Check the `messages` table: SELECT DISTINCT sender FROM messages WHERE sender ~ '^[0-9]+$';
+ * 3. Or check the `telegram_user_mapping` table: SELECT telegram_id, username FROM telegram_user_mapping;
+ * 4. Use the numeric ID (e.g., '123456789') in this array
  *
  * Admins have special permissions to:
  * - Whitelist/remove groups and users
@@ -27,18 +21,13 @@
  * - Execute admin commands
  *
  * @example
- * // Recommended (numeric IDs):
- * export const ADMIN_IDS = ['123456789', '987654321']
- *
- * // Alternative (usernames - requires database mapping):
- * export const ADMIN_IDS = ['SOLamyy', 'lambasoft']
+ * export const ADMIN_IDS = ['123456789', '987654321', '5795384135']
  */
 export const ADMIN_IDS: string[] = [
-    'SOLamyy', // @SOLamyy - Mapped via user_identifiers table
-    'lambasoft', // @lambasoft - Mapped via user_identifiers table
-    '5795384135' // Jhonny Hachem - Numeric Telegram ID
-    // TODO: Replace with numeric Telegram IDs for production security
-    // Example: '123456789', '987654321'
+    '5795384135', // Jhonny Hachem - Numeric Telegram ID (secure)
+    // Add more numeric Telegram IDs here:
+    // '123456789', // Admin Name
+    // '987654321', // Another Admin
 ]
 
 // Backward compatibility export (for v2 services)
