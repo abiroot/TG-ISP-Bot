@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { AuditService } from '~/services/v2/AuditService'
+import { AuditService } from '~/features/audit/services/AuditService'
 
 // Mock repository
 vi.mock('~/database/repositories/toolExecutionAuditRepository', () => ({

@@ -20,6 +20,7 @@ export async function runMigrations(): Promise<void> {
         '010_seed_whitelist.sql',
         '011_add_user_identifiers.sql',
         '013_tool_execution_audit.sql',
+        '014_telegram_user_mapping.sql',
     ]
 
     try {

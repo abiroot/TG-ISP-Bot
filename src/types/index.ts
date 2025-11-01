@@ -10,16 +10,16 @@ export type BotCtx = BotContext
  * Use this type when defining extensions at bot creation
  */
 export interface ServiceExtensions {
-    // V2 Services - primary names only
-    coreAIService?: typeof import('~/services/v2/CoreAIService').CoreAIService
-    ispService?: typeof import('~/services/v2/ISPService').ISPService
-    userManagementService?: typeof import('~/services/v2/UserManagementService').UserManagementService
-    mediaService?: typeof import('~/services/v2/MediaService').MediaService
-    auditService?: typeof import('~/services/v2/AuditService').AuditService
-    botStateService?: typeof import('~/services/v2/EnhancedBotStateService').EnhancedBotStateService
+    // Feature services
+    coreAIService?: typeof import('~/features/conversation/services/CoreAIService').CoreAIService
+    ispService?: typeof import('~/features/isp/services/ISPService').ISPService
+    userManagementService?: typeof import('~/features/admin/services/UserManagementService').UserManagementService
+    mediaService?: typeof import('~/features/media/services/MediaService').MediaService
+    auditService?: typeof import('~/features/audit/services/AuditService').AuditService
+    botStateService?: typeof import('~/features/admin/services/BotStateService').BotStateService
 
-    // Shared service
-    messageService?: typeof import('~/services/messageService').messageService
+    // Core shared service
+    messageService?: typeof import('~/core/services/messageService').messageService
 }
 
 /**

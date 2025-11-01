@@ -16,7 +16,7 @@
 
 import { pool } from '~/config/database'
 import type { PoolClient, QueryResult } from 'pg'
-import { createFlowLogger } from '~/utils/logger'
+import { createFlowLogger } from '~/core/utils/logger'
 
 const txLogger = createFlowLogger('transaction-manager')
 

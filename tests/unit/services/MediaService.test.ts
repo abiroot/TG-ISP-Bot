@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { MediaService } from '~/services/v2/MediaService'
+import { MediaService } from '~/features/media/services/MediaService'
 
 // Mock AI SDK
 vi.mock('ai', () => ({

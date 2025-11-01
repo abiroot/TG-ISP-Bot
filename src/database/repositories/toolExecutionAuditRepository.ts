@@ -12,7 +12,7 @@ import type {
     ToolExecutionAuditQuery,
     ToolExecutionStats,
 } from '~/database/schemas/toolExecutionAudit'
-import { createFlowLogger } from '~/utils/logger'
+import { createFlowLogger } from '~/core/utils/logger'
 
 const logger = createFlowLogger('tool-audit-repository')
 

@@ -6,7 +6,7 @@ import {
     MessageFilter,
     ConversationHistoryOptions,
 } from '../schemas/message'
-import { getCircularReplacer } from '~/utils/jsonHelpers'
+import { getCircularReplacer } from '~/core/utils/jsonHelpers'
 
 export class MessageRepository {
 

@@ -8,7 +8,7 @@ import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { env } from '~/config/env'
 import { testConnection } from '~/config/database'
 import { runMigrations } from '~/database/migrations/runMigrations'
-import { logger, loggers } from '~/utils/logger'
+import { logger, loggers } from '~/core/utils/logger'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -18,23 +18,25 @@ const __dirname = dirname(__filename)
 const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf-8'))
 export const APP_VERSION = packageJson.version
 
-// Import V2 flows
-import { whitelistManagementFlow } from '~/flows/v2/admin/WhitelistManagementFlow'
-import { botManagementFlow } from '~/flows/v2/admin/BotManagementFlow'
-import { ispQueryFlow } from '~/flows/v2/isp/ISPQueryFlow'
-import { welcomeFlowV2 } from '~/flows/v2/ai/WelcomeFlowV2'
+// Import admin flows
+import { whitelistManagementFlow } from '~/features/admin/flows/WhitelistManagementFlow'
+import { botManagementFlow } from '~/features/admin/flows/BotManagementFlow'
+import { versionFlow } from '~/features/admin/flows/VersionFlow'
 
-// Import V1 flows (still needed)
-import {
-    versionFlow,
-    wipeDataFlow,
-    userHelpFlow,
-    personalitySetupFlow,
-    firstTimeUserFlow,
-    pingFlow,
-} from '~/flows'
+// Import user flows
+import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
+import { wipeDataFlow } from '~/features/user/flows/WipeDataFlow'
 
-// NOTE: mikrotikUsersFlow temporarily removed (depends on deleted ispApiService)
+// Import conversation flows
+import { personalitySetupFlow } from '~/features/conversation/flows/PersonalitySetupFlow'
+import { firstTimeUserFlow } from '~/features/conversation/flows/FirstTimeUserFlow'
+import { welcomeFlow } from '~/features/conversation/flows/WelcomeFlow'
+
+// Import ISP flows
+import { ispQueryFlow } from '~/features/isp/flows/ISPQueryFlow'
+
+// Import test flows
+import { pingFlow } from '~/examples/test'
 
 const PORT = env.PORT
 
@@ -60,24 +62,21 @@ async function main() {
 
     // Build flow list based on environment
     const flows = [
-        // V2 Admin flows (consolidated management)
-        whitelistManagementFlow, // Replaces: whitelistGroupFlow, whitelistUserFlow, removeGroupFlow, removeUserFlow, listWhitelistFlow
-        botManagementFlow,       // Replaces: enableMaintenanceFlow, disableMaintenanceFlow, botStatusFlow, toggleFeatureFlow, rateLimitStatusFlow, resetRateLimitFlow, unblockUserFlow, adminHelpFlow
-
-        // Version command (available to all users)
-        versionFlow,
+        // Admin flows (consolidated management)
+        whitelistManagementFlow,
+        botManagementFlow,
+        versionFlow, // Version command (available to all users)
 
         // User flows (help, data wipe)
         userHelpFlow,
         wipeDataFlow,
 
-        // Personality flows (setup handles both create and update)
+        // Conversation/Personality flows
         personalitySetupFlow,
         firstTimeUserFlow, // Automatic setup for first-time users
 
-        // V2 ISP Support flow (consolidated customer lookup)
-        ispQueryFlow,        // Replaces: userInfoFlow, manualPhoneEntryFlow, mikrotikMonitorFlow
-        // mikrotikUsersFlow - temporarily removed (depends on deleted ispApiService)
+        // ISP Support flow (customer lookup)
+        ispQueryFlow,
 
         // Test flows (for development and testing)
         pingFlow,
@@ -104,7 +103,7 @@ async function main() {
             demoBackFlow,
             optionHandlerFlow,
             actionHandlerFlow,
-        } = await import('~/flows/examples')
+        } = await import('~/examples')
 
         flows.push(
             buttonExampleFlow,
@@ -125,8 +124,8 @@ async function main() {
         )
     }
 
-    // V2 Welcome flow MUST be last (EVENTS.WELCOME catches all unmatched messages)
-    flows.push(welcomeFlowV2) // Replaces: welcomeFlow (45% cost reduction!)
+    // Welcome flow MUST be last (EVENTS.WELCOME catches all unmatched messages)
+    flows.push(welcomeFlow)
 
     // Create flow adapter with all registered flows
     const adapterFlow = createFlow(flows)
@@ -155,16 +154,16 @@ async function main() {
         })
     }
 
-    // Import V2 service singletons (already initialized)
-    const { coreAIService } = await import('~/services/v2/CoreAIService')
-    const { ispService } = await import('~/services/v2/ISPService')
-    const { userManagementService } = await import('~/services/v2/UserManagementService')
-    const { mediaService } = await import('~/services/v2/MediaService')
-    const { auditService } = await import('~/services/v2/AuditService')
-    const { enhancedBotStateService } = await import('~/services/v2/EnhancedBotStateService')
+    // Import service singletons (already initialized)
+    const { coreAIService } = await import('~/features/conversation/services/CoreAIService')
+    const { ispService } = await import('~/features/isp/services/ISPService')
+    const { userManagementService } = await import('~/features/admin/services/UserManagementService')
+    const { mediaService } = await import('~/features/media/services/MediaService')
+    const { auditService } = await import('~/features/audit/services/AuditService')
+    const { botStateService } = await import('~/features/admin/services/BotStateService')
 
-    // Shared service (used by both V1 and V2)
-    const { messageService } = await import('~/services/messageService')
+    // Core shared services
+    const { messageService } = await import('~/core/services/messageService')
 
     // Create bot with queue configuration and extensions
     const botInstance = await createBot(
@@ -179,14 +178,14 @@ async function main() {
                 concurrencyLimit: 50, // Handle 50 parallel conversations
             },
             extensions: {
-                // V2 Services - singleton instances
+                // Service singletons
                 coreAIService,
                 ispService,
                 userManagementService,
                 mediaService,
                 auditService,
-                botStateService: enhancedBotStateService, // Use correct singleton name
-                messageService, // Shared service
+                botStateService,
+                messageService,
             },
         }
     )
@@ -194,8 +193,15 @@ async function main() {
     // Event-based message logging - automatically log ALL incoming messages
     adapterProvider.on('message', async (ctx) => {
         try {
-            const { MessageLogger } = await import('~/middleware/messageLogger')
+            // Log incoming message
+            const { MessageLogger } = await import('~/core/middleware/messageLogger')
             await MessageLogger.logIncoming(ctx)
+
+            // Auto-capture user mapping for webhook notifications (non-blocking)
+            const { captureUserMapping } = await import('~/core/middleware/userMappingMiddleware')
+            captureUserMapping(ctx).catch((err) => {
+                loggers.telegram.warn({ err }, 'User mapping capture failed (non-critical)')
+            })
         } catch (error) {
             loggers.telegram.error({ err: error }, 'Failed to log incoming message via event')
         }
@@ -205,7 +211,7 @@ async function main() {
     const bot = await import('@builderbot/bot')
     adapterProvider.on('send_message', async (payload) => {
         try {
-            const { MessageLogger } = await import('~/middleware/messageLogger')
+            const { MessageLogger } = await import('~/core/middleware/messageLogger')
             const { answer, from } = payload as any
             await MessageLogger.logOutgoing(from, from, answer)
         } catch (error) {
@@ -287,6 +293,11 @@ async function main() {
     // Start polling for vendor availability
     registerCallbackHandler()
 
+    // Start HTTP server
+    // Note: TwilioProvider doesn't have initHttpServer method, using httpServer from createBot
+    botInstance.httpServer(PORT)
+
+    // Register HTTP routes AFTER httpServer() is called
     // Health check endpoint
     adapterProvider.server.get('/health', (req, res) => {
         res.writeHead(200, { 'Content-Type': 'application/json' })
@@ -299,14 +310,98 @@ async function main() {
         )
     })
 
-    // Start HTTP server
-    // Note: TwilioProvider doesn't have initHttpServer method, using httpServer from createBot
-    botInstance.httpServer(PORT)
+    // Payment collection webhook endpoint
+    // POST /webhook/collector_payment
+    // Body: { worker_username: string, client_username: string }
+    adapterProvider.server.post('/webhook/collector_payment', async (req: any, res) => {
+        try {
+            // BuilderBot/Polka parses body automatically
+            const { worker_username, client_username } = req.body || {}
+
+            // Validate input
+            if (!worker_username || !client_username) {
+                res.writeHead(400, { 'Content-Type': 'application/json' })
+                return res.end(
+                    JSON.stringify({
+                        success: false,
+                        error: 'Missing required fields: worker_username and client_username',
+                    })
+                )
+            }
+
+            loggers.app.info(
+                { worker_username, client_username },
+                'Payment collection webhook received'
+            )
+
+            // Look up worker's Telegram ID
+            const { telegramUserService } = await import('~/core/services/telegramUserService')
+            const workerTelegramId = await telegramUserService.getTelegramIdByUsername(
+                worker_username
+            )
+
+            if (!workerTelegramId) {
+                loggers.app.warn({ worker_username }, 'Worker not found in user mapping')
+                res.writeHead(404, { 'Content-Type': 'application/json' })
+                return res.end(
+                    JSON.stringify({
+                        success: false,
+                        error: 'Worker not found',
+                        worker_username,
+                    })
+                )
+            }
+
+            // Prepare notification message
+            const message =
+                `💰 <b>Payment Collected</b>\n\n` +
+                `Client: ${client_username}\n` +
+                `Status: Payment received ✅`
+
+            // Send message to worker via Telegram
+            await adapterProvider.vendor.telegram.sendMessage(workerTelegramId, message, {
+                parse_mode: 'HTML',
+            })
+
+            // Log outgoing message
+            const { MessageLogger } = await import('~/core/middleware/messageLogger')
+            await MessageLogger.logOutgoing(workerTelegramId, workerTelegramId, message, undefined, {
+                webhook: 'collector_payment',
+                client_username,
+                worker_username,
+            })
+
+            loggers.app.info(
+                { worker_username, workerTelegramId, client_username },
+                'Payment notification sent successfully'
+            )
+
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(
+                JSON.stringify({
+                    success: true,
+                    worker_username,
+                    telegram_id: workerTelegramId,
+                    message_sent: true,
+                })
+            )
+        } catch (error) {
+            loggers.app.error({ err: error }, 'Webhook error')
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            return res.end(
+                JSON.stringify({
+                    success: false,
+                    error: 'Internal server error',
+                })
+            )
+        }
+    })
 
     loggers.app.info('✅ ISP Support Bot is running!')
     loggers.app.info('📱 Telegram bot configured')
     loggers.app.info({ port: PORT }, '🌐 HTTP server started')
     loggers.app.info({ url: `http://localhost:${PORT}/health` }, '🔍 Health check endpoint')
+    loggers.app.info({ url: `http://localhost:${PORT}/webhook/collector_payment` }, '💰 Payment webhook endpoint')
 }
 
 // Handle graceful shutdown

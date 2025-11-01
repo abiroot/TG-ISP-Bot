@@ -10,5 +10,5 @@ export default {
     onwarn: (warning) => {
         if (warning.code === 'UNRESOLVED_IMPORT') return
     },
-    plugins: [typescript()],
+    plugins: [typescript({ clean: true })],
 }

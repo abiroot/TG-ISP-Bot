@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { UserManagementService } from '~/services/v2/UserManagementService'
+import { UserManagementService } from '~/features/admin/services/UserManagementService'
 
 // Mock repositories
 vi.mock('~/database/repositories/personalityRepository', () => ({

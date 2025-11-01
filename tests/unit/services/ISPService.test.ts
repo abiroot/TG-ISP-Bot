@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest'
-import { ISPService } from '~/services/v2/ISPService'
+import { ISPService } from '~/features/isp/services/ISPService'
 
 // Mock fetch globally
 global.fetch = vi.fn()

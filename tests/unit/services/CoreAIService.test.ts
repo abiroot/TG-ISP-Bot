@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest'
-import { CoreAIService } from '~/services/v2/CoreAIService'
-import type { ConversationContext } from '~/services/v2/CoreAIService'
+import { CoreAIService } from '~/features/conversation/services/CoreAIService'
+import type { ConversationContext } from '~/features/conversation/services/CoreAIService'
 
 // Mock dependencies
 vi.mock('@ai-sdk/openai', () => ({
