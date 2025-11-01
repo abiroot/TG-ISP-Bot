@@ -66,19 +66,21 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
             return
         }
 
-        // If no name data and no existing user, skip
+        // If no name data and no existing user, use telegram_id as username
+        let username: string
         if (!firstName) {
-            logger.debug({ telegramId }, 'Skipping user mapping - no name data available')
-            return
-        }
+            username = `user_${telegramId}`
+            logger.debug({ telegramId, username }, 'Using telegram_id as username (no name data)')
+        } else {
+            // Derive username from first name (remove spaces, convert to lowercase)
+            // For example: "Josiane Youssef" -> "josianeyoussef"
+            username = firstName.toLowerCase().replace(/\s+/g, '')
 
-        // Derive username from first name (remove spaces, convert to lowercase)
-        // For example: "Josiane Youssef" -> "josianeyoussef"
-        const username = firstName.toLowerCase().replace(/\s+/g, '')
-
-        // Skip if username is empty after processing
-        if (!username) {
-            return
+            // Skip if username is empty after processing
+            if (!username) {
+                username = `user_${telegramId}`
+                logger.debug({ telegramId, username }, 'Username empty after processing, using telegram_id')
+            }
         }
 
         // Upsert user mapping (create or update if exists)
