@@ -33,6 +33,23 @@ import { welcomeFlow } from '~/features/conversation/flows/WelcomeFlow'
 // Import ISP flows
 import { ispQueryFlow } from '~/features/isp/flows/ISPQueryFlow'
 
+// Import location flows
+import {
+    updateCoordinatesFlow,
+    locationMethodLocationFlow,
+    locationUserModeFlow,
+    locationConfirmFlow,
+} from '~/features/location/flows/UpdateCoordinatesFlow'
+import {
+    locationHandlerFlow,
+    locationDirectUserModeFlow,
+} from '~/features/location/flows/LocationHandlerFlow'
+import {
+    webhookLocationRequestFlow,
+    webhookLocationSkipFlow,
+    webhookLocationMethodFlow,
+} from '~/features/location/flows/WebhookLocationRequestFlow'
+
 // Import menu flows
 import {
     mainMenuFlow,
@@ -121,6 +138,18 @@ async function main() {
         userHelpFlow,
         wipeDataFlow,
 
+        // Location update flows (must come before ISP flows)
+        // Button handlers MUST come before trigger flow
+        locationMethodLocationFlow, // Manual coordinate entry with inline capture
+        locationUserModeFlow, // Username selection with inline capture
+        locationConfirmFlow, // Confirmation and execution
+        locationDirectUserModeFlow, // Direct location sharing username capture
+        webhookLocationRequestFlow, // Webhook-triggered location request
+        webhookLocationSkipFlow, // Webhook skip button handler
+        webhookLocationMethodFlow, // Webhook location method selection
+        locationHandlerFlow, // Direct location sharing (EVENTS.LOCATION)
+        updateCoordinatesFlow, // Main entry flow
+
         // ISP Support flow (customer lookup)
         ispQueryFlow,
 
@@ -203,6 +232,7 @@ async function main() {
     // Import service singletons (already initialized)
     const { coreAIService } = await import('~/features/conversation/services/CoreAIService')
     const { ispService } = await import('~/features/isp/services/ISPService')
+    const { locationService } = await import('~/features/location/services/LocationService')
     const { userManagementService } = await import('~/features/admin/services/UserManagementService')
     const { mediaService } = await import('~/features/media/services/MediaService')
     const { auditService } = await import('~/features/audit/services/AuditService')
@@ -228,6 +258,7 @@ async function main() {
                 // Service singletons
                 coreAIService,
                 ispService,
+                locationService,
                 userManagementService,
                 mediaService,
                 auditService,
@@ -400,15 +431,22 @@ async function main() {
                 )
             }
 
-            // Prepare notification message
+            // Prepare location update request message
             const message =
-                `💰 <b>Payment Collected</b>\n\n` +
-                `Client: ${client_username}\n` +
-                `Status: Payment received ✅`
+                `📍 <b>Location Update Required</b>\n\n` +
+                `<b>Client:</b> <code>${client_username}</code>\n` +
+                `<b>Payment:</b> Received ✅\n\n` +
+                `Please update the customer's location.`
 
-            // Send message to worker via Telegram
+            // Send message to worker via Telegram with inline buttons
             await adapterProvider.vendor.telegram.sendMessage(workerTelegramId, message, {
                 parse_mode: 'HTML',
+                reply_markup: {
+                    inline_keyboard: [
+                        [{ text: '📍 Update Location', callback_data: `webhook_loc_req:${client_username}` }],
+                        [{ text: '⏭️ Skip for Now', callback_data: 'webhook_loc_skip' }],
+                    ],
+                },
             })
 
             // Log outgoing message

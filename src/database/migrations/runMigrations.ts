@@ -16,6 +16,7 @@ export async function runMigrations(): Promise<void> {
     const migrations = [
         '001_init.sql',
         '002_cleanup_function.sql',
+        '003_customer_locations.sql',
     ]
 
     try {

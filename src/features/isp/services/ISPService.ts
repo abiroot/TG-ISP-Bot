@@ -302,6 +302,28 @@ export class ISPService {
     }
 
     /**
+     * Clean phone number by removing spaces and Lebanese country code
+     * Examples:
+     * - "+961 71 534 710" → "71534710"
+     * - "961 71 534 710" → "71534710"
+     * - "71 534 710" → "71534710"
+     * - "josianeyoussef" → "josianeyoussef" (unchanged for usernames)
+     */
+    private cleanPhoneNumber(identifier: string): string {
+        // Remove all spaces
+        let cleaned = identifier.replace(/\s+/g, '')
+
+        // Remove leading +961 or 961 (Lebanese country code)
+        if (cleaned.startsWith('+961')) {
+            cleaned = cleaned.substring(4)
+        } else if (cleaned.startsWith('961')) {
+            cleaned = cleaned.substring(3)
+        }
+
+        return cleaned
+    }
+
+    /**
      * Search for customer by phone number or username
      * Consolidates: getUserInfo, checkAccountStatus, getTechnicalDetails, getBillingInfo
      */
@@ -318,8 +340,11 @@ export class ISPService {
         try {
             const token = await this.authenticate()
 
+            // Clean phone number before API call
+            const cleanedIdentifier = this.cleanPhoneNumber(identifier)
+
             const response = await fetch(
-                `${this.config.baseUrl}/user-info?mobile=${encodeURIComponent(identifier)}`,
+                `${this.config.baseUrl}/user-info?mobile=${encodeURIComponent(cleanedIdentifier)}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -404,16 +429,16 @@ export class ISPService {
                 return { success: false, error: errorText }
             }
 
-            // API returns boolean or JSON response
+            // API returns boolean: true (user exists) or false (user doesn't exist)
             const responseText = await response.text()
-            const isSuccess = responseText === 'true' || responseText.includes('"success":true')
+            const isSuccess = responseText.trim() === 'true'
 
             if (!isSuccess) {
                 ispLogger.warn(
                     { userName, latitude, longitude, response: responseText },
-                    'Location update returned false'
+                    'Location update returned false - user may not exist'
                 )
-                return { success: false, error: 'API returned false' }
+                return { success: false, error: 'User not found in ISP system' }
             }
 
             ispLogger.info({ userName, latitude, longitude }, 'User location updated')

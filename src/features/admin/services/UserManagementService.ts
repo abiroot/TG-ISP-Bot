@@ -167,15 +167,18 @@ export class UserManagementService {
     /**
      * Check if a user/group is whitelisted
      */
-    async isWhitelisted(from: string): Promise<boolean> {
+    async isWhitelisted(from: string | number): Promise<boolean> {
         try {
+            // Convert to string if number
+            const fromStr = String(from)
+
             // Check if it's a group (starts with -)
-            const isGroup = from.startsWith('-')
+            const isGroup = fromStr.startsWith('-')
 
             if (isGroup) {
-                return await whitelistRepository.isGroupWhitelisted(from)
+                return await whitelistRepository.isGroupWhitelisted(fromStr)
             } else {
-                return await whitelistRepository.isUserWhitelisted(from)
+                return await whitelistRepository.isUserWhitelisted(fromStr)
             }
         } catch (error) {
             userMgmtLogger.error({ err: error, from }, 'Failed to check whitelist')
@@ -269,8 +272,10 @@ export class UserManagementService {
     /**
      * Check if user is admin
      */
-    isAdmin(userIdentifier: string): boolean {
-        return admins.includes(userIdentifier)
+    isAdmin(userIdentifier: string | number): boolean {
+        // Convert to string if number
+        const userIdStr = String(userIdentifier)
+        return admins.includes(userIdStr)
     }
 
     /**

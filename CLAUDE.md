@@ -499,7 +499,7 @@ export const myFlow = addKeyword('BUTTON_MY_ACTION')
 - **Database path:** `161.35.72.42:/home/vito/vito/storage/database.sqlite`
 - **Table:** `deployment_scripts`
 - **Active Site:**
-  - Script 14: tg-isp.abiroot.dev (Node.js/PM2) - Site ID: 14
+  - Script 14: tg-isp.abiroot.dev (Node.js/Supervisor) - Site ID: 14
 
 ### How to Update Deployment Scripts
 ```bash
@@ -522,13 +522,12 @@ echo "Script updated";
 - **Status Check:** View deployment logs at `161.35.72.42:/home/vito/vito/storage/app/server-logs/`
 - **Manual Deploy:** If needed, SSH to production and run deployment script manually
 
-### PM2 & Process Management
+### Supervisor & Process Management
 **CRITICAL CONFIGURATION:**
 - App runs under **vito user** (NOT root)
-- Managed via **PM2** with `ecosystem.config.cjs`
-- **`kill_timeout: 30000`** (30 seconds) - BuilderBot needs time for graceful shutdown
+- Managed via **Supervisor** (system process manager)
 - Graceful shutdown handlers in `src/app.ts` (lines 252-287) handle SIGTERM/SIGINT
-- **Current PM2 processes:** Only `tg-isp.abiroot.dev` (all other sites deleted)
+- **Current processes:** Only `tg-isp.abiroot.dev` (all other sites deleted)
 
 ### Deployment Script Structure (Node.js Apps)
 All Node.js deployment scripts include:
@@ -537,23 +536,22 @@ All Node.js deployment scripts include:
 3. Build cache cleanup
 4. `npm run build`
 5. **Port cleanup** - Kill any zombie processes on app port (CRITICAL for preventing EADDRINUSE)
-6. PM2 stop/delete old process
+6. Supervisor restart process
 7. 3-second wait for full termination
-8. PM2 start with ecosystem.config.cjs
-9. 10-second stabilization wait
-10. Health check verification
+8. 10-second stabilization wait
+9. Health check verification
 
 ### Common Issues & Solutions
 
 **Issue: Port conflicts (EADDRINUSE errors)**
-- **Cause:** BuilderBot apps don't release ports fast enough during PM2 restarts
-- **Solution:** Deployment scripts now include `lsof -ti:$PORT | xargs kill -9` before PM2 start
-- **Manual fix:** `lsof -ti:3010 | xargs kill -9 && pm2 restart tg-isp.abiroot.dev`
+- **Cause:** BuilderBot apps don't release ports fast enough during restarts
+- **Solution:** Deployment scripts now include `lsof -ti:$PORT | xargs kill -9` before restart
+- **Manual fix:** `lsof -ti:3010 | xargs kill -9 && supervisorctl restart tg-isp.abiroot.dev`
 
-**Issue: PM2 crash loops**
-- **Cause:** App crashes within `min_uptime: 10000` window (10 seconds)
-- **Solution:** Increased `kill_timeout` from 5s to 30s in ecosystem.config.cjs
-- **Check status:** `ssh root@159.223.220.101 "su - vito -c 'pm2 list'"`
+**Issue: Process not starting**
+- **Cause:** Supervisor configuration issues or app crashes on startup
+- **Check status:** `ssh root@159.223.220.101 "supervisorctl status tg-isp.abiroot.dev"`
+- **View logs:** `ssh root@159.223.220.101 "tail -f /var/log/supervisor/tg-isp.abiroot.dev-*.log"`
 
 **Issue: Auto-deploy not triggering**
 - **Cause:** VitoDeploy webhooks not configured or failing
@@ -566,7 +564,7 @@ All Node.js deployment scripts include:
   git pull origin main
   npm ci
   npm run build
-  pm2 restart tg-isp.abiroot.dev
+  supervisorctl restart tg-isp.abiroot.dev
   ```
 
 ### Important Reminders
@@ -574,5 +572,5 @@ All Node.js deployment scripts include:
 - ⚠️ Deployment script changes require manual update via VitoDeploy database (ask user to update if needed)
 - ✅ Auto-deployment is fully functional and verified working (2025-10-29)
 - ✅ Git push triggers auto-deployment (~2 minutes)
-- ✅ PM2 saves state - app auto-restarts on server reboot
+- ✅ Supervisor manages process - app auto-restarts on server reboot
 - ✅ Only one site (tg-isp.abiroot.dev) runs on this server

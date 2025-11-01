@@ -163,3 +163,139 @@ export function getTimezoneName(timezone: string): string {
     }
     return timezone
 }
+
+/**
+ * Coordinate validation result
+ */
+export interface CoordinateValidation {
+    valid: boolean
+    latitude?: number
+    longitude?: number
+    error?: string
+}
+
+/**
+ * Validate coordinate string and parse latitude/longitude
+ *
+ * Accepts formats:
+ * - "33.8547, 35.8623" (with space)
+ * - "33.8547,35.8623" (without space)
+ * - "-2.1462137699127197, -79.88981628417969" (negative values)
+ *
+ * @param input - Coordinate string
+ * @returns Validation result with parsed coordinates or error
+ */
+export function validateCoordinates(input: string): CoordinateValidation {
+    if (!input || typeof input !== 'string') {
+        return { valid: false, error: 'Coordinates are required' }
+    }
+
+    // Regex for "latitude, longitude" format
+    // Matches: optional minus, digits, optional decimal point and more digits
+    const coordRegex = /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/
+    const match = input.trim().match(coordRegex)
+
+    if (!match) {
+        return {
+            valid: false,
+            error: 'Invalid format. Use: latitude, longitude (e.g., 33.8547, 35.8623)',
+        }
+    }
+
+    const lat = parseFloat(match[1])
+    const lng = parseFloat(match[2])
+
+    // Validate latitude range
+    if (isNaN(lat) || lat < -90 || lat > 90) {
+        return { valid: false, error: 'Latitude must be between -90 and 90' }
+    }
+
+    // Validate longitude range
+    if (isNaN(lng) || lng < -180 || lng > 180) {
+        return { valid: false, error: 'Longitude must be between -180 and 180' }
+    }
+
+    return { valid: true, latitude: lat, longitude: lng }
+}
+
+/**
+ * Validate ISP username format
+ *
+ * Valid usernames:
+ * - Start with a letter
+ * - 3-32 characters
+ * - Alphanumeric + underscore + dot
+ * - Cannot be all numbers
+ *
+ * @param username - ISP username to validate
+ * @returns true if valid format
+ */
+export function validateIspUsername(username: string): boolean {
+    if (!username || typeof username !== 'string') return false
+
+    const trimmed = username.trim()
+
+    // Username validation: 3-32 characters, alphanumeric + underscore + dot
+    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_.]{2,31}$/
+
+    // Additional checks
+    if (!usernameRegex.test(trimmed)) return false
+    if (/^\d+$/.test(trimmed)) return false // Not all numbers
+    if (trimmed.length > 32) return false
+
+    return true
+}
+
+/**
+ * Parse comma-separated username list
+ *
+ * Example: "user1, user2, user3" → ["user1", "user2", "user3"]
+ *
+ * @param input - Comma-separated usernames
+ * @returns Array of trimmed usernames (may include invalid ones)
+ */
+export function parseUsernameList(input: string): string[] {
+    if (!input || typeof input !== 'string') {
+        return []
+    }
+
+    return input
+        .split(',')
+        .map((u) => u.trim())
+        .filter((u) => u.length > 0)
+}
+
+/**
+ * Validate and parse username list
+ *
+ * @param input - Comma-separated usernames
+ * @returns Validation result with valid/invalid usernames
+ */
+export function validateUsernameList(input: string): {
+    valid: string[]
+    invalid: string[]
+    allValid: boolean
+} {
+    const usernames = parseUsernameList(input)
+
+    if (usernames.length === 0) {
+        return { valid: [], invalid: [], allValid: false }
+    }
+
+    const valid: string[] = []
+    const invalid: string[] = []
+
+    for (const username of usernames) {
+        if (validateIspUsername(username)) {
+            valid.push(username)
+        } else {
+            invalid.push(username)
+        }
+    }
+
+    return {
+        valid,
+        invalid,
+        allValid: invalid.length === 0,
+    }
+}

@@ -25,6 +25,7 @@
  */
 export const ADMIN_IDS: string[] = [
     '5795384135', // Jhonny Hachem - Numeric Telegram ID (secure)
+    '341628148', // Lamba - Dev/Testing account
     // Add more numeric Telegram IDs here:
     // '123456789', // Admin Name
     // '987654321', // Another Admin
