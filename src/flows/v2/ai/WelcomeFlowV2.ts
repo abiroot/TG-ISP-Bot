@@ -102,17 +102,38 @@ export const welcomeFlowV2 = addKeyword<TelegramProvider, Database>(EVENTS.WELCO
 
             // Send response with HTML formatting via telegram API directly
             // Note: provider.sendMessage() doesn't forward parse_mode, so we use telegram API directly
-            await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
 
-            flowLogger.info(
-                {
-                    contextId,
-                    responseTime: response.responseTimeMs,
-                    toolCalls: response.toolCalls?.length || 0,
-                    tokensUsed: response.tokensUsed,
-                },
-                'AI response sent'
-            )
+            // Check if there are multiple messages (e.g., multiple user search results)
+            if (response.multipleMessages && response.multipleMessages.length > 1) {
+                // Send each message separately
+                for (const message of response.multipleMessages) {
+                    await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
+                }
+
+                flowLogger.info(
+                    {
+                        contextId,
+                        responseTime: response.responseTimeMs,
+                        toolCalls: response.toolCalls?.length || 0,
+                        tokensUsed: response.tokensUsed,
+                        messageCount: response.multipleMessages.length,
+                    },
+                    'Multiple AI responses sent'
+                )
+            } else {
+                // Send single message
+                await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
+
+                flowLogger.info(
+                    {
+                        contextId,
+                        responseTime: response.responseTimeMs,
+                        toolCalls: response.toolCalls?.length || 0,
+                        tokensUsed: response.tokensUsed,
+                    },
+                    'AI response sent'
+                )
+            }
         } catch (error) {
             // AI SDK v5 Enhanced Error Handling
             if (error instanceof CoreAIServiceError) {

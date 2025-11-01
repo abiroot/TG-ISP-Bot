@@ -97,17 +97,38 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
 
             // Send response with HTML formatting via telegram API directly
             // Note: provider.sendMessage() doesn't forward parse_mode, so we use telegram API directly
-            await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
 
-            flowLogger.info(
-                {
-                    from: ctx.from,
-                    identifier,
-                    toolCalls: response.toolCalls?.length || 0,
-                    responseTime: response.responseTimeMs,
-                },
-                'ISP query completed'
-            )
+            // Check if there are multiple messages (e.g., multiple user search results)
+            if (response.multipleMessages && response.multipleMessages.length > 1) {
+                // Send each message separately
+                for (const message of response.multipleMessages) {
+                    await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
+                }
+
+                flowLogger.info(
+                    {
+                        from: ctx.from,
+                        identifier,
+                        toolCalls: response.toolCalls?.length || 0,
+                        responseTime: response.responseTimeMs,
+                        messageCount: response.multipleMessages.length,
+                    },
+                    'ISP query completed with multiple results'
+                )
+            } else {
+                // Send single message
+                await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
+
+                flowLogger.info(
+                    {
+                        from: ctx.from,
+                        identifier,
+                        toolCalls: response.toolCalls?.length || 0,
+                        responseTime: response.responseTimeMs,
+                    },
+                    'ISP query completed'
+                )
+            }
         } catch (error) {
             flowLogger.error({ err: error, from: ctx.from }, 'ISP query failed')
             await provider.vendor.telegram.sendMessage(ctx.from, '❌ An error occurred while processing your query. Please try again.', { parse_mode: 'HTML' })
@@ -169,7 +190,16 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                 ispService.getTools()
             )
 
-            await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
+            // Check if there are multiple messages (e.g., multiple user search results)
+            if (response.multipleMessages && response.multipleMessages.length > 1) {
+                // Send each message separately
+                for (const message of response.multipleMessages) {
+                    await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
+                }
+            } else {
+                // Send single message
+                await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
+            }
         }
     )
 

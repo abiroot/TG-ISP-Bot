@@ -1,7 +1,6 @@
 import { addKeyword } from '@builderbot/bot'
 import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
-// import { runUserMiddleware } from '~/middleware/pipeline'
 import { messageRepository } from '~/database/repositories/messageRepository'
 import { personalityRepository } from '~/database/repositories/personalityRepository'
 import { embeddingRepository } from '~/database/repositories/embeddingRepository'

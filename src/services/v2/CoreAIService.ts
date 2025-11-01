@@ -67,6 +67,7 @@ export interface AIResponse {
     steps?: any[]
     tokensUsed?: number
     responseTimeMs: number
+    multipleMessages?: string[] // For tools that return multiple formatted messages
 }
 
 /**
@@ -235,22 +236,40 @@ export class CoreAIService {
 
             // 8. Extract direct tool message if available (bypass AI commentary)
             let finalText = result.text
+            let multipleMessages: string[] | undefined
             if (result.toolResults && result.toolResults.length > 0) {
-                // Check if any tool returned a 'message' field
+                // Check if any tool returned a 'message' field or multiple messages
                 for (const toolResult of result.toolResults) {
                     // Type assertion for tool result - AI SDK doesn't expose the result type properly
                     const resultData = toolResult as any
-                    if (resultData.result && typeof resultData.result === 'object' && 'message' in resultData.result) {
-                        // Use the tool's message directly instead of AI's text
-                        finalText = resultData.result.message
-                        aiLogger.info(
-                            {
-                                contextId: context.contextId,
-                                toolName: toolResult.toolName,
-                            },
-                            'Using direct tool message instead of AI text'
-                        )
-                        break // Use first tool message found
+                    if (resultData.result && typeof resultData.result === 'object') {
+                        // Check for multiple messages (e.g., multiple user search results)
+                        if ('messages' in resultData.result && Array.isArray(resultData.result.messages)) {
+                            multipleMessages = resultData.result.messages
+                            finalText = resultData.result.messages[0] // First message as fallback
+                            aiLogger.info(
+                                {
+                                    contextId: context.contextId,
+                                    toolName: toolResult.toolName,
+                                    messageCount: resultData.result.messages.length,
+                                },
+                                'Tool returned multiple messages'
+                            )
+                            break
+                        }
+                        // Check for single message
+                        else if ('message' in resultData.result) {
+                            // Use the tool's message directly instead of AI's text
+                            finalText = resultData.result.message
+                            aiLogger.info(
+                                {
+                                    contextId: context.contextId,
+                                    toolName: toolResult.toolName,
+                                },
+                                'Using direct tool message instead of AI text'
+                            )
+                            break // Use first tool message found
+                        }
                     }
                 }
             }
@@ -292,6 +311,7 @@ export class CoreAIService {
                 steps: result.steps,
                 tokensUsed: result.usage?.totalTokens,
                 responseTimeMs,
+                multipleMessages, // Include multiple messages if available
             }
         } catch (error) {
             // AI SDK v5 Specific Error Handling
@@ -455,8 +475,9 @@ You are ${personality.bot_name}, an intelligent ISP support assistant.
 
 🔧 AVAILABLE TOOLS:
 1. searchCustomer - Look up customer by phone number or username
-2. updateUserLocation - Update single user's location coordinates
-3. batchUpdateLocations - Update multiple users' locations at once
+2. getMikrotikUsers - List all users on a Mikrotik interface with online/offline status
+3. updateUserLocation - Update single user's location coordinates
+4. batchUpdateLocations - Update multiple users' locations at once
 
 📋 WHEN TO USE TOOLS (CRITICAL):
 - User says "check dimetrejradi" → CALL searchCustomer(identifier: "dimetrejradi")
@@ -464,6 +485,7 @@ You are ${personality.bot_name}, an intelligent ISP support assistant.
 - User asks "show me info for john_doe" → CALL searchCustomer(identifier: "john_doe")
 - User asks about account status → CALL searchCustomer with their identifier
 - User mentions ANY phone number or username → CALL searchCustomer immediately
+- User asks about users on interface/router → CALL getMikrotikUsers with interface name
 - User provides location coordinates → CALL updateUserLocation or batchUpdateLocations
 
 ⚠️ TOOL USAGE RULES:
