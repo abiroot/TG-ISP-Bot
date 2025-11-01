@@ -19,15 +19,44 @@ const logger = createFlowLogger('user-mapping-middleware')
  * The username is derived from the user's name (typically first name from Telegram).
  *
  * This runs silently in the background and doesn't block the flow.
+ * Updates on EVERY message to ensure mapping is always current.
  */
 export async function captureUserMapping(ctx: BotCtx): Promise<void> {
     try {
-        // Skip if we don't have essential user data
-        if (!ctx.from || !ctx.name) {
+        // Skip if we don't have telegram ID
+        if (!ctx.from) {
             return
         }
 
         const telegramId = ctx.from
+
+        // Check if user already exists in mapping
+        const existingUser = await telegramUserService.getUserByTelegramId(telegramId)
+
+        // If ctx.name is missing but user exists, just update last_seen (via upsert with existing data)
+        if (!ctx.name && existingUser) {
+            // Re-upsert with existing data to update timestamp
+            await telegramUserService.upsertUser({
+                username: existingUser.username,
+                telegram_id: telegramId,
+                telegram_username: existingUser.telegram_username || undefined,
+                first_name: existingUser.first_name || undefined,
+                last_name: existingUser.last_name || undefined,
+            })
+
+            logger.debug(
+                { telegramId, username: existingUser.username },
+                'User mapping timestamp updated (name not in ctx)'
+            )
+            return
+        }
+
+        // If ctx.name is missing and no existing user, skip (nothing to capture)
+        if (!ctx.name) {
+            logger.debug({ telegramId }, 'Skipping user mapping - no name in ctx and no existing user')
+            return
+        }
+
         const firstName = ctx.name
 
         // Derive username from name (remove spaces, convert to lowercase)
