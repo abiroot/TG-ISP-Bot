@@ -24,7 +24,7 @@ const logger = createFlowLogger('user-mapping-middleware')
  */
 export async function captureUserMapping(ctx: BotCtx): Promise<void> {
     try {
-        logger.debug(
+        logger.info(
             {
                 from: ctx.from,
                 name: ctx.name,
@@ -63,7 +63,7 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
                 last_name: existingUser.last_name || undefined,
             })
 
-            logger.debug(
+            logger.info(
                 { telegramId: userData.telegramId, workerUsername: existingUser.worker_username },
                 'User mapping timestamp updated (no name data)'
             )
@@ -92,7 +92,7 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
                 'Username conflict - number appended to new user'
             )
         } else {
-            logger.debug(
+            logger.info(
                 {
                     workerUsername: userMapping.worker_username,
                     telegramId: userData.telegramId,
