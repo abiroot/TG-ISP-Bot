@@ -27,7 +27,6 @@ import {
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
 import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
-import { storeConfirmationData, retrieveConfirmationData, deleteConfirmationData } from '~/core/utils/buttonStateStore'
 
 const logger = createFlowLogger('update-coordinates-flow')
 
@@ -280,139 +279,12 @@ export const locationUserModeFlow = addKeyword<TelegramProvider, Database>('BUTT
 
         logger.info({ usernames }, 'Usernames captured successfully')
 
-        // Show confirmation
+        // Get coordinates from state
         const latitude = await state.get<number>('latitude')
         const longitude = await state.get<number>('longitude')
 
-        const summary =
-            `<b>📍 Update Summary</b>\n\n` +
-            `<b>Coordinates:</b>\n` +
-            `📍 <code>${latitude}, ${longitude}</code>\n\n` +
-            `<b>Customer(s):</b>\n` +
-            usernames.map((u) => `• ${html.escape(u)}`).join('\n') +
-            `\n\n<b>Total:</b> ${usernames.length} customer(s)\n\n` +
-            `⚡ Locations will be updated in ISP system and local database.\n` +
-            `Invalid usernames will be reported after attempting update.`
-
-        // Encode state data in button callback for reliability
-        // If data is too large (>64 bytes), use temporary store
-        const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
-
-        let confirmCallbackData: string
-        if (encodedData.length > 55) { // Leave room for "loc_confirm:" prefix
-            // Store in temporary memory store and use short reference
-            const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
-            confirmCallbackData = `loc_confirm:ref:${stateId}`
-            logger.debug({ stateId, dataLength: encodedData.length }, 'Using state store for large data')
-        } else {
-            confirmCallbackData = `loc_confirm:${encodedData}`
-        }
-
-        await sendWithInlineButtons(
-            ctx,
-            { extensions, provider, state, flowDynamic } as any,
-            summary,
-            [
-                [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
-                [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
-            ],
-            { parseMode: 'HTML' }
-        )
-    })
-
-/**
- * Confirmation and execution
- */
-export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_LOC_CONFIRM')
-    .addAction(async (ctx, { state, extensions, provider, flowDynamic, endFlow }) => {
-        // Parse button data (format: yes|lat:X|lon:Y|u:user1,user2 OR just "no")
-        const buttonData = ctx._button_data as string
-
-        // Check if user cancelled
-        if (buttonData === 'no' || buttonData.startsWith('no|')) {
-            await state.clear()
-            await provider.vendor.telegram.sendMessage(ctx.from, '❌ <b>Operation cancelled.</b>', { parse_mode: 'HTML' })
-            return endFlow()
-        }
-
+        // Get locationService from extensions
         const { locationService } = extensions!
-
-        // Try to retrieve state first (primary method)
-        let latitude = await state.get<number>('latitude')
-        let longitude = await state.get<number>('longitude')
-        let usernames = await state.get<string[]>('usernames')
-        let retrievedStateId: string | undefined // Track stateId for cleanup
-
-        // If state is missing, parse from button data (fallback method)
-        if (!latitude || !longitude || !usernames || usernames.length === 0) {
-            logger.info({ from: ctx.from }, 'State missing, attempting to parse from button data')
-
-            try {
-                // Check if this is a reference to stored data (format: ref:stateId)
-                if (buttonData.startsWith('yes:ref:') || buttonData.startsWith('ref:')) {
-                    const stateId = buttonData.replace(/^(yes:)?ref:/, '')
-                    logger.debug({ stateId }, 'Retrieving data from store')
-
-                    const storedData = retrieveConfirmationData(ctx.from, stateId)
-                    if (!storedData) {
-                        throw new Error('Stored data not found or expired')
-                    }
-
-                    latitude = storedData.latitude
-                    longitude = storedData.longitude
-                    usernames = storedData.usernames
-                    retrievedStateId = stateId // Store for cleanup after successful update
-
-                    logger.info({ latitude, longitude, usernames }, 'Successfully retrieved data from store')
-                } else {
-                    // Parse format: yes|lat:X|lon:Y|u:user1,user2
-                    const parts = buttonData.split('|')
-
-                    if (parts.length < 4) {
-                        throw new Error('Invalid button data format')
-                    }
-
-                    // Extract data from parts
-                    const dataMap: Record<string, string> = {}
-                    for (const part of parts.slice(1)) { // Skip 'yes'
-                        const [key, value] = part.split(':', 2)
-                        if (key && value) {
-                            dataMap[key] = value
-                        }
-                    }
-
-                    latitude = parseFloat(dataMap.lat)
-                    longitude = parseFloat(dataMap.lon)
-                    usernames = dataMap.u ? dataMap.u.split(',').filter(u => u.trim()) : []
-
-                    if (!latitude || !longitude || isNaN(latitude) || isNaN(longitude) || usernames.length === 0) {
-                        throw new Error('Invalid parsed data')
-                    }
-
-                    logger.info({ latitude, longitude, usernames }, 'Successfully parsed data from button')
-                }
-            } catch (error) {
-                logger.error({ err: error, buttonData }, 'Failed to parse button data')
-                await provider.vendor.telegram.sendMessage(
-                    ctx.from,
-                    '❌ <b>Missing data. Please start over.</b>\n\nTry sharing location again or use /setlocation',
-                    { parse_mode: 'HTML' }
-                )
-                await state.clear()
-                return endFlow()
-            }
-        }
-
-        // Validate data exists
-        if (!latitude || !longitude || !usernames || usernames.length === 0) {
-            await provider.vendor.telegram.sendMessage(
-                ctx.from,
-                '❌ <b>Missing data. Please start over.</b>\n\nTry sharing location again or use /setlocation',
-                { parse_mode: 'HTML' }
-            )
-            await state.clear()
-            return endFlow()
-        }
 
         // Show loading indicator
         const loadingMsg = await LoadingIndicator.show(
@@ -490,12 +362,6 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
             }
 
             logger.info({ usernames, latitude, longitude }, 'Location update completed')
-
-            // Cleanup button state if we retrieved data from store
-            if (retrievedStateId) {
-                deleteConfirmationData(ctx.from, retrievedStateId)
-                logger.debug({ stateId: retrievedStateId }, 'Cleaned up confirmation data after successful update')
-            }
         } catch (error) {
             await LoadingIndicator.hide(provider, loadingMsg)
             logger.error({ err: error }, 'Location update failed')
@@ -507,4 +373,6 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
         } finally {
             await state.clear()
         }
+
+        return endFlow()
     })

@@ -72,20 +72,16 @@ export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>
 
         logger.debug({ userId: ctx.from, clientUsername }, 'Stored webhook context in globalState')
 
-        // Import button helpers
-        const { sendWithReplyButtons } = await import('~/core/utils/flowHelpers')
-        const { createLocationButton, createTextButton } = await import('~/core/utils/telegramButtons')
-
-        // Show location sharing request with reply keyboard
-        await sendWithReplyButtons(
-            ctx,
-            { extensions, provider, state, flowDynamic } as any,
+        // Show location sharing request (no reply keyboard - cleaner UX)
+        await provider.vendor.telegram.sendMessage(
+            ctx.from,
             `<b>📍 Update Location for Customer</b>\n\n` +
                 `<b>Customer:</b> <code>${html.escape(clientUsername)}</code>\n\n` +
-                `Please share the customer's current location using the button below, ` +
-                `or tap the attachment icon and select "Location".`,
-            [[createLocationButton('📍 Share Location')], [createTextButton('❌ Cancel')]],
-            { oneTime: true, resize: true, parseMode: 'HTML' }
+                `Please share the customer's current location:\n` +
+                `• Tap the attachment icon (📎) and select "Location"\n` +
+                `• Or send a Google Maps link\n` +
+                `• Or use /setlocation command`,
+            { parse_mode: 'HTML' }
         )
     })
 

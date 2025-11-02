@@ -21,7 +21,6 @@ import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
 import { html } from '~/core/utils/telegramFormatting'
 import { validateIspUsername, parseUsernameList } from '~/core/utils/validators'
-import { storeConfirmationData } from '~/core/utils/buttonStateStore'
 
 const logger = createFlowLogger('location-handler-flow')
 
@@ -133,51 +132,79 @@ export const locationHandlerFlow = addKeyword<TelegramProvider, Database>(EVENTS
         if (triggeredBy === 'webhook' && clientUsername) {
             // Clear globalState for this user after retrieving
             await globalState.update({ [`webhook_${ctx.from}`]: null })
-            // Webhook flow: Skip user mode selection, go directly to confirmation
-            logger.info({ clientUsername, latitude, longitude }, 'Webhook location - auto-filling username')
+            // Webhook flow: Update immediately with pre-filled username
+            logger.info({ clientUsername, latitude, longitude }, 'Webhook location - updating immediately')
 
             const usernames = [clientUsername]
-            await state.update({ usernames })
 
-            const summary =
-                `<b>📍 Update Summary</b>\n\n` +
-                `<b>Coordinates:</b>\n` +
-                `📍 <code>${latitude}, ${longitude}</code>\n\n` +
-                `<b>Customer:</b>\n` +
-                `• ${html.escape(clientUsername)}\n\n` +
-                `⚡ Location will be updated in ISP system and local database.`
+            // Get locationService from extensions
+            const { locationService } = extensions!
 
-            // Encode state data (use store if too large)
-            const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
-            let confirmCallbackData: string
-
-            if (encodedData.length > 55) {
-                const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
-                confirmCallbackData = `loc_confirm:ref:${stateId}`
-                logger.debug({ stateId }, 'Using state store for webhook confirmation')
-            } else {
-                confirmCallbackData = `loc_confirm:${encodedData}`
-            }
-
-            await sendWithInlineButtons(
-                ctx,
-                { extensions, provider, state, flowDynamic } as any,
-                summary,
-                [
-                    [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
-                    [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
-                ],
-                { parseMode: 'HTML' }
+            // Show loading indicator
+            const loadingMsg = await provider.vendor.telegram.sendMessage(
+                ctx.from,
+                '🔄 <b>Updating location...</b>',
+                { parse_mode: 'HTML' }
             )
 
-            // Clear webhook state after showing confirmation to prevent state persistence
-            await state.update({
-                triggeredBy: null,
-                clientUsername: null,
-                userMode: null,
-            })
+            try {
+                // Single user update (webhook always single user)
+                const result = await locationService.updateCustomerLocation(
+                    clientUsername,
+                    latitude,
+                    longitude,
+                    ctx.from,
+                    ctx.name || undefined
+                )
 
-            logger.debug({ from: ctx.from }, 'Cleared webhook state after confirmation display')
+                // Delete loading message
+                await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+
+                if (result.success) {
+                    await provider.vendor.telegram.sendMessage(
+                        ctx.from,
+                        `✅ <b>Location Updated Successfully</b>\n\n` +
+                            `<b>Customer:</b> ${html.escape(clientUsername)}\n` +
+                            `<b>Coordinates:</b> <code>${latitude}, ${longitude}</code>\n\n` +
+                            `${result.api_synced ? '✅' : '❌'} ISP API\n` +
+                            `${result.local_saved ? '✅' : '❌'} Local database`,
+                        { parse_mode: 'HTML' }
+                    )
+                } else {
+                    await provider.vendor.telegram.sendMessage(
+                        ctx.from,
+                        `❌ <b>Update Failed</b>\n\n` +
+                            `<b>Customer:</b> ${html.escape(clientUsername)}\n` +
+                            `<b>Error:</b> ${html.escape(result.error || 'Unknown error')}`,
+                        { parse_mode: 'HTML' }
+                    )
+                }
+
+                logger.info({ username: clientUsername, latitude, longitude }, 'Webhook location update completed')
+            } catch (error) {
+                // Delete loading message on error
+                try {
+                    await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+                } catch (e) {
+                    // Ignore error if message already deleted
+                }
+                logger.error({ err: error }, 'Webhook location update failed')
+                await provider.vendor.telegram.sendMessage(
+                    ctx.from,
+                    '❌ <b>Update failed due to an unexpected error.</b>\n\nPlease try again later.',
+                    { parse_mode: 'HTML' }
+                )
+            } finally {
+                // Clear webhook state after update
+                await state.update({
+                    triggeredBy: null,
+                    clientUsername: null,
+                    userMode: null,
+                })
+                await state.clear()
+            }
+
+            return endFlow()
         } else {
             // Normal flow: Prompt for user mode selection
             await sendWithInlineButtons(
@@ -308,42 +335,108 @@ export const locationDirectUserModeFlow = addKeyword<TelegramProvider, Database>
 
         logger.info({ usernames }, 'Usernames captured successfully')
 
-        // Show confirmation
+        // Get coordinates from state
         const latitude = await state.get<number>('latitude')
         const longitude = await state.get<number>('longitude')
 
-        const summary =
-            `<b>📍 Update Summary</b>\n\n` +
-            `<b>Coordinates:</b>\n` +
-            `📍 <code>${latitude}, ${longitude}</code>\n\n` +
-            `<b>Customer(s):</b>\n` +
-            usernames.map((u) => `• ${html.escape(u)}`).join('\n') +
-            `\n\n<b>Total:</b> ${usernames.length} customer(s)\n\n` +
-            `⚡ Locations will be updated in ISP system and local database.\n` +
-            `Invalid usernames will be reported after attempting update.`
+        // Get locationService from extensions
+        const { locationService } = extensions!
 
-        // Encode state data in button callback for reliability
-        // If data is too large (>64 bytes), use temporary store
-        const encodedData = `yes|lat:${latitude}|lon:${longitude}|u:${usernames.join(',')}`
+        // Show loading indicator
+        const loadingMsg = await provider.vendor.telegram.sendMessage(
+            ctx.from,
+            '🔄 <b>Updating locations...</b>',
+            { parse_mode: 'HTML' }
+        )
 
-        let confirmCallbackData: string
-        if (encodedData.length > 55) { // Leave room for "loc_confirm:" prefix
-            // Store in temporary memory store and use short reference
-            const stateId = storeConfirmationData(ctx.from, latitude, longitude, usernames)
-            confirmCallbackData = `loc_confirm:ref:${stateId}`
-            logger.debug({ stateId, dataLength: encodedData.length }, 'Using state store for large data')
-        } else {
-            confirmCallbackData = `loc_confirm:${encodedData}`
+        try {
+            if (usernames.length === 1) {
+                // Single user update
+                const result = await locationService.updateCustomerLocation(
+                    usernames[0],
+                    latitude,
+                    longitude,
+                    ctx.from,
+                    ctx.name || undefined
+                )
+
+                // Delete loading message
+                await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+
+                if (result.success) {
+                    await provider.vendor.telegram.sendMessage(
+                        ctx.from,
+                        `✅ <b>Location Updated Successfully</b>\n\n` +
+                            `<b>Customer:</b> ${html.escape(usernames[0])}\n` +
+                            `<b>Coordinates:</b> <code>${latitude}, ${longitude}</code>\n\n` +
+                            `${result.api_synced ? '✅' : '❌'} ISP API\n` +
+                            `${result.local_saved ? '✅' : '❌'} Local database`,
+                        { parse_mode: 'HTML' }
+                    )
+                } else {
+                    await provider.vendor.telegram.sendMessage(
+                        ctx.from,
+                        `❌ <b>Update Failed</b>\n\n` +
+                            `<b>Customer:</b> ${html.escape(usernames[0])}\n` +
+                            `<b>Error:</b> ${html.escape(result.error || 'Unknown error')}`,
+                        { parse_mode: 'HTML' }
+                    )
+                }
+            } else {
+                // Multiple users update
+                const result = await locationService.updateMultipleCustomerLocations(
+                    usernames,
+                    latitude,
+                    longitude,
+                    ctx.from,
+                    ctx.name || undefined
+                )
+
+                // Delete loading message
+                await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+
+                const successUsers = result.results.filter((r) => r.success)
+                const failedUsers = result.results.filter((r) => !r.success)
+
+                let message = `<b>📍 Batch Update Complete</b>\n\n`
+                message += `<b>Summary:</b>\n`
+                message += `✅ Success: ${result.successful}/${result.total}\n`
+                message += `❌ Failed: ${result.failed}/${result.total}\n\n`
+
+                if (successUsers.length > 0) {
+                    message += `<b>✅ Updated Successfully:</b>\n`
+                    message += successUsers.map((r) => `• ${html.escape(r.username)}`).join('\n')
+                    message += '\n\n'
+                }
+
+                if (failedUsers.length > 0) {
+                    message += `<b>❌ Failed:</b>\n`
+                    message += failedUsers
+                        .map((r) => `• ${html.escape(r.username)}: ${html.escape(r.error || 'Unknown error')}`)
+                        .join('\n')
+                }
+
+                await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
+            }
+
+            logger.info({ usernames, latitude, longitude }, 'Location update completed')
+        } catch (error) {
+            // Delete loading message on error
+            try {
+                await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+            } catch (e) {
+                // Ignore error if message already deleted
+            }
+            logger.error({ err: error }, 'Location update failed')
+            await provider.vendor.telegram.sendMessage(
+                ctx.from,
+                '❌ <b>Update failed due to an unexpected error.</b>\n\nPlease try again later.',
+                { parse_mode: 'HTML' }
+            )
+        } finally {
+            await clearIdleTimer(ctx.from)
+            await state.clear()
         }
 
-        await sendWithInlineButtons(
-            ctx,
-            { extensions, provider, state, flowDynamic } as any,
-            summary,
-            [
-                [createCallbackButton('✅ Confirm Update', confirmCallbackData)],
-                [createCallbackButton('❌ Cancel', 'loc_confirm:no')],
-            ],
-            { parseMode: 'HTML' }
-        )
+        return endFlow()
     })

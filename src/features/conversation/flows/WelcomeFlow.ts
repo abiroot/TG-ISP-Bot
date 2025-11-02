@@ -19,6 +19,7 @@ import { withRetry } from '~/core/utils/flowRetry'
 import { sendFormattedMessage } from '~/core/utils/telegramFormatting'
 import { getContextId } from '~/core/utils/contextId'
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
+import { extractCoordinatesFromText, containsLocationUrl } from '~/core/utils/locationParser'
 
 const flowLogger = createFlowLogger('welcome')
 
@@ -43,6 +44,141 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
             // Route to new onboarding flow (button-based modern UI)
             const { onboardingWelcomeFlow } = await import('~/features/onboarding/flows')
             return gotoFlow(onboardingWelcomeFlow)
+        }
+
+        // Check if message contains a location URL
+        if (containsLocationUrl(ctx.body)) {
+            const coordinates = extractCoordinatesFromText(ctx.body)
+            if (coordinates) {
+                flowLogger.info(
+                    { from: ctx.from, coordinates, body: ctx.body },
+                    'Location URL detected - checking webhook context'
+                )
+
+                // Store coordinates in state
+                const { state, globalState } = utils
+                await state.update({
+                    latitude: coordinates.latitude,
+                    longitude: coordinates.longitude,
+                })
+
+                // Check if this is a webhook-triggered location request
+                let triggeredBy = await state.get<string>('triggeredBy')
+                let clientUsername = await state.get<string>('clientUsername')
+
+                // If not in state, check globalState (persists across flows)
+                if (!triggeredBy || !clientUsername) {
+                    const webhookData = await globalState.get<{
+                        clientUsername: string
+                        triggeredBy: string
+                        timestamp: number
+                    }>(`webhook_${ctx.from}`)
+
+                    if (webhookData) {
+                        triggeredBy = webhookData.triggeredBy
+                        clientUsername = webhookData.clientUsername
+                        await state.update({ triggeredBy, clientUsername, userMode: 'single' })
+                        flowLogger.debug({ webhookData }, 'Retrieved webhook context from globalState')
+                    }
+                }
+
+                // If webhook context exists, update immediately with pre-filled username
+                if (triggeredBy === 'webhook' && clientUsername) {
+                    flowLogger.info(
+                        { clientUsername, coordinates },
+                        'Webhook location URL - updating immediately'
+                    )
+
+                    // Get locationService from extensions
+                    const { locationService } = extensions!
+
+                    // Show loading indicator
+                    const loadingMsg = await provider.vendor.telegram.sendMessage(
+                        ctx.from,
+                        '🔄 <b>Updating location...</b>',
+                        { parse_mode: 'HTML' }
+                    )
+
+                    try {
+                        // Single user update (webhook always single user)
+                        const result = await locationService.updateCustomerLocation(
+                            clientUsername,
+                            coordinates.latitude,
+                            coordinates.longitude,
+                            ctx.from,
+                            ctx.name || undefined
+                        )
+
+                        // Delete loading message
+                        await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+
+                        if (result.success) {
+                            await provider.vendor.telegram.sendMessage(
+                                ctx.from,
+                                `✅ <b>Location Updated Successfully</b>\n\n` +
+                                    `<b>Customer:</b> ${clientUsername}\n` +
+                                    `<b>Coordinates:</b> <code>${coordinates.latitude}, ${coordinates.longitude}</code>\n\n` +
+                                    `${result.api_synced ? '✅' : '❌'} ISP API\n` +
+                                    `${result.local_saved ? '✅' : '❌'} Local database`,
+                                { parse_mode: 'HTML' }
+                            )
+                        } else {
+                            await provider.vendor.telegram.sendMessage(
+                                ctx.from,
+                                `❌ <b>Update Failed</b>\n\n` +
+                                    `<b>Customer:</b> ${clientUsername}\n` +
+                                    `<b>Error:</b> ${result.error || 'Unknown error'}`,
+                                { parse_mode: 'HTML' }
+                            )
+                        }
+
+                        flowLogger.info(
+                            { username: clientUsername, coordinates },
+                            'Webhook location URL update completed'
+                        )
+                    } catch (error) {
+                        // Delete loading message on error
+                        try {
+                            await provider.vendor.telegram.deleteMessage(ctx.from, loadingMsg.message_id)
+                        } catch (e) {
+                            // Ignore if already deleted
+                        }
+                        flowLogger.error({ err: error }, 'Webhook location URL update failed')
+                        await provider.vendor.telegram.sendMessage(
+                            ctx.from,
+                            '❌ <b>Update failed due to an unexpected error.</b>\n\nPlease try again later.',
+                            { parse_mode: 'HTML' }
+                        )
+                    } finally {
+                        // Clear webhook context
+                        await globalState.update({ [`webhook_${ctx.from}`]: null })
+                        await state.clear()
+                    }
+
+                    return // End flow after webhook update
+                }
+
+                // No webhook context - normal flow: ask for user mode
+                await provider.vendor.telegram.sendMessage(
+                    ctx.from,
+                    `✅ <b>Location URL Detected</b>\n\n` +
+                        `📍 <code>${coordinates.latitude.toFixed(6)}, ${coordinates.longitude.toFixed(6)}</code>\n\n` +
+                        `Update for single or multiple customers?`,
+                    {
+                        parse_mode: 'HTML',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '👤 Single User', callback_data: 'loc_direct_mode:single' },
+                                    { text: '👥 Multiple Users', callback_data: 'loc_direct_mode:multiple' },
+                                ],
+                            ],
+                        },
+                    }
+                )
+
+                return // Stop processing, wait for button click
+            }
         }
 
         // Check if AI is enabled

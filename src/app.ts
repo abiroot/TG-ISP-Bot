@@ -47,7 +47,6 @@ import {
     updateCoordinatesFlow,
     locationMethodLocationFlow,
     locationUserModeFlow,
-    locationConfirmFlow,
 } from '~/features/location/flows/UpdateCoordinatesFlow'
 import {
     locationHandlerFlow,
@@ -159,9 +158,8 @@ async function main() {
         // Location update flows (must come before ISP flows)
         // Button handlers MUST come before trigger flow
         locationMethodLocationFlow, // Manual coordinate entry with inline capture
-        locationUserModeFlow, // Username selection with inline capture
-        locationConfirmFlow, // Confirmation and execution
-        locationDirectUserModeFlow, // Direct location sharing username capture
+        locationUserModeFlow, // Username selection with inline capture (now updates immediately)
+        locationDirectUserModeFlow, // Direct location sharing username capture (now updates immediately)
         webhookLocationRequestFlow, // Webhook-triggered location request
         webhookLocationSkipFlow, // Webhook skip button handler
         webhookLocationCancelFlow, // Webhook cancel handler

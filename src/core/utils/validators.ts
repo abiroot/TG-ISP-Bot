@@ -3,6 +3,8 @@
  * Ensures data integrity for bot configuration
  */
 
+import { extractCoordinatesFromText } from '~/core/utils/locationParser'
+
 /**
  * Supported languages (ISO 639-1 codes)
  *
@@ -181,8 +183,10 @@ export interface CoordinateValidation {
  * - "33.8547, 35.8623" (with space)
  * - "33.8547,35.8623" (without space)
  * - "-2.1462137699127197, -79.88981628417969" (negative values)
+ * - Google Maps URLs: "https://maps.google.com/?q=33.954967,35.616299"
+ * - "Location: https://maps.google.com/?q=33.954967,35.616299" (with text prefix)
  *
- * @param input - Coordinate string
+ * @param input - Coordinate string or location URL
  * @returns Validation result with parsed coordinates or error
  */
 export function validateCoordinates(input: string): CoordinateValidation {
@@ -190,6 +194,19 @@ export function validateCoordinates(input: string): CoordinateValidation {
         return { valid: false, error: 'Coordinates are required' }
     }
 
+    // First, try to extract coordinates from URL (if it's a location link)
+    const urlCoordinates = extractCoordinatesFromText(input)
+
+    if (urlCoordinates) {
+        // Successfully parsed from URL
+        return {
+            valid: true,
+            latitude: urlCoordinates.latitude,
+            longitude: urlCoordinates.longitude,
+        }
+    }
+
+    // Fallback: Try standard "latitude, longitude" format
     // Regex for "latitude, longitude" format
     // Matches: optional minus, digits, optional decimal point and more digits
     const coordRegex = /^(-?\d+\.?\d*)\s*,\s*(-?\d+\.?\d*)$/
@@ -198,7 +215,7 @@ export function validateCoordinates(input: string): CoordinateValidation {
     if (!match) {
         return {
             valid: false,
-            error: 'Invalid format. Use: latitude, longitude (e.g., 33.8547, 35.8623)',
+            error: 'Invalid format. Use: latitude, longitude (e.g., 33.8547, 35.8623) or a Google Maps link',
         }
     }
 
