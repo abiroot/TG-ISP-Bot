@@ -91,7 +91,7 @@ export const webhookLocationSkipFlow = addKeyword<TelegramProvider, Database>('B
     .addAction(async (ctx, { provider, endFlow }) => {
         await provider.vendor.telegram.sendMessage(
             ctx.from,
-            '⏭️ <b>Location update skipped.',
+            '⏭️ <b>Location update skipped.</b>',
             { parse_mode: 'HTML' }
         )
         return endFlow()
