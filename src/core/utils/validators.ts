@@ -184,18 +184,19 @@ export interface CoordinateValidation {
  * - "33.8547,35.8623" (without space)
  * - "-2.1462137699127197, -79.88981628417969" (negative values)
  * - Google Maps URLs: "https://maps.google.com/?q=33.954967,35.616299"
+ * - Google Maps short URLs: "https://maps.app.goo.gl/..." (automatically resolved)
  * - "Location: https://maps.google.com/?q=33.954967,35.616299" (with text prefix)
  *
  * @param input - Coordinate string or location URL
  * @returns Validation result with parsed coordinates or error
  */
-export function validateCoordinates(input: string): CoordinateValidation {
+export async function validateCoordinates(input: string): Promise<CoordinateValidation> {
     if (!input || typeof input !== 'string') {
         return { valid: false, error: 'Coordinates are required' }
     }
 
     // First, try to extract coordinates from URL (if it's a location link)
-    const urlCoordinates = extractCoordinatesFromText(input)
+    const urlCoordinates = await extractCoordinatesFromText(input)
 
     if (urlCoordinates) {
         // Successfully parsed from URL

@@ -15,21 +15,72 @@ export interface LocationCoordinates {
 }
 
 /**
+ * Check if URL is a Google Maps short link (goo.gl)
+ */
+function isGoogleMapsShortUrl(url: string): boolean {
+    return /maps\.app\.goo\.gl|goo\.gl\/maps/i.test(url)
+}
+
+/**
+ * Resolve Google Maps short URL to full URL with coordinates
+ * @param shortUrl - Short URL (e.g., https://maps.app.goo.gl/...)
+ * @param timeoutMs - Request timeout (default: 5000ms)
+ * @returns Final URL with coordinates or null if resolution fails
+ */
+async function resolveGoogleMapsShortUrl(shortUrl: string, timeoutMs = 5000): Promise<string | null> {
+    try {
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
+        const response = await fetch(shortUrl, {
+            redirect: 'follow', // Auto-follow redirects
+            signal: controller.signal,
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (compatible; TelegramBot/1.0)',
+            },
+        })
+
+        clearTimeout(timeoutId)
+
+        logger.debug({ shortUrl, finalUrl: response.url }, 'Short URL resolved')
+        return response.url
+    } catch (error) {
+        logger.error({ err: error, url: shortUrl }, 'Failed to resolve short URL')
+        return null
+    }
+}
+
+/**
  * Extract coordinates from text containing location URLs
  *
  * Supported formats:
  * - https://maps.google.com/?q=33.954967,35.616299
  * - https://www.google.com/maps?q=33.954967,35.616299
- * - https://maps.app.goo.gl/... (Google short links)
+ * - https://maps.app.goo.gl/... (Google short links - automatically resolved)
  * - Location: https://maps.google.com/?q=33.954967,35.616299
  * - Plain text with embedded URLs
  *
  * @param text - Text that may contain a location URL
  * @returns Coordinates object or null if no valid location found
  */
-export function extractCoordinatesFromText(text: string): LocationCoordinates | null {
+export async function extractCoordinatesFromText(text: string): Promise<LocationCoordinates | null> {
     if (!text || typeof text !== 'string') {
         return null
+    }
+
+    let urlToCheck = text
+
+    // Check if URL is a short link and resolve it
+    if (isGoogleMapsShortUrl(text)) {
+        logger.debug({ url: text }, 'Detected Google Maps short URL, resolving...')
+        const resolvedUrl = await resolveGoogleMapsShortUrl(text)
+        if (resolvedUrl) {
+            urlToCheck = resolvedUrl
+            logger.info({ shortUrl: text, resolvedUrl }, 'Short URL resolved successfully')
+        } else {
+            logger.warn({ url: text }, 'Failed to resolve short URL')
+            return null // Cannot extract coordinates from unresolved short link
+        }
     }
 
     // Google Maps URL patterns
@@ -54,7 +105,7 @@ export function extractCoordinatesFromText(text: string): LocationCoordinates | 
     ]
 
     for (const pattern of urlPatterns) {
-        const match = text.match(pattern)
+        const match = urlToCheck.match(pattern)
         if (match) {
             const lat = parseFloat(match[1])
             const lon = parseFloat(match[2])

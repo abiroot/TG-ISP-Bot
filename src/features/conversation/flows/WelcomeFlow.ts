@@ -48,7 +48,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
 
         // Check if message contains a location URL
         if (containsLocationUrl(ctx.body)) {
-            const coordinates = extractCoordinatesFromText(ctx.body)
+            const coordinates = await extractCoordinatesFromText(ctx.body)
             if (coordinates) {
                 flowLogger.info(
                     { from: ctx.from, coordinates, body: ctx.body },

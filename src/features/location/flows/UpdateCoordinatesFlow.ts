@@ -132,7 +132,7 @@ export const locationMethodLocationFlow = addKeyword<TelegramProvider, Database>
         }
 
         // Validate coordinates
-        const validation = validateCoordinates(input)
+        const validation = await validateCoordinates(input)
         if (!validation.valid) {
             await provider.vendor.telegram.sendMessage(ctx.from, `❌ ${html.escape(validation.error || 'Invalid coordinates')}`, {
                 parse_mode: 'HTML',
