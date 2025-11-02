@@ -59,9 +59,12 @@ function getTableList(): string[] {
         'whitelisted_groups',
         'whitelisted_users',
         'telegram_user_mapping',
-        'onboarding_state',
         'bot_state',
         'tool_execution_audit',
+        'contact',
+        'customer_locations',
+        'history',
+        'setup_state_temp',
     ]
 }
 
@@ -182,11 +185,12 @@ async function resetProductionDatabase() {
 
         console.log('1️⃣  Executing database reset on server...')
 
-        // Execute SQL via SSH
-        const command = `ssh ${PROD_SERVER} "cd ${PROD_PROJECT_PATH} && PGPASSWORD='${PROD_DB_PASSWORD}' psql -h localhost -U ${PROD_DB_USER} -d ${PROD_DB_NAME} -c \\"${sqlCommands.replace(/"/g, '\\"')}\\"`
+        // Execute SQL via SSH using stdin to avoid escaping issues
+        const command = `ssh ${PROD_SERVER} "PGPASSWORD='${PROD_DB_PASSWORD}' psql -h localhost -U ${PROD_DB_USER} -d ${PROD_DB_NAME}"`
 
         execSync(command, {
-            stdio: 'inherit',
+            input: sqlCommands,
+            stdio: ['pipe', 'inherit', 'inherit'],
         })
 
         console.log('\n✅ ========================================')

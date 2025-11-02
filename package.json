@@ -16,6 +16,10 @@
     "test:ui": "vitest --ui",
     "db:reset": "tsx ./scripts/db-reset.ts --local",
     "db:reset:prod": "tsx ./scripts/db-reset.ts --production",
+    "seed:users": "tsx ./scripts/seed-telegram-users.ts --local",
+    "seed:users:prod": "tsx ./scripts/seed-telegram-users.ts --production",
+    "seed:roles": "tsx ./scripts/seed-user-roles.ts --local",
+    "seed:roles:prod": "tsx ./scripts/seed-user-roles.ts --production",
     "admin:ids": "tsx ./scripts/getAdminIds.ts",
     "prepare": "husky"
   },

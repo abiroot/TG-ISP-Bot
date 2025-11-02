@@ -14,6 +14,8 @@ interface ButtonState {
     longitude: number
     usernames: string[]
     createdAt: number
+    consumed: boolean
+    consumedAt?: number
 }
 
 // In-memory store: userId -> stateId -> data
@@ -22,25 +24,31 @@ const store = new Map<string, Map<string, ButtonState>>()
 // Auto-cleanup after 10 minutes
 const EXPIRY_MS = 10 * 60 * 1000
 
+// Grace period for consumed data (2 minutes to handle retries)
+const CONSUMED_GRACE_PERIOD_MS = 2 * 60 * 1000
+
 /**
  * Store location confirmation data temporarily
  * @returns Short reference ID (e.g., "a1b2c3")
  */
 export function storeConfirmationData(
-    userId: string,
+    userId: string | number,
     latitude: number,
     longitude: number,
     usernames: string[]
 ): string {
+    // Normalize userId to string to ensure consistency
+    const normalizedUserId = String(userId)
+
     // Generate short ID (6 chars)
     const stateId = Math.random().toString(36).substring(2, 8)
 
     // Ensure user map exists
-    if (!store.has(userId)) {
-        store.set(userId, new Map())
+    if (!store.has(normalizedUserId)) {
+        store.set(normalizedUserId, new Map())
     }
 
-    const userStore = store.get(userId)!
+    const userStore = store.get(normalizedUserId)!
 
     // Store data
     userStore.set(stateId, {
@@ -48,46 +56,56 @@ export function storeConfirmationData(
         longitude,
         usernames,
         createdAt: Date.now(),
+        consumed: false,
     })
 
-    logger.debug({ userId, stateId, usernames }, 'Stored confirmation data')
+    logger.info({ userId: normalizedUserId, stateId, usernames, storeSize: store.size }, 'Stored confirmation data')
 
     // Cleanup old entries (lazy cleanup)
-    cleanupExpired(userId)
+    cleanupExpired(normalizedUserId)
 
     return stateId
 }
 
 /**
- * Retrieve and remove stored confirmation data
+ * Retrieve stored confirmation data (idempotent - can be called multiple times)
+ * Marks data as consumed on first retrieval but doesn't delete immediately
  */
 export function retrieveConfirmationData(
-    userId: string,
+    userId: string | number,
     stateId: string
 ): ButtonState | null {
-    const userStore = store.get(userId)
+    // Normalize userId to string to ensure consistency
+    const normalizedUserId = String(userId)
+
+    const userStore = store.get(normalizedUserId)
     if (!userStore) {
-        logger.warn({ userId, stateId }, 'User store not found')
+        const allUserIds = Array.from(store.keys())
+        logger.warn({ userId: normalizedUserId, stateId, allUserIds, storeSize: store.size }, 'User store not found')
         return null
     }
 
     const data = userStore.get(stateId)
     if (!data) {
-        logger.warn({ userId, stateId }, 'State data not found')
+        logger.warn({ userId: normalizedUserId, stateId }, 'State data not found')
         return null
     }
 
     // Check expiry
     if (Date.now() - data.createdAt > EXPIRY_MS) {
-        logger.info({ userId, stateId }, 'State data expired')
+        logger.info({ userId: normalizedUserId, stateId }, 'State data expired')
         userStore.delete(stateId)
         return null
     }
 
-    // Remove after retrieval (one-time use)
-    userStore.delete(stateId)
-
-    logger.debug({ userId, stateId, usernames: data.usernames }, 'Retrieved confirmation data')
+    // Mark as consumed on first retrieval (idempotent - returns same data on subsequent calls)
+    if (!data.consumed) {
+        data.consumed = true
+        data.consumedAt = Date.now()
+        logger.debug({ userId: normalizedUserId, stateId, usernames: data.usernames }, 'Retrieved and marked confirmation data as consumed')
+    } else {
+        logger.debug({ userId: normalizedUserId, stateId, usernames: data.usernames }, 'Retrieved already-consumed confirmation data (idempotent)')
+    }
 
     return data
 }
@@ -95,37 +113,67 @@ export function retrieveConfirmationData(
 /**
  * Clear all stored data for a user
  */
-export function clearUserData(userId: string): void {
-    const deleted = store.delete(userId)
+export function clearUserData(userId: string | number): void {
+    const normalizedUserId = String(userId)
+    const deleted = store.delete(normalizedUserId)
     if (deleted) {
-        logger.debug({ userId }, 'Cleared user confirmation data')
+        logger.debug({ userId: normalizedUserId }, 'Cleared user confirmation data')
     }
 }
 
 /**
- * Remove expired entries for a user
+ * Delete a specific state entry (useful for explicit cleanup after successful operation)
  */
-function cleanupExpired(userId: string): void {
-    const userStore = store.get(userId)
+export function deleteConfirmationData(userId: string | number, stateId: string): void {
+    const normalizedUserId = String(userId)
+    const userStore = store.get(normalizedUserId)
     if (!userStore) return
 
-    const now = Date.now()
-    let cleaned = 0
-
-    for (const [stateId, data] of userStore.entries()) {
-        if (now - data.createdAt > EXPIRY_MS) {
-            userStore.delete(stateId)
-            cleaned++
-        }
-    }
-
-    if (cleaned > 0) {
-        logger.debug({ userId, cleaned }, 'Cleaned up expired confirmation data')
+    const deleted = userStore.delete(stateId)
+    if (deleted) {
+        logger.debug({ userId: normalizedUserId, stateId }, 'Explicitly deleted confirmation data')
     }
 
     // Remove user map if empty
     if (userStore.size === 0) {
-        store.delete(userId)
+        store.delete(normalizedUserId)
+    }
+}
+
+/**
+ * Remove expired entries and consumed entries past grace period
+ */
+function cleanupExpired(userId: string | number): void {
+    const normalizedUserId = String(userId)
+    const userStore = store.get(normalizedUserId)
+    if (!userStore) return
+
+    const now = Date.now()
+    let cleanedExpired = 0
+    let cleanedConsumed = 0
+
+    for (const [stateId, data] of userStore.entries()) {
+        // Remove expired data (created more than 10 minutes ago)
+        if (now - data.createdAt > EXPIRY_MS) {
+            userStore.delete(stateId)
+            cleanedExpired++
+            continue
+        }
+
+        // Remove consumed data after grace period (2 minutes after consumption)
+        if (data.consumed && data.consumedAt && now - data.consumedAt > CONSUMED_GRACE_PERIOD_MS) {
+            userStore.delete(stateId)
+            cleanedConsumed++
+        }
+    }
+
+    if (cleanedExpired > 0 || cleanedConsumed > 0) {
+        logger.debug({ userId: normalizedUserId, cleanedExpired, cleanedConsumed }, 'Cleaned up confirmation data')
+    }
+
+    // Remove user map if empty
+    if (userStore.size === 0) {
+        store.delete(normalizedUserId)
     }
 }
 

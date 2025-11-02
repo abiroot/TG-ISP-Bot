@@ -125,6 +125,45 @@ export class MockISPService {
     }
 
     /**
+     * Extract phone number from message (mimics ISPService behavior)
+     */
+    extractPhoneNumberFromMessage(message: string, fallback?: string): string | null {
+        // Clean message
+        const cleanMessage = message.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
+
+        // Try various phone number patterns
+        const phonePatterns = [
+            /\b(?:\+?\d\s?){6,15}\b/g,
+            /\b(?:\+?961\s?)?\d{1,2}(?:\s?\d{2,3}){1,3}(?:\s?\d{2,3})\b/g,
+            /\b(\+?\d{6,15})\b/g,
+        ]
+
+        for (const pattern of phonePatterns) {
+            const matches = cleanMessage.match(pattern)
+            if (matches) {
+                for (const match of matches) {
+                    let phoneNumber = match.replace(/[^\d+]/g, '')
+                    if (phoneNumber.length >= 6 && phoneNumber.length <= 15) {
+                        if (!phoneNumber.startsWith('+') && phoneNumber.length >= 10) {
+                            phoneNumber = '+' + phoneNumber
+                        }
+                        return phoneNumber
+                    }
+                }
+            }
+        }
+
+        // Try username pattern
+        const usernamePattern = /(?:user|username|account)\s*[:-]?\s*([a-zA-Z][a-zA-Z0-9_.]{2,31})/gi
+        const usernameMatch = cleanMessage.match(usernamePattern)
+        if (usernameMatch) {
+            return usernameMatch[1]
+        }
+
+        return fallback || null
+    }
+
+    /**
      * Get AI SDK tools (for AI chat integration)
      * Returns tools that use mock data
      */

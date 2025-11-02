@@ -27,7 +27,7 @@ import {
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
 import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
-import { storeConfirmationData, retrieveConfirmationData } from '~/core/utils/buttonStateStore'
+import { storeConfirmationData, retrieveConfirmationData, deleteConfirmationData } from '~/core/utils/buttonStateStore'
 
 const logger = createFlowLogger('update-coordinates-flow')
 
@@ -341,6 +341,7 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
         let latitude = await state.get<number>('latitude')
         let longitude = await state.get<number>('longitude')
         let usernames = await state.get<string[]>('usernames')
+        let retrievedStateId: string | undefined // Track stateId for cleanup
 
         // If state is missing, parse from button data (fallback method)
         if (!latitude || !longitude || !usernames || usernames.length === 0) {
@@ -360,6 +361,7 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
                     latitude = storedData.latitude
                     longitude = storedData.longitude
                     usernames = storedData.usernames
+                    retrievedStateId = stateId // Store for cleanup after successful update
 
                     logger.info({ latitude, longitude, usernames }, 'Successfully retrieved data from store')
                 } else {
@@ -488,6 +490,12 @@ export const locationConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTO
             }
 
             logger.info({ usernames, latitude, longitude }, 'Location update completed')
+
+            // Cleanup button state if we retrieved data from store
+            if (retrievedStateId) {
+                deleteConfirmationData(ctx.from, retrievedStateId)
+                logger.debug({ stateId: retrievedStateId }, 'Cleaned up confirmation data after successful update')
+            }
         } catch (error) {
             await LoadingIndicator.hide(provider, loadingMsg)
             logger.error({ err: error }, 'Location update failed')

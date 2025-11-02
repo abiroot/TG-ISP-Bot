@@ -2,6 +2,8 @@ import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import { pool } from '~/config/database'
+import { seedTelegramUsers } from '../seeders/telegramUserSeeder.js'
+import { seedUserRoles } from '../seeders/userRoleSeeder.js'
 
 // Get __dirname equivalent in ES modules
 const __filename = fileURLToPath(import.meta.url)
@@ -63,6 +65,12 @@ export async function runMigrations(): Promise<void> {
         }
 
         console.log('✅ All migrations completed successfully')
+
+        // Run seeders after migrations
+        console.log('\n🌱 Running database seeders...')
+        await seedTelegramUsers()
+        await seedUserRoles()
+        console.log('✅ All seeders completed successfully')
     } catch (error) {
         console.error('❌ Migration failed:', error)
         throw error
