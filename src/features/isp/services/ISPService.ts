@@ -612,9 +612,19 @@ export class ISPService {
     }
 
     /**
-     * Format user info for display (ALL 51 FIELDS)
+     * Check if a Mikrotik interface is an OLT interface
+     * OLT interfaces contain "OLT" followed by a digit (case-insensitive)
      */
-    formatUserInfo(userInfo: ISPUserInfo): string {
+    private isOLTInterface(mikrotikInterface: string | null | undefined): boolean {
+        if (!mikrotikInterface) return false
+        return /OLT/i.test(mikrotikInterface)
+    }
+
+    /**
+     * Format user info for display (ALL 51 FIELDS)
+     * Async to support OLT interface handling with getMikrotikUsers
+     */
+    async formatUserInfo(userInfo: ISPUserInfo): Promise<string> {
         const statusEmoji = userInfo.online ? '🟢' : '🔴'
         const accountStatus = userInfo.activatedAccount ? '✅ Activated' : '❌ Not Activated'
         const activeStatus = userInfo.active ? '✅ Active' : '❌ Inactive'
@@ -624,6 +634,9 @@ export class ISPService {
         const expiryDate = new Date(userInfo.expiryAccount)
         const isExpired = expiryDate < new Date()
         const expiryStatus = isExpired ? '⏰ Expired' : '✅ Valid'
+
+        // Check if this is an OLT interface
+        const isOLT = this.isOLTInterface(userInfo.mikrotikInterface)
 
         // Escape helper - only escape raw user data
         const esc = (str: string | null | undefined, fallback = 'N/A') => {
@@ -650,10 +663,58 @@ export class ISPService {
             })
             .join('\n')
 
-        // Access point users
-        const apUsers = userInfo.accessPointUsers
-            .map((u) => `• ${esc(u.userName)} ${u.online ? '🟢' : '🔴'}`)
-            .join('\n')
+        // Access point users - handle OLT interfaces differently
+        let apUsers: string
+        if (isOLT && userInfo.mikrotikInterface) {
+            // For OLT interfaces, fetch users from getMikrotikUsers
+            try {
+                const mikrotikUsers = await this.getMikrotikUsers(userInfo.mikrotikInterface)
+                if (mikrotikUsers.length === 0) {
+                    apUsers = '• No users found on this interface'
+                } else {
+                    apUsers = mikrotikUsers
+                        .map((u) => `• ${esc(u.userName)} ${u.online ? '🟢' : '🔴'}`)
+                        .join('\n')
+                }
+            } catch (error) {
+                ispLogger.error({ err: error, mikrotikInterface: userInfo.mikrotikInterface }, 'Failed to fetch Mikrotik users for OLT interface')
+                apUsers = '• Unable to fetch user list'
+            }
+        } else {
+            // For non-OLT interfaces, use existing accessPointUsers
+            apUsers = userInfo.accessPointUsers
+                .map((u) => `• ${esc(u.userName)} ${u.online ? '🟢' : '🔴'}`)
+                .join('\n')
+        }
+
+        // Build optional sections based on interface type
+        const stationSection = !isOLT
+            ? `
+📡 <b>Station Information:</b>
+- <b>Status:</b> ${userInfo.stationOnline ? '🟢 Online' : '🔴 Offline'}
+- <b>Name:</b> ${esc(userInfo.stationName)}
+- <b>IP:</b> <code>${esc(userInfo.stationIpAddress)}</code>
+- <b>Uptime:</b> ${esc(userInfo.stationUpTime)}
+
+📊 <b>Station Interface Stats:</b>
+${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
+`
+            : ''
+
+        const accessPointSection = !isOLT
+            ? `
+📶 <b>Access Point:</b>
+- <b>Status:</b> ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
+- <b>Name:</b> ${esc(userInfo.accessPointName)}
+- <b>IP:</b> <code>${esc(userInfo.accessPointIpAddress)}</code>
+- <b>Uptime:</b> ${esc(userInfo.accessPointUpTime)}
+- <b>Signal:</b> ${esc(userInfo.accessPointSignal)}
+- <b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}
+
+📊 <b>Access Point Interface Stats:</b>
+${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
+`
+            : ''
 
         return `
 Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} ${esc(userInfo.lastName)}</b>:
@@ -695,27 +756,7 @@ Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} $
 - <b>Speeds:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
 - <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
 - <b>Monthly Quota:</b> ${formatQuota(userInfo.monthlyQuota)}
-
-📡 <b>Station Information:</b>
-- <b>Status:</b> ${userInfo.stationOnline ? '🟢 Online' : '🔴 Offline'}
-- <b>Name:</b> ${esc(userInfo.stationName)}
-- <b>IP:</b> <code>${esc(userInfo.stationIpAddress)}</code>
-- <b>Uptime:</b> ${esc(userInfo.stationUpTime)}
-
-📊 <b>Station Interface Stats:</b>
-${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
-
-📶 <b>Access Point:</b>
-- <b>Status:</b> ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
-- <b>Name:</b> ${esc(userInfo.accessPointName)}
-- <b>IP:</b> <code>${esc(userInfo.accessPointIpAddress)}</code>
-- <b>Uptime:</b> ${esc(userInfo.accessPointUpTime)}
-- <b>Signal:</b> ${esc(userInfo.accessPointSignal)}
-- <b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}
-
-📊 <b>Access Point Interface Stats:</b>
-${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
-
+${stationSection}${accessPointSection}
 👥 <b>Users on Same AP:</b>
 ${apUsers || '• None'}
 
@@ -862,7 +903,8 @@ If you need further assistance, feel free to ask! 😊`.trim()
 
                     // Return all users with formatted messages
                     // If multiple users, set multipleResults flag for CoreAIService to handle
-                    const messages = users.map((user) => this.formatUserInfo(user))
+                    // formatUserInfo is now async to support OLT interface handling
+                    const messages = await Promise.all(users.map((user) => this.formatUserInfo(user)))
 
                     return {
                         success: true,
