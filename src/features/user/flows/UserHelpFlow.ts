@@ -23,7 +23,7 @@ export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/he
         flowLogger.info({ user: ctx.from }, 'User requested help')
 
         // Get user access context
-        const isAdmin = userManagementService.isAdmin(ctx.from)
+        const isAdmin = await userManagementService.isAdmin(ctx.from)
         const isWhitelisted = await userManagementService.isWhitelisted(ctx.from)
         const userRoles = await roleService.getUserRoles(ctx.from)
 

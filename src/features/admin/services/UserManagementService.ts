@@ -25,6 +25,7 @@ import { embeddingRepository } from '~/database/repositories/embeddingRepository
 import { telegramUserRepository } from '~/database/repositories/telegramUserRepository'
 import { toolExecutionAuditRepository } from '~/database/repositories/toolExecutionAuditRepository'
 import { admins } from '~/config/admins'
+import { RoleService } from '~/services/roleService'
 import { createFlowLogger } from '~/core/utils/logger'
 import { ServiceError } from '~/core/errors/ServiceError'
 import { getContextId, getContextType } from '~/core/utils/contextId'
@@ -47,6 +48,12 @@ export class UserManagementServiceError extends ServiceError {
  * Centralized service for all user-related operations
  */
 export class UserManagementService {
+    private roleService: RoleService
+
+    constructor() {
+        this.roleService = new RoleService()
+    }
+
     /**
      * PERSONALITY MANAGEMENT
      */
@@ -271,11 +278,28 @@ export class UserManagementService {
 
     /**
      * Check if user is admin
+     *
+     * Checks both:
+     * 1. Hardcoded ADMIN_IDS config (fast, for core admins)
+     * 2. Database role system (allows dynamic admin promotion via /set role)
      */
-    isAdmin(userIdentifier: string | number): boolean {
+    async isAdmin(userIdentifier: string | number): Promise<boolean> {
         // Convert to string if number
         const userIdStr = String(userIdentifier)
-        return admins.includes(userIdStr)
+
+        // Check hardcoded config first (fast path)
+        if (admins.includes(userIdStr)) {
+            return true
+        }
+
+        // Check database roles (allows dynamic admin promotion)
+        try {
+            const roles = await this.roleService.getUserRoles(userIdStr)
+            return roles.includes('admin')
+        } catch (error) {
+            userMgmtLogger.warn({ err: error, userIdentifier }, 'Failed to check database roles, falling back to config-only')
+            return false
+        }
     }
 
     /**
@@ -381,11 +405,12 @@ export class UserManagementService {
         isAdmin: boolean
     }> {
         try {
-            const [messageCount, embeddingStats, personality, isWhitelisted] = await Promise.all([
+            const [messageCount, embeddingStats, personality, isWhitelisted, isAdmin] = await Promise.all([
                 messageRepository.getMessageCount(contextId),
                 embeddingRepository.getStats(contextId),
                 personalityRepository.getByContextId(contextId),
                 this.isWhitelisted(contextId),
+                this.isAdmin(contextId),
             ])
 
             return {
@@ -393,7 +418,7 @@ export class UserManagementService {
                 embeddingCount: embeddingStats.total_chunks,
                 hasPersonality: !!personality,
                 isWhitelisted,
-                isAdmin: this.isAdmin(contextId),
+                isAdmin,
             }
         } catch (error) {
             userMgmtLogger.error({ err: error, contextId }, 'Failed to get user data stats')

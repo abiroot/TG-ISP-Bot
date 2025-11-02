@@ -55,7 +55,7 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Whitelist management triggered')
 
         // Check admin
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }
@@ -63,7 +63,8 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
         const input = ctx.body.toLowerCase()
 
         // Route to appropriate sub-action
-        if (input.includes('list')) {
+        // Use word boundary matching to prevent "whitelist" matching "list"
+        if (input.match(/\blist\b/) || input === 'list whitelist' || input === '/list whitelist') {
             return handleListWhitelist(ctx, utils, userManagementService)
         } else if (input.includes('remove')) {
             await state.update({ action: 'remove' })
@@ -84,7 +85,8 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
         { capture: true },
         async (ctx, { flowDynamic, state, endFlow, extensions }) => {
             const { userManagementService } = extensions!
-            const action = await state.get<'add' | 'remove'>('action')
+            // Default to 'add' if state is undefined (safety fallback)
+            const action = (await state.get<'add' | 'remove'>('action')) || 'add'
             const input = ctx.body.trim()
 
             if (input.toLowerCase() === 'group') {

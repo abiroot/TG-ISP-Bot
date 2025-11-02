@@ -40,7 +40,7 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Bot management triggered')
 
         // Check admin
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }

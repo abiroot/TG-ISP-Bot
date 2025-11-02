@@ -6,6 +6,7 @@
  */
 
 import { UserRoleRepository } from '~/database/repositories/userRoleRepository.js'
+import { whitelistRepository } from '~/database/repositories/whitelistRepository.js'
 import { TOOL_PERMISSIONS, type RoleName, type ToolName, USER_ROLES } from '~/config/roles.js'
 import { createFlowLogger } from '~/core/utils/logger.js'
 import type { CreateUserRoleInput } from '~/database/schemas/userRole.js'
@@ -181,6 +182,27 @@ ${permissions.join('\n')}
                 })
             }
 
+            // Auto-whitelist user when any role is assigned
+            if (roles.length > 0) {
+                try {
+                    await whitelistRepository.addUser({
+                        user_identifier: userTelegramId,
+                        whitelisted_by: setBy,
+                        notes: `Auto-whitelisted via role assignment: ${roles.join(', ')}`,
+                    })
+                    roleLogger.info(
+                        { userTelegramId, roles },
+                        'User auto-whitelisted on role assignment'
+                    )
+                } catch (error) {
+                    // Non-critical: Log warning but don't fail the role assignment
+                    roleLogger.warn(
+                        { err: error, userTelegramId, roles },
+                        'Failed to auto-whitelist user (non-critical)'
+                    )
+                }
+            }
+
             roleLogger.info(
                 {
                     userTelegramId,
@@ -233,6 +255,25 @@ ${permissions.join('\n')}
                 role,
                 assigned_by: setBy,
             })
+
+            // Auto-whitelist user when any role is assigned
+            try {
+                await whitelistRepository.addUser({
+                    user_identifier: userTelegramId,
+                    whitelisted_by: setBy,
+                    notes: `Auto-whitelisted via role assignment: ${role}`,
+                })
+                roleLogger.info(
+                    { userTelegramId, role },
+                    'User auto-whitelisted on role assignment'
+                )
+            } catch (error) {
+                // Non-critical: Log warning but don't fail the role assignment
+                roleLogger.warn(
+                    { err: error, userTelegramId, role },
+                    'Failed to auto-whitelist user (non-critical)'
+                )
+            }
 
             roleLogger.info(
                 {

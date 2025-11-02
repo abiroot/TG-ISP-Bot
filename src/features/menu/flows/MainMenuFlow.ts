@@ -23,7 +23,7 @@ export const mainMenuFlow = addKeyword<TelegramProvider, Database>(['menu', '/me
 })
     .addAction(async (ctx, utils) => {
         const { userManagementService } = utils.extensions!
-        const isAdmin = userManagementService.isAdmin(ctx.from)
+        const isAdmin = await userManagementService.isAdmin(ctx.from)
 
         flowLogger.info({ from: ctx.from, isAdmin }, 'Main menu opened')
 

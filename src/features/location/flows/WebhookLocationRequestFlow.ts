@@ -45,7 +45,7 @@ export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>
 
         // Check if user is whitelisted or admin
         const { userManagementService } = extensions!
-        const isAdmin = userManagementService.isAdmin(ctx.from)
+        const isAdmin = await userManagementService.isAdmin(ctx.from)
         const isWhitelisted = await userManagementService.isWhitelisted(ctx.from)
 
         if (!isAdmin && !isWhitelisted) {

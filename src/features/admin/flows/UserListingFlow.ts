@@ -22,7 +22,7 @@ export const userListingFlow = addKeyword<TelegramProvider, Database>([
     const { userManagementService, telegramUserService, roleService } = extensions!
 
     // Admin check
-    if (!userManagementService.isAdmin(ctx.from)) {
+    if (!(await userManagementService.isAdmin(ctx.from))) {
         await flowDynamic('⚠️ This command is only available to administrators.')
         return
     }

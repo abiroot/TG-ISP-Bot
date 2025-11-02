@@ -129,7 +129,7 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
         const { userManagementService, roleService } = extensions!
 
         // Admin check
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }
@@ -208,7 +208,7 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
         const { userManagementService, roleService } = extensions!
 
         // Admin check
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }
@@ -277,7 +277,7 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
         const { userManagementService, roleService } = extensions!
 
         // Admin check
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }
@@ -346,7 +346,7 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
         const { userManagementService, roleService } = extensions!
 
         // Admin check
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }
@@ -392,7 +392,7 @@ export const listRolesFlow = addKeyword(['/list roles', 'list roles']).addAction
         const { userManagementService, roleService } = extensions!
 
         // Admin check
-        if (!userManagementService.isAdmin(ctx.from)) {
+        if (!(await userManagementService.isAdmin(ctx.from))) {
             await flowDynamic('⚠️ This command is only available to administrators.')
             return
         }

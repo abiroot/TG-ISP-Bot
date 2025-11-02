@@ -46,7 +46,7 @@ export const updateCoordinatesFlow = addKeyword<TelegramProvider, Database>([
         logger.info({ from: ctx.from }, 'Update coordinates flow started')
 
         // Check whitelist or admin status
-        const isAdmin = userManagementService.isAdmin(ctx.from)
+        const isAdmin = await userManagementService.isAdmin(ctx.from)
         const isWhitelisted = await userManagementService.isWhitelisted(ctx.from)
 
         if (!isAdmin && !isWhitelisted) {
