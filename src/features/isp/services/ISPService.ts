@@ -27,6 +27,7 @@ import { ServiceError } from '~/core/errors/ServiceError'
 import type { Personality } from '~/database/schemas/personality'
 import { type ToolName } from '~/config/roles.js'
 import type { RoleService } from '~/services/roleService.js'
+import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierExtractor'
 
 const ispLogger = createFlowLogger('isp-service')
 
@@ -745,40 +746,21 @@ If you need further assistance, feel free to ask! 😊`.trim()
 
     /**
      * Extract phone number from message
+     * Uses the robust userIdentifierExtractor utility
      */
     extractPhoneNumberFromMessage(message: string, fallback?: string): string | null {
-        // Clean message
-        const cleanMessage = message.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()
+        const result = extractFirstUserIdentifier(message)
 
-        // Try various phone number patterns
-        const phonePatterns = [
-            /\b(?:\+?\d\s?){6,15}\b/g,
-            /\b(?:\+?961\s?)?\d{1,2}(?:\s?\d{2,3}){1,3}(?:\s?\d{2,3})\b/g,
-            /\b(\+?\d{6,15})\b/g,
-        ]
-
-        for (const pattern of phonePatterns) {
-            const matches = cleanMessage.match(pattern)
-            if (matches) {
-                for (const match of matches) {
-                    let phoneNumber = match.replace(/[^\d+]/g, '')
-                    if (phoneNumber.length >= 6 && phoneNumber.length <= 15) {
-                        if (!phoneNumber.startsWith('+') && phoneNumber.length >= 10) {
-                            phoneNumber = '+' + phoneNumber
-                        }
-                        return phoneNumber
-                    }
-                }
+        if (result) {
+            // For phone numbers, use normalized version if available
+            if (result.type === 'phone' && result.normalized) {
+                return result.normalized
             }
+            // For usernames or non-normalized phones, use the value
+            return result.value
         }
 
-        // Try username pattern
-        const usernamePattern = /(?:user|username|account)\s*[:-]?\s*([a-zA-Z][a-zA-Z0-9_.]{2,31})/gi
-        const usernameMatch = cleanMessage.match(usernamePattern)
-        if (usernameMatch) {
-            return usernameMatch[1]
-        }
-
+        // Only use fallback if explicitly provided
         return fallback || null
     }
 

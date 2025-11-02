@@ -54,8 +54,8 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                 return
             }
 
-            // Extract identifier from message
-            const identifier = ispService.extractPhoneNumberFromMessage(ctx.body, ctx.from)
+            // Extract identifier from message (no fallback to Telegram ID)
+            const identifier = ispService.extractPhoneNumberFromMessage(ctx.body)
 
             if (!identifier) {
                 await flowDynamic(
@@ -203,8 +203,8 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                     return endFlow()
                 }
 
-                // Extract identifier from captured message
-                const identifier = ispService.extractPhoneNumberFromMessage(ctx.body, ctx.from)
+                // Extract identifier from captured message (no fallback to Telegram ID)
+                const identifier = ispService.extractPhoneNumberFromMessage(ctx.body)
 
                 if (!identifier) {
                     await flowDynamic(
