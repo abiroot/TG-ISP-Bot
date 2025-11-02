@@ -166,6 +166,7 @@ export class MockTelegramProvider extends EventEmitter {
             from: ctx.from || 'test-user',
             body: ctx.body || 'test message',
             name: ctx.name,
+            provider: this as any, // Add provider reference to context
             ...ctx,
         }
 

@@ -17,7 +17,8 @@ const userListLogger = createFlowLogger('UserListingFlow')
 export const userListingFlow = addKeyword<TelegramProvider, Database>([
     '/users',
     'users',
-]).addAction(async (ctx, { flowDynamic, extensions }) => {
+]).addAction(async (ctx, utils) => {
+    const { flowDynamic, extensions } = utils
     const { userManagementService, telegramUserService, roleService } = extensions!
 
     // Admin check
@@ -110,7 +111,7 @@ export const userListingFlow = addKeyword<TelegramProvider, Database>([
         message += '• <code>/getmyid</code> - Get your own Telegram ID'
 
         // Send with HTML formatting via telegram API directly
-        const provider = ctx.provider as TelegramProvider
+        const provider = utils.provider as TelegramProvider
         await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 
         userListLogger.info({ from: ctx.from, userCount: allUsers.length }, 'User list sent successfully')

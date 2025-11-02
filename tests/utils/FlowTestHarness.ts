@@ -110,11 +110,12 @@ export class FlowTestHarness {
     ): Promise<BotResponse> {
         const messageCount = this.provider.getAllMessages().length
 
-        // Create message context
+        // Create message context with provider reference
         const ctx: BotContext = {
             from,
             body,
             name: context?.name,
+            provider: this.provider as any, // Add provider reference for flows that need it
             ...context,
         }
 

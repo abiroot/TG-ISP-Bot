@@ -48,7 +48,8 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
     'list whitelist',
     '/list whitelist',
 ])
-    .addAction(async (ctx, { flowDynamic, state, fallBack, extensions }) => {
+    .addAction(async (ctx, utils) => {
+        const { flowDynamic, state, fallBack, extensions } = utils
         const { userManagementService } = extensions!
 
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Whitelist management triggered')
@@ -63,17 +64,17 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
 
         // Route to appropriate sub-action
         if (input.includes('list')) {
-            return handleListWhitelist(ctx, flowDynamic, userManagementService)
+            return handleListWhitelist(ctx, utils, userManagementService)
         } else if (input.includes('remove')) {
             await state.update({ action: 'remove' })
             const message = '🗑️ <b>Remove from Whitelist</b>\n\nReply with:\n• "group" to remove current group\n• Telegram username to remove user (e.g., @username or SOLamyy)'
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         } else {
             await state.update({ action: 'add' })
             const message = '➕ <b>Add to Whitelist</b>\n\nReply with:\n• "group" to whitelist current group\n• Telegram username to whitelist user (e.g., @username or SOLamyy)'
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
@@ -122,7 +123,7 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
 /**
  * Handle list whitelist sub-action
  */
-async function handleListWhitelist(ctx: any, flowDynamic: any, userManagementService: any) {
+async function handleListWhitelist(ctx: any, utils: any, userManagementService: any) {
     const [groups, users] = await Promise.all([
         userManagementService.getWhitelistedGroups(),
         userManagementService.getWhitelistedUsers(),
@@ -155,7 +156,7 @@ async function handleListWhitelist(ctx: any, flowDynamic: any, userManagementSer
         message += '<b>Users:</b> None'
     }
 
-    const provider = ctx.provider as TelegramProvider
+    const provider = utils.provider as TelegramProvider
     await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 }
 

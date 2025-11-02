@@ -33,7 +33,8 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
     'toggle rag',
     'toggle isp',
 ])
-    .addAction(async (ctx, { flowDynamic, extensions }) => {
+    .addAction(async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { botStateService, userManagementService } = extensions!
 
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Bot management triggered')
@@ -48,19 +49,19 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
 
         // Route to appropriate action
         if (input.includes('status')) {
-            return handleBotStatus(ctx, flowDynamic, botStateService)
+            return handleBotStatus(ctx, utils, botStateService)
         } else if (input.includes('enable maintenance')) {
             await botStateService.enableMaintenanceMode({
                 message: '🔧 Bot is under maintenance. Please try again later.',
                 enabledBy: ctx.from,
             })
             const message = '✅ Maintenance mode <b>ENABLED</b>'
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else if (input.includes('disable maintenance')) {
             await botStateService.disableMaintenanceMode(ctx.from)
             const message = '✅ Maintenance mode <b>DISABLED</b>'
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else if (input.includes('toggle')) {
             return handleToggleFeature(ctx, flowDynamic, botStateService)
@@ -70,7 +71,7 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
 /**
  * Handle bot status display
  */
-async function handleBotStatus(ctx: any, flowDynamic: any, botStateService: any) {
+async function handleBotStatus(ctx: any, utils: any, botStateService: any) {
     const state = await botStateService.getFullState()
     const uptime = process.uptime()
     const uptimeHours = Math.floor(uptime / 3600)
@@ -97,7 +98,7 @@ async function handleBotStatus(ctx: any, flowDynamic: any, botStateService: any)
         if (state.features.test_flows) message += `• Test Flows: ✅\n`
     }
 
-    const provider = ctx.provider as TelegramProvider
+    const provider = utils.provider as TelegramProvider
     await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 }
 

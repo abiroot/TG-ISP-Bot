@@ -124,7 +124,8 @@ function parseShowRoleCommand(message: string): string | null {
  * Example: /set role @johndoe collector
  */
 export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
-    async (ctx, { flowDynamic, extensions }) => {
+    async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { userManagementService, roleService } = extensions!
 
         // Admin check
@@ -149,7 +150,7 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
                 `• Use <code>/users</code> to see all Telegram user IDs\n` +
                 `• Ask users to use <code>/getmyid</code> to get their own ID`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
@@ -177,7 +178,7 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
                 `<b>New Role:</b> ${html.escape(role)}\n\n` +
                 `${permissionSummary}`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             roleLogger.error(
@@ -202,7 +203,8 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
  * Example: /add role @johndoe admin
  */
 export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
-    async (ctx, { flowDynamic, extensions }) => {
+    async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { userManagementService, roleService } = extensions!
 
         // Admin check
@@ -227,7 +229,7 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
                 `• Use <code>/users</code> to see all Telegram user IDs\n` +
                 `• Ask users to use <code>/getmyid</code> to get their own ID`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
@@ -255,7 +257,7 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
                 `<b>Added Role:</b> ${html.escape(role)}\n\n` +
                 `${permissionSummary}`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             await flowDynamic(`❌ ${addResult.message}`)
@@ -270,7 +272,8 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
  * Example: /remove role @johndoe collector
  */
 export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAction(
-    async (ctx, { flowDynamic, extensions }) => {
+    async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { userManagementService, roleService } = extensions!
 
         // Admin check
@@ -295,7 +298,7 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
                 `• Use <code>/users</code> to see all Telegram user IDs\n` +
                 `• Ask users to use <code>/getmyid</code> to get their own ID`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
@@ -323,7 +326,7 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
                 `<b>Removed Role:</b> ${html.escape(role)}\n\n` +
                 `${permissionSummary}`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             await flowDynamic(`❌ ${removeResult.message}`)
@@ -338,7 +341,8 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
  * Example: /show role @johndoe
  */
 export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
-    async (ctx, { flowDynamic, extensions }) => {
+    async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { userManagementService, roleService } = extensions!
 
         // Admin check
@@ -362,7 +366,7 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
                 `• Use <code>/users</code> to see all Telegram user IDs\n` +
                 `• Ask users to use <code>/getmyid</code> to get their own ID`
 
-            const provider = ctx.provider as TelegramProvider
+            const provider = utils.provider as TelegramProvider
             await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
@@ -372,7 +376,7 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
 
         const message = `<b>User ID:</b> <code>${html.escape(userId)}</code>\n\n${permissionSummary}`
 
-        const provider = ctx.provider as TelegramProvider
+        const provider = utils.provider as TelegramProvider
         await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
     }
 )
@@ -383,7 +387,8 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
  * Command: /list roles
  */
 export const listRolesFlow = addKeyword(['/list roles', 'list roles']).addAction(
-    async (ctx, { flowDynamic, extensions }) => {
+    async (ctx, utils) => {
+        const { flowDynamic, extensions } = utils
         const { userManagementService, roleService } = extensions!
 
         // Admin check
@@ -409,31 +414,33 @@ export const listRolesFlow = addKeyword(['/list roles', 'list roles']).addAction
             }
         }
 
-        // Format output
-        let message = '👥 **Role Assignments**\n\n'
+        // Format output with HTML
+        let message = '<b>👥 Role Assignments</b>\n\n'
 
         for (const role of VALID_ROLES) {
             const users = roleGroups[role] || []
-            message += `**${role.toUpperCase()}** (${users.length} users)\n`
+            message += `<b>${role.toUpperCase()}</b> (${users.length} users)\n`
 
             if (users.length > 0) {
                 users.forEach((userId) => {
-                    message += `  • \`${userId}\`\n`
+                    message += `  • <code>${html.escape(userId)}</code>\n`
                 })
             } else {
-                message += `  (No users assigned)\n`
+                message += `  <i>(No users assigned)</i>\n`
             }
 
             message += '\n'
         }
 
-        message += `\n**Commands:**\n`
-        message += `• \`/set role <user_id> <role>\` - Assign role\n`
-        message += `• \`/add role <user_id> <role>\` - Add role (keep existing)\n`
-        message += `• \`/remove role <user_id> <role>\` - Remove role\n`
-        message += `• \`/show role <user_id>\` - Show user's roles\n`
-        message += `\n**Valid roles:** ${VALID_ROLES.join(', ')}`
+        message += `\n<b>Commands:</b>\n`
+        message += `• <code>/set role &lt;user_id&gt; &lt;role&gt;</code> - Assign role\n`
+        message += `• <code>/add role &lt;user_id&gt; &lt;role&gt;</code> - Add role (keep existing)\n`
+        message += `• <code>/remove role &lt;user_id&gt; &lt;role&gt;</code> - Remove role\n`
+        message += `• <code>/show role &lt;user_id&gt;</code> - Show user's roles\n`
+        message += `\n<b>Valid roles:</b> ${VALID_ROLES.join(', ')}`
 
-        await flowDynamic(message)
+        // Send with HTML formatting via telegram API directly
+        const provider = utils.provider as TelegramProvider
+        await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
     }
 )

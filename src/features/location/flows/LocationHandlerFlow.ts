@@ -169,6 +169,15 @@ export const locationHandlerFlow = addKeyword<TelegramProvider, Database>(EVENTS
                 ],
                 { parseMode: 'HTML' }
             )
+
+            // Clear webhook state after showing confirmation to prevent state persistence
+            await state.update({
+                triggeredBy: null,
+                clientUsername: null,
+                userMode: null,
+            })
+
+            logger.debug({ from: ctx.from }, 'Cleared webhook state after confirmation display')
         } else {
             // Normal flow: Prompt for user mode selection
             await sendWithInlineButtons(

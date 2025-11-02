@@ -13,7 +13,7 @@ import { TelegramUserHelper } from '~/core/utils/TelegramUserHelper'
 import { html } from '~/core/utils/telegramFormatting'
 
 export const getMyIdFlow = addKeyword<BotCtx>(['/getmyid', '/myid', 'getmyid', 'myid'])
-    .addAction(async (ctx, { flowDynamic }) => {
+    .addAction(async (ctx, utils) => {
         const telegramId = TelegramUserHelper.getTelegramId(ctx)
         const fullName = TelegramUserHelper.getFullName(ctx)
         const telegramHandle = TelegramUserHelper.getTelegramHandle(ctx)
@@ -34,7 +34,7 @@ export const getMyIdFlow = addKeyword<BotCtx>(['/getmyid', '/myid', 'getmyid', '
 
         // Send formatted message (HTML parse mode)
         const chatId = ctx.from
-        await ctx.provider.vendor.telegram.sendMessage(chatId, message, {
+        await utils.provider.vendor.telegram.sendMessage(chatId, message, {
             parse_mode: 'HTML',
         })
     })
