@@ -243,6 +243,18 @@ export class TelegramUserRepository {
         )
         return result.rows[0].exists
     }
+
+    /**
+     * Check if Telegram ID exists in mapping (for webhook validation)
+     * Used to validate that a Telegram ID from webhook exists in our database
+     */
+    async telegramIdExists(telegramId: string): Promise<boolean> {
+        const result = await pool.query(
+            'SELECT EXISTS(SELECT 1 FROM telegram_user_mapping WHERE telegram_id = $1)',
+            [telegramId]
+        )
+        return result.rows[0].exists
+    }
 }
 
 // Export singleton instance

@@ -220,6 +220,36 @@ export class TelegramUserService {
             )
         }
     }
+
+    /**
+     * Validate that a Telegram ID exists in our database
+     * Used by webhook to verify that tg_username (Telegram ID) is in our system
+     *
+     * @param telegramId - Telegram numeric user ID from webhook
+     * @returns The Telegram ID if valid, null if not found
+     */
+    async validateTelegramId(telegramId: string): Promise<string | null> {
+        try {
+            // Validate input
+            if (!telegramId || typeof telegramId !== 'string' || telegramId.trim() === '') {
+                logger.warn({ telegramId }, 'Invalid Telegram ID provided for validation')
+                return null
+            }
+
+            const exists = await telegramUserRepository.telegramIdExists(telegramId.trim())
+            logger.debug({ telegramId, exists }, 'Telegram ID validation check')
+
+            return exists ? telegramId.trim() : null
+        } catch (error) {
+            logger.error({ err: error, telegramId }, 'Failed to validate Telegram ID')
+            throw new TelegramUserServiceError(
+                'Failed to validate Telegram ID',
+                'TELEGRAM_ID_VALIDATION_ERROR',
+                error,
+                true
+            )
+        }
+    }
 }
 
 /**

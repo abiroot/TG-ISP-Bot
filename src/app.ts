@@ -431,11 +431,8 @@ async function main() {
             // BuilderBot/Polka parses body automatically
             const { worker_username, tg_username, client_username } = req.body || {}
 
-            // Prefer tg_username, fallback to worker_username for backward compatibility
-            const username = tg_username || worker_username
-
             // Validate input
-            if (!username || !client_username) {
+            if ((!tg_username && !worker_username) || !client_username) {
                 res.writeHead(400, { 'Content-Type': 'application/json' })
                 return res.end(
                     JSON.stringify({
@@ -446,25 +443,53 @@ async function main() {
             }
 
             loggers.app.info(
-                { tg_username, worker_username, client_username, used_username: username },
+                { tg_username, worker_username, client_username },
                 'Payment collection webhook received'
             )
 
-            // Look up worker's Telegram ID using tg_username (preferred) or worker_username
+            // Look up worker's Telegram ID
+            // Strategy: tg_username (Telegram ID) is preferred, fallback to worker_username lookup
             const { telegramUserService } = await import('~/core/services/telegramUserService')
-            const workerTelegramId = await telegramUserService.getTelegramIdByUsername(
-                username
-            )
+            let workerTelegramId: string | null = null
+            let lookupStrategy: string = 'none'
+
+            // Try tg_username first (contains Telegram ID directly)
+            if (tg_username) {
+                workerTelegramId = await telegramUserService.validateTelegramId(tg_username)
+                if (workerTelegramId) {
+                    lookupStrategy = 'tg_username_direct'
+                    loggers.app.debug(
+                        { tg_username, workerTelegramId },
+                        'Worker found via tg_username (Telegram ID)'
+                    )
+                }
+            }
+
+            // Fallback to worker_username lookup if tg_username failed or not provided
+            if (!workerTelegramId && worker_username) {
+                workerTelegramId = await telegramUserService.getTelegramIdByUsername(worker_username)
+                if (workerTelegramId) {
+                    lookupStrategy = 'worker_username_lookup'
+                    loggers.app.debug(
+                        { worker_username, workerTelegramId },
+                        'Worker found via worker_username lookup (fallback)'
+                    )
+                }
+            }
 
             if (!workerTelegramId) {
-                loggers.app.warn({ tg_username, worker_username, used_username: username }, 'Worker not found in user mapping')
+                loggers.app.warn(
+                    { tg_username, worker_username, client_username },
+                    'Worker not found in user mapping (tried both tg_username and worker_username)'
+                )
                 res.writeHead(404, { 'Content-Type': 'application/json' })
                 return res.end(
                     JSON.stringify({
                         success: false,
-                        error: 'Worker not found',
+                        error: 'Worker not found in database',
                         tg_username,
                         worker_username,
+                        note: 'User must interact with bot at least once to be registered',
                     })
                 )
             }
@@ -494,10 +519,11 @@ async function main() {
                 client_username,
                 tg_username,
                 worker_username, // Keep for backward compatibility
+                lookup_strategy: lookupStrategy,
             })
 
             loggers.app.info(
-                { tg_username, worker_username, workerTelegramId, client_username },
+                { tg_username, worker_username, workerTelegramId, client_username, lookupStrategy },
                 'Payment notification sent successfully'
             )
 
