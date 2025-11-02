@@ -40,29 +40,124 @@ export class TelegramUserRepository {
     }
 
     /**
+     * Find the next available username by checking existing numbered variants
+     * Examples:
+     * - If "josiane" exists, returns "josiane2"
+     * - If "josiane" and "josiane2" exist, returns "josiane3"
+     * - If "josiane", "josiane5" exist, returns "josiane6" (finds highest)
+     */
+    async findNextAvailableUsername(baseUsername: string): Promise<string> {
+        // Query for all usernames matching the pattern: baseUsername OR baseUsername + number
+        // Uses PostgreSQL regex: ^baseUsername[0-9]*$
+        const result = await pool.query(
+            `SELECT username FROM telegram_user_mapping
+             WHERE username ~ $1
+             ORDER BY username DESC`,
+            [`^${baseUsername}[0-9]*$`]
+        )
+
+        if (result.rows.length === 0) {
+            // No conflicts, use base username
+            return baseUsername
+        }
+
+        // Extract numbers from all matching usernames
+        const numbers: number[] = []
+        for (const row of result.rows) {
+            const username = row.username
+            if (username === baseUsername) {
+                // Base username exists (no number suffix)
+                numbers.push(1)
+            } else {
+                // Extract number from suffix (e.g., "josiane5" -> 5)
+                const match = username.match(/^[a-z_]+(\d+)$/)
+                if (match && match[1]) {
+                    numbers.push(parseInt(match[1], 10))
+                }
+            }
+        }
+
+        // Find the highest number and add 1
+        const maxNumber = Math.max(...numbers)
+        const nextNumber = maxNumber === 1 ? 2 : maxNumber + 1
+
+        return `${baseUsername}${nextNumber}`
+    }
+
+    /**
      * Upsert user mapping (insert or update if exists)
      * Used by auto-capture middleware
+     * Automatically handles username conflicts by appending numbers
      */
     async upsertUser(data: CreateTelegramUserMapping): Promise<TelegramUserMapping> {
-        const result = await pool.query(
-            `INSERT INTO telegram_user_mapping (username, telegram_id, telegram_username, first_name, last_name)
-             VALUES ($1, $2, $3, $4, $5)
-             ON CONFLICT (username) DO UPDATE SET
-                telegram_id = EXCLUDED.telegram_id,
-                telegram_username = EXCLUDED.telegram_username,
-                first_name = EXCLUDED.first_name,
-                last_name = EXCLUDED.last_name,
-                updated_at = CURRENT_TIMESTAMP
-             RETURNING *`,
-            [
-                data.username,
-                data.telegram_id,
-                data.telegram_username || null,
-                data.first_name || null,
-                data.last_name || null,
-            ]
+        const maxRetries = 5
+        let currentUsername = data.username
+        let lastError: Error | null = null
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                // Check if user already exists by telegram_id
+                const existingUser = await this.getUserByTelegramId(data.telegram_id)
+
+                if (existingUser) {
+                    // User exists - update their record using their existing username
+                    // This preserves the username even if their name changed
+                    const result = await pool.query(
+                        `UPDATE telegram_user_mapping SET
+                            telegram_username = $1,
+                            first_name = $2,
+                            last_name = $3,
+                            updated_at = CURRENT_TIMESTAMP
+                         WHERE telegram_id = $4
+                         RETURNING *`,
+                        [
+                            data.telegram_username || null,
+                            data.first_name || null,
+                            data.last_name || null,
+                            data.telegram_id,
+                        ]
+                    )
+                    return result.rows[0]
+                }
+
+                // New user - try to insert
+                const result = await pool.query(
+                    `INSERT INTO telegram_user_mapping (username, telegram_id, telegram_username, first_name, last_name)
+                     VALUES ($1, $2, $3, $4, $5)
+                     RETURNING *`,
+                    [
+                        currentUsername,
+                        data.telegram_id,
+                        data.telegram_username || null,
+                        data.first_name || null,
+                        data.last_name || null,
+                    ]
+                )
+                return result.rows[0]
+            } catch (error: any) {
+                // Check if error is UNIQUE constraint violation on username
+                if (error.code === '23505' && error.constraint === 'telegram_user_mapping_username_key') {
+                    lastError = error
+
+                    // Extract base username (strip any existing number suffix)
+                    const baseUsername = currentUsername.replace(/\d+$/, '')
+
+                    // Find next available username
+                    currentUsername = await this.findNextAvailableUsername(baseUsername)
+
+                    // Retry with new numbered username
+                    continue
+                }
+
+                // Different error - rethrow
+                throw error
+            }
+        }
+
+        // Max retries exceeded
+        throw new Error(
+            `Failed to upsert user after ${maxRetries} attempts. Last error: ${lastError?.message || 'Unknown'}`
         )
-        return result.rows[0]
     }
 
     /**

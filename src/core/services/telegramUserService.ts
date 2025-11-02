@@ -97,6 +97,7 @@ export class TelegramUserService {
 
     /**
      * Upsert user mapping (used by auto-capture middleware)
+     * Handles username conflicts automatically by appending numbers
      */
     async upsertUser(data: CreateTelegramUserMapping): Promise<TelegramUserMapping> {
         try {
@@ -110,8 +111,24 @@ export class TelegramUserService {
                 )
             }
 
+            const requestedUsername = data.username
             const user = await telegramUserRepository.upsertUser(data)
-            logger.info({ username: data.username, telegramId: data.telegram_id }, 'User mapping upserted')
+
+            // Log if username was changed due to conflict
+            if (user.username !== requestedUsername) {
+                logger.info(
+                    {
+                        requestedUsername,
+                        assignedUsername: user.username,
+                        telegramId: data.telegram_id,
+                        firstName: data.first_name,
+                    },
+                    'Username conflict resolved - number appended to new user'
+                )
+            } else {
+                logger.debug({ username: user.username, telegramId: data.telegram_id }, 'User mapping upserted')
+            }
+
             return user
         } catch (error) {
             if (error instanceof TelegramUserServiceError) {

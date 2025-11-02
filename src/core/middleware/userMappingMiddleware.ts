@@ -84,7 +84,8 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
         }
 
         // Upsert user mapping (create or update if exists)
-        await telegramUserService.upsertUser({
+        const requestedUsername = username
+        const userMapping = await telegramUserService.upsertUser({
             username,
             telegram_id: telegramId,
             telegram_username: telegramUsername,
@@ -92,10 +93,23 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
             last_name: lastName,
         })
 
-        logger.debug(
-            { username, telegramId, telegramUsername, firstName, lastName },
-            'User mapping captured/updated'
-        )
+        // Log the final username (may be different if conflict occurred)
+        if (userMapping.username !== requestedUsername) {
+            logger.info(
+                {
+                    requestedUsername,
+                    assignedUsername: userMapping.username,
+                    telegramId,
+                    firstName,
+                },
+                'Username conflict - number appended to new user'
+            )
+        } else {
+            logger.debug(
+                { username: userMapping.username, telegramId, telegramUsername, firstName, lastName },
+                'User mapping captured/updated'
+            )
+        }
     } catch (error) {
         // Log error but don't throw - user mapping should not block flows
         logger.error({ err: error, from: ctx.from }, 'Failed to capture user mapping')
