@@ -29,6 +29,7 @@ import {
     showRoleFlow,
     listRolesFlow,
 } from '~/features/admin/flows/RoleManagementFlow'
+import { userListingFlow } from '~/features/admin/flows/UserListingFlow'
 
 // Import user flows
 import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
@@ -117,6 +118,8 @@ async function main() {
         removeRoleFlow,
         showRoleFlow,
         listRolesFlow,
+        // User listing flow (admin-only)
+        userListingFlow,
         versionFlow, // Version command (available to all users)
 
         // Onboarding flows (simple 3-step setup)
@@ -267,6 +270,7 @@ async function main() {
 
     // Core shared services
     const { messageService } = await import('~/core/services/messageService')
+    const { telegramUserService } = await import('~/core/services/telegramUserService')
 
     // Create bot with queue configuration and extensions
     const botInstance = await createBot(
@@ -292,6 +296,7 @@ async function main() {
                 botStateService,
                 onboardingStateService,
                 messageService,
+                telegramUserService,
             },
         }
     )

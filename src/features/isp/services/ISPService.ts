@@ -522,7 +522,57 @@ export class ISPService {
     }
 
     /**
+     * Format date to DD/MM/YYYY HH:mm in Beirut timezone
+     */
+    private formatDateBeirut(dateStr: string | null): string {
+        if (!dateStr) return 'N/A'
+
+        try {
+            const date = new Date(dateStr)
+            // Format in Asia/Beirut timezone
+            return date.toLocaleString('en-GB', {
+                timeZone: 'Asia/Beirut',
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            }).replace(',', '')
+        } catch (error) {
+            return 'Invalid Date'
+        }
+    }
+
+    /**
+     * Parse session duration from API format "0 D : 0 H : 15 M : 27 S" to "15m 27s"
+     */
+    private parseSessionDuration(duration: string | null): string {
+        if (!duration) return 'N/A'
+
+        try {
+            // Parse format: "0 D : 0 H : 15 M : 27 S"
+            const parts = duration.split(':').map(p => p.trim())
+            const days = parseInt(parts[0])
+            const hours = parseInt(parts[1])
+            const minutes = parseInt(parts[2])
+            const seconds = parseInt(parts[3])
+
+            const result: string[] = []
+            if (days > 0) result.push(`${days}d`)
+            if (hours > 0) result.push(`${hours}h`)
+            if (minutes > 0) result.push(`${minutes}m`)
+            if (seconds > 0) result.push(`${seconds}s`)
+
+            return result.length > 0 ? result.join(' ') : '0s'
+        } catch (error) {
+            return duration // Fallback to original if parsing fails
+        }
+    }
+
+    /**
      * Format interface statistics for display
+     * Shows connection status, speed, and link outages only (no Rx/Tx data)
      */
     private formatInterfaceStats(stats: any[] | null): string {
         if (!stats || stats.length === 0) {
@@ -533,34 +583,13 @@ export class ISPService {
             .map((stat) => {
                 const esc = (str: any, fallback = 'N/A') => html.escape(String(str || fallback))
 
-                // Convert bytes to human-readable format
-                const formatBytes = (bytes: number): string => {
-                    if (bytes === 0) return '0 B'
-                    const k = 1024
-                    const sizes = ['B', 'KB', 'MB', 'GB', 'TB']
-                    const i = Math.floor(Math.log(bytes) / Math.log(k))
-                    return `${(bytes / Math.pow(k, i)).toFixed(2)} ${sizes[i]}`
-                }
-
-                const formatPackets = (packets: number): string => {
-                    if (packets === 0) return '0'
-                    if (packets >= 1e9) return `${(packets / 1e9).toFixed(2)}B`
-                    if (packets >= 1e6) return `${(packets / 1e6).toFixed(2)}M`
-                    if (packets >= 1e3) return `${(packets / 1e3).toFixed(2)}K`
-                    return String(packets)
-                }
-
                 return `
 <b>Interface:</b> <code>${esc(stat.name)}</code> (${esc(stat.type)})
 - <b>MAC:</b> <code>${esc(stat.macAddress)}</code>
 - <b>Speed:</b> ${esc(stat.speed, 'Unknown')}
-- <b>MTU:</b> ${esc(stat.mtu)}/${esc(stat.actualMtu)} (Max: ${esc(stat.maxL2mtu)})
 - <b>Status:</b> ${stat.running ? '🟢 Running' : '🔴 Down'} ${stat.disabled ? '(Disabled)' : ''}
 - <b>Link Downs:</b> ${esc(stat.linkDowns)}
-- <b>Last Up:</b> ${esc(stat.lastLinkUpTime, 'Unknown')}
-- <b>RX:</b> ${formatBytes(stat.rxByte || 0)} (${formatPackets(stat.rxPacket || 0)} pkts, ${esc(stat.rxError || 0)} err, ${esc(stat.rxDrop || 0)} drop)
-- <b>TX:</b> ${formatBytes(stat.txByte || 0)} (${formatPackets(stat.txPacket || 0)} pkts, ${esc(stat.txError || 0)} err, ${esc(stat.txDrop || 0)} drop)
-- <b>TX Queue Drop:</b> ${esc(stat.txQueueDrop || 0)}`.trim()
+- <b>Last Link Up:</b> ${esc(stat.lastLinkUpTime, 'Unknown')}`.trim()
             })
             .join('\n\n')
     }
@@ -595,33 +624,28 @@ export class ISPService {
         const isExpired = expiryDate < new Date()
         const expiryStatus = isExpired ? '⏰ Expired' : '✅ Valid'
 
-        // Format dates
-        const formatDate = (dateStr: string | null) => {
-            if (!dateStr) return 'N/A'
-            return new Date(dateStr).toLocaleString()
-        }
-
         // Escape helper - only escape raw user data
         const esc = (str: string | null | undefined, fallback = 'N/A') => {
             return html.escape(str || fallback)
         }
 
-        // Format quotas
+        // Format quotas (values are in MB, convert to GB if >= 1024 MB)
         const formatQuota = (quota: string | null | undefined): string => {
-            if (!quota || quota === '0') return 'N/A'
-            const quotaNum = parseFloat(quota)
-            if (quotaNum >= 1024) {
-                return `${(quotaNum / 1024).toFixed(2)} GB`
+            if (!quota || quota === '0') return '0.00 GB'
+            const quotaMB = parseFloat(quota) // Value is already in MB
+            if (quotaMB >= 1024) {
+                return `${(quotaMB / 1024).toFixed(2)} GB`
             }
-            return `${quotaNum.toFixed(2)} MB`
+            return `${quotaMB.toFixed(2)} MB`
         }
 
-        // All sessions
+        // All sessions with improved formatting
         const allSessions = userInfo.userSessions
             .map((session) => {
-                const start = new Date(session.startSession).toLocaleString()
-                const end = session.endSession ? new Date(session.endSession).toLocaleString() : 'Active'
-                return `• ${esc(start)} → ${esc(end)}\n  Duration: ${esc(session.sessionTime, 'Ongoing')}`
+                const start = this.formatDateBeirut(session.startSession)
+                const end = session.endSession ? this.formatDateBeirut(session.endSession) : '🟢 Active'
+                const duration = this.parseSessionDuration(session.sessionTime)
+                return `• ${start} → ${end}\n  ⏱️ ${duration}`
             })
             .join('\n')
 
@@ -644,7 +668,7 @@ Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} $
 - <b>MOF:</b> ${esc(userInfo.mof, 'N/A')}
 
 📋 <b>Account Metadata:</b>
-- <b>Created:</b> ${esc(formatDate(userInfo.creationDate))}
+- <b>Created:</b> ${this.formatDateBeirut(userInfo.creationDate)}
 - <b>User Category ID:</b> ${userInfo.userCategoryId}
 - <b>Financial Category ID:</b> ${userInfo.financialCategoryId}
 - <b>User Group ID:</b> ${userInfo.userGroupId}
@@ -699,17 +723,16 @@ ${apUsers || '• None'}
 - <b>Discount:</b> ${userInfo.discount}%
 - <b>Real IP Price:</b> $${userInfo.realIpPrice}
 - <b>IPTV Price:</b> $${userInfo.iptvPrice}
-- <b>Expires:</b> ${expiryDate.toLocaleDateString()} ${expiryDate.toLocaleTimeString()}
+- <b>Expires:</b> ${this.formatDateBeirut(userInfo.expiryAccount)}
 
 👨‍💼 <b>Collector Information:</b>
-- <b>Collector ID:</b> ${userInfo.collectorId}
 - <b>Username:</b> <code>${esc(userInfo.collectorUserName)}</code>
 - <b>Name:</b> ${esc(userInfo.collectorFirstName)} ${esc(userInfo.collectorLastName)}
 - <b>Mobile:</b> ${esc(userInfo.collectorMobile)}
 
 📅 <b>Timeline:</b>
-- <b>Last Login:</b> ${esc(formatDate(userInfo.lastLogin))}
-- <b>Last Logout:</b> ${esc(formatDate(userInfo.lastLogOut))}
+- <b>Last Login:</b> ${this.formatDateBeirut(userInfo.lastLogin)}
+- <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}
 
 🕐 <b>Session History:</b>
 ${allSessions || '• No sessions'}
