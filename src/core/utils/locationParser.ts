@@ -46,8 +46,11 @@ export function extractCoordinatesFromText(text: string): LocationCoordinates | 
         // OpenStreetMap: ?mlat=lat&mlon=lon
         /openstreetmap\.org.*[?&]mlat=([-+]?\d+\.?\d*).*[?&]mlon=([-+]?\d+\.?\d*)/i,
 
+        // Google Maps: /place/lat,lon format
+        /(?:maps\.google\.com|google\.com\/maps)\/place\/([-+]?\d{1,3}\.\d+),([-+]?\d{1,3}\.\d+)/i,
+
         // Generic coordinate pattern in URLs (last resort)
-        /(?:https?:\/\/[^\s]+).*?([-+]?\d{1,2}\.\d{4,}),([-+]?\d{1,3}\.\d{4,})/i,
+        /(?:https?:\/\/[^\s]+?)[/?]([-+]?\d{1,3}\.\d{4,}),([-+]?\d{1,3}\.\d{4,})/i,
     ]
 
     for (const pattern of urlPatterns) {
