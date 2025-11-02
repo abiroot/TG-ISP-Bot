@@ -27,10 +27,13 @@ export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/he
         const isWhitelisted = await userManagementService.isWhitelisted(ctx.from)
         const userRoles = await roleService.getUserRoles(ctx.from)
 
-        // Determine access level label
+        // Determine access level label with priority: Admin > Role-based > Whitelisted > Public
         let accessLevel = 'Public User'
         if (isAdmin) {
             accessLevel = 'Administrator'
+        } else if (userRoles.length > 0) {
+            // User has database roles (admin, collector, worker)
+            accessLevel = 'Role-Based User'
         } else if (isWhitelisted) {
             accessLevel = 'Whitelisted User'
         }
