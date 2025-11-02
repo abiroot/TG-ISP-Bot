@@ -7,22 +7,22 @@ import {
 
 export class TelegramUserRepository {
     /**
-     * Get Telegram ID by username (primary use case for webhook)
+     * Get Telegram ID by worker username (primary use case for webhook)
      */
     async getTelegramIdByUsername(username: string): Promise<string | null> {
         const result = await pool.query(
-            'SELECT telegram_id FROM telegram_user_mapping WHERE username = $1',
+            'SELECT telegram_id FROM telegram_user_mapping WHERE worker_username = $1',
             [username]
         )
         return result.rows.length > 0 ? result.rows[0].telegram_id : null
     }
 
     /**
-     * Get full user mapping by username
+     * Get full user mapping by worker username
      */
     async getUserByUsername(username: string): Promise<TelegramUserMapping | null> {
         const result = await pool.query(
-            'SELECT * FROM telegram_user_mapping WHERE username = $1',
+            'SELECT * FROM telegram_user_mapping WHERE worker_username = $1',
             [username]
         )
         return result.rows.length > 0 ? result.rows[0] : null
@@ -47,12 +47,12 @@ export class TelegramUserRepository {
      * - If "josiane", "josiane5" exist, returns "josiane6" (finds highest)
      */
     async findNextAvailableUsername(baseUsername: string): Promise<string> {
-        // Query for all usernames matching the pattern: baseUsername OR baseUsername + number
+        // Query for all worker_usernames matching the pattern: baseUsername OR baseUsername + number
         // Uses PostgreSQL regex: ^baseUsername[0-9]*$
         const result = await pool.query(
-            `SELECT username FROM telegram_user_mapping
-             WHERE username ~ $1
-             ORDER BY username DESC`,
+            `SELECT worker_username FROM telegram_user_mapping
+             WHERE worker_username ~ $1
+             ORDER BY worker_username DESC`,
             [`^${baseUsername}[0-9]*$`]
         )
 
@@ -64,7 +64,7 @@ export class TelegramUserRepository {
         // Extract numbers from all matching usernames
         const numbers: number[] = []
         for (const row of result.rows) {
-            const username = row.username
+            const username = row.worker_username
             if (username === baseUsername) {
                 // Base username exists (no number suffix)
                 numbers.push(1)
@@ -91,7 +91,7 @@ export class TelegramUserRepository {
      */
     async upsertUser(data: CreateTelegramUserMapping): Promise<TelegramUserMapping> {
         const maxRetries = 5
-        let currentUsername = data.username
+        let currentUsername = data.worker_username
         let lastError: Error | null = null
 
         for (let attempt = 1; attempt <= maxRetries; attempt++) {
@@ -100,18 +100,18 @@ export class TelegramUserRepository {
                 const existingUser = await this.getUserByTelegramId(data.telegram_id)
 
                 if (existingUser) {
-                    // User exists - update their record using their existing username
-                    // This preserves the username even if their name changed
+                    // User exists - update their record using their existing worker_username
+                    // This preserves the worker_username even if their name changed
                     const result = await pool.query(
                         `UPDATE telegram_user_mapping SET
-                            telegram_username = $1,
+                            telegram_handle = $1,
                             first_name = $2,
                             last_name = $3,
                             updated_at = CURRENT_TIMESTAMP
                          WHERE telegram_id = $4
                          RETURNING *`,
                         [
-                            data.telegram_username || null,
+                            data.telegram_handle || null,
                             data.first_name || null,
                             data.last_name || null,
                             data.telegram_id,
@@ -122,21 +122,21 @@ export class TelegramUserRepository {
 
                 // New user - try to insert
                 const result = await pool.query(
-                    `INSERT INTO telegram_user_mapping (username, telegram_id, telegram_username, first_name, last_name)
+                    `INSERT INTO telegram_user_mapping (worker_username, telegram_id, telegram_handle, first_name, last_name)
                      VALUES ($1, $2, $3, $4, $5)
                      RETURNING *`,
                     [
                         currentUsername,
                         data.telegram_id,
-                        data.telegram_username || null,
+                        data.telegram_handle || null,
                         data.first_name || null,
                         data.last_name || null,
                     ]
                 )
                 return result.rows[0]
             } catch (error: any) {
-                // Check if error is UNIQUE constraint violation on username
-                if (error.code === '23505' && error.constraint === 'telegram_user_mapping_username_key') {
+                // Check if error is UNIQUE constraint violation on worker_username
+                if (error.code === '23505' && error.constraint === 'telegram_user_mapping_worker_username_key') {
                     lastError = error
 
                     // Extract base username (strip any existing number suffix)
@@ -175,9 +175,9 @@ export class TelegramUserRepository {
             updates.push(`telegram_id = $${paramIndex++}`)
             values.push(data.telegram_id)
         }
-        if (data.telegram_username !== undefined) {
-            updates.push(`telegram_username = $${paramIndex++}`)
-            values.push(data.telegram_username)
+        if (data.telegram_handle !== undefined) {
+            updates.push(`telegram_handle = $${paramIndex++}`)
+            values.push(data.telegram_handle)
         }
         if (data.first_name !== undefined) {
             updates.push(`first_name = $${paramIndex++}`)
@@ -196,7 +196,7 @@ export class TelegramUserRepository {
         values.push(username)
 
         const result = await pool.query(
-            `UPDATE telegram_user_mapping SET ${updates.join(', ')} WHERE username = $${paramIndex} RETURNING *`,
+            `UPDATE telegram_user_mapping SET ${updates.join(', ')} WHERE worker_username = $${paramIndex} RETURNING *`,
             values
         )
 
@@ -214,10 +214,10 @@ export class TelegramUserRepository {
     }
 
     /**
-     * Delete user mapping by username
+     * Delete user mapping by worker username
      */
     async deleteUser(username: string): Promise<boolean> {
-        const result = await pool.query('DELETE FROM telegram_user_mapping WHERE username = $1', [
+        const result = await pool.query('DELETE FROM telegram_user_mapping WHERE worker_username = $1', [
             username,
         ])
         return result.rowCount ? result.rowCount > 0 : false
@@ -234,11 +234,11 @@ export class TelegramUserRepository {
     }
 
     /**
-     * Check if username exists in mapping
+     * Check if worker username exists in mapping
      */
     async usernameExists(username: string): Promise<boolean> {
         const result = await pool.query(
-            'SELECT EXISTS(SELECT 1 FROM telegram_user_mapping WHERE username = $1)',
+            'SELECT EXISTS(SELECT 1 FROM telegram_user_mapping WHERE worker_username = $1)',
             [username]
         )
         return result.rows[0].exists

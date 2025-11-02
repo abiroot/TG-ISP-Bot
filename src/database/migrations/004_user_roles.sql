@@ -50,7 +50,8 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_active
     ON user_roles(is_active, user_telegram_id, role);
 
 -- Trigger for automatic updated_at timestamp
-CREATE TRIGGER IF NOT EXISTS update_user_roles_updated_at
+DROP TRIGGER IF EXISTS update_user_roles_updated_at ON user_roles CASCADE;
+CREATE TRIGGER update_user_roles_updated_at
     BEFORE UPDATE ON user_roles
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
@@ -78,6 +79,6 @@ COMMENT ON COLUMN user_roles.revoked_at IS
     'Timestamp when role was revoked. NULL if still active.';
 
 -- Insert migration record
-INSERT INTO migrations (name, executed_at)
+INSERT INTO migrations (name, applied_at)
 VALUES ('004_user_roles', NOW())
 ON CONFLICT (name) DO NOTHING;

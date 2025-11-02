@@ -473,15 +473,6 @@ export const myFlow = addKeyword('BUTTON_MY_ACTION')
 - See `src/flows/examples/buttonExampleFlow.ts` for complete working examples
 - See `TELEGRAM_BUTTONS.md` for comprehensive button system documentation
 
-## Additional Documentation
-
-- **DEVELOPMENT.md** - Development setup instructions
-- **DATABASE_SCHEMA.md** - Schema details, indexes, scaling strategy
-- **MESSAGE_STORAGE.md** - Message logging system and query examples
-- **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
-- **TELEGRAM_BUTTONS.md** - Complete button system guide (inline keyboards, callback queries)
-- **TESTING.md** - Testing setup and examples
-
 ## VitoDeploy Production Deployment
 
 ### Server Infrastructure
@@ -574,3 +565,47 @@ All Node.js deployment scripts include:
 - ✅ Git push triggers auto-deployment (~2 minutes)
 - ✅ Supervisor manages process - app auto-restarts on server reboot
 - ✅ Only one site (tg-isp.abiroot.dev) runs on this server
+
+## Telegram User Management
+
+The bot includes a comprehensive user management system that auto-captures every user interaction.
+
+**Key Features:**
+- **Auto-capture:** Every conversation is stored in `telegram_user_mapping` table
+- **Worker mapping:** Maps billing system worker usernames to Telegram IDs for webhook notifications
+- **Self-service ID retrieval:** `/getmyid` command shows Telegram ID for whitelisting
+- **TelegramUserHelper:** Unified utility for extracting user data from context
+
+**Important Columns:**
+- `worker_username` - Worker username from billing system (derived from first_name, lowercase)
+- `telegram_id` - Telegram numeric user ID (primary identifier, permanent)
+- `telegram_handle` - Telegram @username (optional, can change)
+
+**Get User Data:**
+```typescript
+import { TelegramUserHelper } from '~/core/utils/TelegramUserHelper'
+
+// Extract complete user data (single source of truth)
+const userData = TelegramUserHelper.extractUserData(ctx)
+
+// Get specific fields
+const telegramId = TelegramUserHelper.getTelegramId(ctx)
+const firstName = TelegramUserHelper.getFirstName(ctx)
+const workerUsername = TelegramUserHelper.getWorkerUsername(ctx)
+```
+
+**User Commands:**
+- `/getmyid` or `/myid` - Get your Telegram ID (available to all users)
+- `/users` - Admin command to list all telegram_user_mapping entries
+
+**See:** `docs/TELEGRAM_USER_MANAGEMENT.md` for complete documentation
+
+## Additional Documentation
+
+- **DEVELOPMENT.md** - Development setup instructions
+- **DATABASE_SCHEMA.md** - Schema details, indexes, scaling strategy
+- **MESSAGE_STORAGE.md** - Message logging system and query examples
+- **RAG_IMPLEMENTATION.md** - RAG architecture, configuration, and usage guide
+- **TELEGRAM_BUTTONS.md** - Complete button system guide (inline keyboards, callback queries)
+- **TELEGRAM_USER_MANAGEMENT.md** - User management, telegram_user_mapping table, TelegramUserHelper usage
+- **TESTING.md** - Testing setup and examples

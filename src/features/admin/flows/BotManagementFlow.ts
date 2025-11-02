@@ -15,6 +15,7 @@ import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { APP_VERSION } from '~/app'
 import { createFlowLogger } from '~/core/utils/logger'
+import { html } from '~/core/utils/telegramFormatting'
 
 const flowLogger = createFlowLogger('bot-management')
 
@@ -53,10 +54,14 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
                 message: '🔧 Bot is under maintenance. Please try again later.',
                 enabledBy: ctx.from,
             })
-            await flowDynamic('✅ Maintenance mode **ENABLED**')
+            const message = '✅ Maintenance mode <b>ENABLED</b>'
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else if (input.includes('disable maintenance')) {
             await botStateService.disableMaintenanceMode(ctx.from)
-            await flowDynamic('✅ Maintenance mode **DISABLED**')
+            const message = '✅ Maintenance mode <b>DISABLED</b>'
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else if (input.includes('toggle')) {
             return handleToggleFeature(ctx, flowDynamic, botStateService)
         }
@@ -71,14 +76,14 @@ async function handleBotStatus(ctx: any, flowDynamic: any, botStateService: any)
     const uptimeHours = Math.floor(uptime / 3600)
     const uptimeMinutes = Math.floor((uptime % 3600) / 60)
 
-    const maintenanceStatus = state.maintenance.enabled ? '🔧 **ENABLED**' : '✅ **DISABLED**'
+    const maintenanceStatus = state.maintenance.enabled ? '🔧 <b>ENABLED</b>' : '✅ <b>DISABLED</b>'
 
-    let message = `🤖 **Bot Status**\n\n`
-    message += `**Version:** ${APP_VERSION}\n`
-    message += `**Uptime:** ${uptimeHours}h ${uptimeMinutes}m\n`
-    message += `**Maintenance:** ${maintenanceStatus}\n\n`
+    let message = `🤖 <b>Bot Status</b>\n\n`
+    message += `<b>Version:</b> ${html.escape(APP_VERSION)}\n`
+    message += `<b>Uptime:</b> ${uptimeHours}h ${uptimeMinutes}m\n`
+    message += `<b>Maintenance:</b> ${maintenanceStatus}\n\n`
 
-    message += `**Features:**\n`
+    message += `<b>Features:</b>\n`
     message += `• AI Responses: ${state.features.ai_responses ? '✅' : '❌'}\n`
     message += `• RAG: ${state.features.rag_enabled ? '✅' : '❌'}\n`
     message += `• Voice Transcription: ${state.features.voice_transcription ? '✅' : '❌'}\n`
@@ -87,12 +92,13 @@ async function handleBotStatus(ctx: any, flowDynamic: any, botStateService: any)
     message += `• Rate Limiting: ${state.features.rate_limiting ? '✅' : '❌'}\n`
 
     if (state.features.button_demos || state.features.test_flows) {
-        message += `\n**Development:**\n`
+        message += `\n<b>Development:</b>\n`
         if (state.features.button_demos) message += `• Button Demos: ✅\n`
         if (state.features.test_flows) message += `• Test Flows: ✅\n`
     }
 
-    await flowDynamic(message)
+    const provider = ctx.provider as TelegramProvider
+    await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 }
 
 /**

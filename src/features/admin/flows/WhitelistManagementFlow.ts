@@ -16,6 +16,7 @@ import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { createFlowLogger } from '~/core/utils/logger'
 import { normalizeGroupId } from '~/core/utils/contextId'
+import { html } from '~/core/utils/telegramFormatting'
 
 const flowLogger = createFlowLogger('whitelist-mgmt')
 
@@ -65,11 +66,15 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
             return handleListWhitelist(ctx, flowDynamic, userManagementService)
         } else if (input.includes('remove')) {
             await state.update({ action: 'remove' })
-            await flowDynamic('🗑️ **Remove from Whitelist**\n\nReply with:\n• "group" to remove current group\n• Telegram username to remove user (e.g., @username or SOLamyy)')
+            const message = '🗑️ <b>Remove from Whitelist</b>\n\nReply with:\n• "group" to remove current group\n• Telegram username to remove user (e.g., @username or SOLamyy)'
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         } else {
             await state.update({ action: 'add' })
-            await flowDynamic('➕ **Add to Whitelist**\n\nReply with:\n• "group" to whitelist current group\n• Telegram username to whitelist user (e.g., @username or SOLamyy)')
+            const message = '➕ <b>Add to Whitelist</b>\n\nReply with:\n• "group" to whitelist current group\n• Telegram username to whitelist user (e.g., @username or SOLamyy)'
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
     })
@@ -123,34 +128,35 @@ async function handleListWhitelist(ctx: any, flowDynamic: any, userManagementSer
         userManagementService.getWhitelistedUsers(),
     ])
 
-    let message = '📋 **Whitelist Overview**\n\n'
+    let message = '📋 <b>Whitelist Overview</b>\n\n'
 
     if (groups.length > 0) {
-        message += `**Groups (${groups.length}):**\n`
+        message += `<b>Groups (${groups.length}):</b>\n`
         groups.slice(0, 10).forEach((g: any) => {
-            message += `• ${g.group_id}\n`
+            message += `• <code>${html.escape(g.group_id)}</code>\n`
         })
         if (groups.length > 10) {
-            message += `_...and ${groups.length - 10} more_\n`
+            message += `<i>...and ${groups.length - 10} more</i>\n`
         }
         message += '\n'
     } else {
-        message += '**Groups:** None\n\n'
+        message += '<b>Groups:</b> None\n\n'
     }
 
     if (users.length > 0) {
-        message += `**Users (${users.length}):**\n`
+        message += `<b>Users (${users.length}):</b>\n`
         users.slice(0, 10).forEach((u: any) => {
-            message += `• ${u.user_identifier}\n`
+            message += `• <code>${html.escape(u.user_identifier)}</code>\n`
         })
         if (users.length > 10) {
-            message += `_...and ${users.length - 10} more_\n`
+            message += `<i>...and ${users.length - 10} more</i>\n`
         }
     } else {
-        message += '**Users:** None'
+        message += '<b>Users:</b> None'
     }
 
-    await flowDynamic(message)
+    const provider = ctx.provider as TelegramProvider
+    await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 }
 
 /**

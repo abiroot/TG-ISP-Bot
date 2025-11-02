@@ -375,9 +375,10 @@ COMMENT ON COLUMN telegram_user_mapping.telegram_id IS 'Telegram numeric user ID
 
 -- ============= SEED DATA =============
 
--- Insert default admin user
+-- Insert default admin user (using numeric Telegram ID for security)
+-- Use /getmyid command to find your Telegram ID
 INSERT INTO whitelisted_users (user_identifier, whitelisted_by, notes)
-VALUES ('SOLamyy', 'system', 'Telegram admin user SOLamyy')
+VALUES ('341628148', 'system', 'Telegram admin user (Lamba)')
 ON CONFLICT (user_identifier) DO NOTHING;
 
 -- ============= FUTURE PARTITIONING NOTES =============

@@ -102,31 +102,31 @@ export class TelegramUserService {
     async upsertUser(data: CreateTelegramUserMapping): Promise<TelegramUserMapping> {
         try {
             // Validate required fields
-            if (!data.username || !data.telegram_id) {
+            if (!data.worker_username || !data.telegram_id) {
                 throw new TelegramUserServiceError(
-                    'Username and telegram_id are required',
+                    'worker_username and telegram_id are required',
                     'INVALID_USER_DATA',
                     undefined,
                     false
                 )
             }
 
-            const requestedUsername = data.username
+            const requestedUsername = data.worker_username
             const user = await telegramUserRepository.upsertUser(data)
 
             // Log if username was changed due to conflict
-            if (user.username !== requestedUsername) {
+            if (user.worker_username !== requestedUsername) {
                 logger.info(
                     {
                         requestedUsername,
-                        assignedUsername: user.username,
+                        assignedUsername: user.worker_username,
                         telegramId: data.telegram_id,
                         firstName: data.first_name,
                     },
                     'Username conflict resolved - number appended to new user'
                 )
             } else {
-                logger.debug({ username: user.username, telegramId: data.telegram_id }, 'User mapping upserted')
+                logger.debug({ workerUsername: user.worker_username, telegramId: data.telegram_id }, 'User mapping upserted')
             }
 
             return user

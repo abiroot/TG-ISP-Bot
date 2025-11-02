@@ -4,6 +4,7 @@ import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 
 // Core bot types
 export type BotCtx = BotContext
+export type { BotContext } from '@builderbot/bot/dist/types'
 
 /**
  * Optional service extensions (for initialization)

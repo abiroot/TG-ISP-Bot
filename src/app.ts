@@ -34,6 +34,7 @@ import { userListingFlow } from '~/features/admin/flows/UserListingFlow'
 // Import user flows
 import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
 import { wipeDataFlow } from '~/features/user/flows/WipeDataFlow'
+import { getMyIdFlow } from '~/features/user/flows/GetMyIdFlow'
 
 // Import conversation flows
 import { welcomeFlow } from '~/features/conversation/flows/WelcomeFlow'
@@ -150,9 +151,10 @@ async function main() {
         // Main menu LAST (after all button handlers)
         mainMenuFlow,
 
-        // User flows (help, data wipe)
+        // User flows (help, data wipe, ID retrieval)
         userHelpFlow,
         wipeDataFlow,
+        getMyIdFlow,
 
         // Location update flows (must come before ISP flows)
         // Button handlers MUST come before trigger flow

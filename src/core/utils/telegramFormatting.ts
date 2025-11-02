@@ -24,10 +24,14 @@ import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
  * const safe = escapeHtml(name) // "&lt;script&gt;alert('xss')&lt;/script&gt;"
  * ```
  */
-export function escapeHtml(text: string): string {
-    if (!text) return ''
+export function escapeHtml(text: string | number | null | undefined): string {
+    // Handle null, undefined, empty string
+    if (text == null || text === '') return ''
 
-    return text
+    // Convert to string if not already
+    const str = String(text)
+
+    return str
         .replace(/&/g, '&amp;')
         .replace(/</g, '&lt;')
         .replace(/>/g, '&gt;')

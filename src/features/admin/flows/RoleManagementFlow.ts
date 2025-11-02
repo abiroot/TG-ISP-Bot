@@ -16,8 +16,11 @@
  */
 
 import { addKeyword, EVENTS } from '@builderbot/bot'
+import type { TelegramProvider } from '@builderbot-plugins/telegram'
+import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { type RoleName } from '~/config/roles.js'
 import { createFlowLogger } from '~/core/utils/logger'
+import { html } from '~/core/utils/telegramFormatting'
 
 const roleLogger = createFlowLogger('role-management')
 
@@ -135,9 +138,19 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
         // Parse command
         const parsed = parseRoleCommand(ctx.body)
         if (!parsed) {
-            await flowDynamic(
-                `❌ **Invalid command format**\n\nUsage: \`/set role <user_id> <role>\`\n\nExamples:\n- \`/set role 123456789 collector\`\n- \`/set role 987654321 worker\`\n- \`/set role @username admin\` (if username is numeric ID)\n\nValid roles: ${VALID_ROLES.join(', ')}`
-            )
+            const message =
+                `❌ <b>Invalid command format</b>\n\n` +
+                `<b>Usage:</b> <code>/set role &lt;user_id&gt; &lt;role&gt;</code>\n\n` +
+                `<b>Examples:</b>\n` +
+                `• <code>/set role 123456789 collector</code>\n` +
+                `• <code>/set role 987654321 worker</code>\n\n` +
+                `<b>Valid roles:</b> ${VALID_ROLES.join(', ')}\n\n` +
+                `💡 <b>How to get user IDs:</b>\n` +
+                `• Use <code>/users</code> to see all Telegram user IDs\n` +
+                `• Ask users to use <code>/getmyid</code> to get their own ID`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
 
@@ -158,9 +171,14 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
             )
 
             const permissionSummary = await roleService.getUserPermissionSummary(userId)
-            await flowDynamic(
-                `✅ **Role Assigned**\n\n**User ID:** \`${userId}\`\n**New Role:** ${role}\n\n${permissionSummary}`
-            )
+            const message =
+                `✅ <b>Role Assigned</b>\n\n` +
+                `<b>User ID:</b> <code>${html.escape(userId)}</code>\n` +
+                `<b>New Role:</b> ${html.escape(role)}\n\n` +
+                `${permissionSummary}`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             roleLogger.error(
                 {
@@ -198,9 +216,19 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
         // Parse command
         const parsed = parseRoleCommand(ctx.body)
         if (!parsed) {
-            await flowDynamic(
-                `❌ **Invalid command format**\n\nUsage: \`/add role <user_id> <role>\`\n\nExamples:\n- \`/add role 123456789 collector\`\n- \`/add role 987654321 admin\`\n\nValid roles: ${VALID_ROLES.join(', ')}`
-            )
+            const message =
+                `❌ <b>Invalid command format</b>\n\n` +
+                `<b>Usage:</b> <code>/add role &lt;user_id&gt; &lt;role&gt;</code>\n\n` +
+                `<b>Examples:</b>\n` +
+                `• <code>/add role 123456789 collector</code>\n` +
+                `• <code>/add role 987654321 admin</code>\n\n` +
+                `<b>Valid roles:</b> ${VALID_ROLES.join(', ')}\n\n` +
+                `💡 <b>How to get user IDs:</b>\n` +
+                `• Use <code>/users</code> to see all Telegram user IDs\n` +
+                `• Ask users to use <code>/getmyid</code> to get their own ID`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
 
@@ -221,7 +249,14 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
             )
 
             const permissionSummary = await roleService.getUserPermissionSummary(userId)
-            await flowDynamic(`✅ **Role Added**\n\n**User ID:** \`${userId}\`\n**Added Role:** ${role}\n\n${permissionSummary}`)
+            const message =
+                `✅ <b>Role Added</b>\n\n` +
+                `<b>User ID:</b> <code>${html.escape(userId)}</code>\n` +
+                `<b>Added Role:</b> ${html.escape(role)}\n\n` +
+                `${permissionSummary}`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             await flowDynamic(`❌ ${addResult.message}`)
         }
@@ -249,9 +284,19 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
         // Parse command
         const parsed = parseRoleCommand(ctx.body)
         if (!parsed) {
-            await flowDynamic(
-                `❌ **Invalid command format**\n\nUsage: \`/remove role <user_id> <role>\`\n\nExamples:\n- \`/remove role 123456789 collector\`\n- \`/remove role 987654321 worker\`\n\nValid roles: ${VALID_ROLES.join(', ')}`
-            )
+            const message =
+                `❌ <b>Invalid command format</b>\n\n` +
+                `<b>Usage:</b> <code>/remove role &lt;user_id&gt; &lt;role&gt;</code>\n\n` +
+                `<b>Examples:</b>\n` +
+                `• <code>/remove role 123456789 collector</code>\n` +
+                `• <code>/remove role 987654321 worker</code>\n\n` +
+                `<b>Valid roles:</b> ${VALID_ROLES.join(', ')}\n\n` +
+                `💡 <b>How to get user IDs:</b>\n` +
+                `• Use <code>/users</code> to see all Telegram user IDs\n` +
+                `• Ask users to use <code>/getmyid</code> to get their own ID`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
 
@@ -272,9 +317,14 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
             )
 
             const permissionSummary = await roleService.getUserPermissionSummary(userId)
-            await flowDynamic(
-                `✅ **Role Removed**\n\n**User ID:** \`${userId}\`\n**Removed Role:** ${role}\n\n${permissionSummary}`
-            )
+            const message =
+                `✅ <b>Role Removed</b>\n\n` +
+                `<b>User ID:</b> <code>${html.escape(userId)}</code>\n` +
+                `<b>Removed Role:</b> ${html.escape(role)}\n\n` +
+                `${permissionSummary}`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
         } else {
             await flowDynamic(`❌ ${removeResult.message}`)
         }
@@ -302,16 +352,28 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
         // Parse command
         const userId = parseShowRoleCommand(ctx.body)
         if (!userId) {
-            await flowDynamic(
-                `❌ **Invalid command format**\n\nUsage: \`/show role <user_id>\`\n\nExamples:\n- \`/show role 123456789\`\n- \`/show role 987654321\``
-            )
+            const message =
+                `❌ <b>Invalid command format</b>\n\n` +
+                `<b>Usage:</b> <code>/show role &lt;user_id&gt;</code>\n\n` +
+                `<b>Examples:</b>\n` +
+                `• <code>/show role 123456789</code>\n` +
+                `• <code>/show role 987654321</code>\n\n` +
+                `💡 <b>How to get user IDs:</b>\n` +
+                `• Use <code>/users</code> to see all Telegram user IDs\n` +
+                `• Ask users to use <code>/getmyid</code> to get their own ID`
+
+            const provider = ctx.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
             return
         }
 
         // Get user roles and permissions - Use database-backed RoleService
         const permissionSummary = await roleService.getUserPermissionSummary(userId)
 
-        await flowDynamic(`**User ID:** \`${userId}\`\n\n${permissionSummary}`)
+        const message = `<b>User ID:</b> <code>${html.escape(userId)}</code>\n\n${permissionSummary}`
+
+        const provider = ctx.provider as TelegramProvider
+        await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
     }
 )
 

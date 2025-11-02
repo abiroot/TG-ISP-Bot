@@ -9,9 +9,9 @@
  * - More secure for production systems
  *
  * How to get numeric Telegram IDs:
- * 1. Send a message to the bot from your Telegram account
- * 2. Check the `messages` table: SELECT DISTINCT sender FROM messages WHERE sender ~ '^[0-9]+$';
- * 3. Or check the `telegram_user_mapping` table: SELECT telegram_id, username FROM telegram_user_mapping;
+ * 1. EASIEST: Send `/getmyid` command to the bot
+ * 2. Alternative: Send `/users` as admin to see all telegram_user_mapping entries
+ * 3. Database query: SELECT telegram_id, worker_username FROM telegram_user_mapping;
  * 4. Use the numeric ID (e.g., '123456789') in this array
  *
  * Admins have special permissions to:

@@ -1,13 +1,14 @@
 /**
  * User Mapping Middleware
  *
- * Automatically captures and stores username -> Telegram ID mapping
+ * Automatically captures and stores worker_username -> Telegram ID mapping
  * when users interact with the bot. This enables webhook notifications
- * to find users by their system username.
+ * to find users by their billing system username.
  */
 
 import { telegramUserService } from '~/core/services/telegramUserService'
 import { createFlowLogger } from '~/core/utils/logger'
+import { TelegramUserHelper } from '~/core/utils/TelegramUserHelper'
 import type { BotCtx } from '~/types'
 
 const logger = createFlowLogger('user-mapping-middleware')
@@ -16,7 +17,7 @@ const logger = createFlowLogger('user-mapping-middleware')
  * Auto-capture user mapping from bot interaction
  *
  * Extracts user data from context and stores/updates in telegram_user_mapping table.
- * The username is derived from the user's name (typically first name from Telegram).
+ * The worker_username is derived from the user's first name (for billing system mapping).
  *
  * This runs silently in the background and doesn't block the flow.
  * Updates on EVERY message to ensure mapping is always current.
@@ -28,85 +29,59 @@ export async function captureUserMapping(ctx: BotCtx): Promise<void> {
             return
         }
 
-        const telegramId = ctx.from
-
-        // Extract user data from Telegram update (BuilderBot doesn't always populate ctx.name)
-        let firstName: string | undefined = ctx.name
-        let lastName: string | undefined = undefined
-        let telegramUsername: string | undefined = (ctx as any).username
-
-        // Fallback: Extract from raw Telegram update if ctx.name is missing
-        if (!firstName) {
-            const messageCtx = (ctx as any).messageCtx
-            if (messageCtx?.update?.message?.from) {
-                const telegramUser = messageCtx.update.message.from
-                firstName = telegramUser.first_name
-                lastName = telegramUser.last_name
-                telegramUsername = telegramUser.username || telegramUsername
-            }
-        }
+        // Extract all user data using unified helper
+        const userData = TelegramUserHelper.extractUserData(ctx)
 
         // Check if user already exists in mapping
-        const existingUser = await telegramUserService.getUserByTelegramId(telegramId)
+        const existingUser = await telegramUserService.getUserByTelegramId(userData.telegramId)
 
         // If no name data available but user exists, just update timestamp
-        if (!firstName && existingUser) {
+        if (!userData.firstName && existingUser) {
             await telegramUserService.upsertUser({
-                username: existingUser.username,
-                telegram_id: telegramId,
-                telegram_username: existingUser.telegram_username || undefined,
+                worker_username: existingUser.worker_username,
+                telegram_id: userData.telegramId,
+                telegram_handle: existingUser.telegram_handle || undefined,
                 first_name: existingUser.first_name || undefined,
                 last_name: existingUser.last_name || undefined,
             })
 
             logger.debug(
-                { telegramId, username: existingUser.username },
+                { telegramId: userData.telegramId, workerUsername: existingUser.worker_username },
                 'User mapping timestamp updated (no name data)'
             )
             return
         }
 
-        // If no name data and no existing user, use telegram_id as username
-        let username: string
-        if (!firstName) {
-            username = `user_${telegramId}`
-            logger.debug({ telegramId, username }, 'Using telegram_id as username (no name data)')
-        } else {
-            // Derive username from first name (remove spaces, convert to lowercase)
-            // For example: "Josiane Youssef" -> "josianeyoussef"
-            username = firstName.toLowerCase().replace(/\s+/g, '')
-
-            // Skip if username is empty after processing
-            if (!username) {
-                username = `user_${telegramId}`
-                logger.debug({ telegramId, username }, 'Username empty after processing, using telegram_id')
-            }
-        }
-
         // Upsert user mapping (create or update if exists)
-        const requestedUsername = username
+        const requestedUsername = userData.workerUsername
         const userMapping = await telegramUserService.upsertUser({
-            username,
-            telegram_id: telegramId,
-            telegram_username: telegramUsername,
-            first_name: firstName,
-            last_name: lastName,
+            worker_username: userData.workerUsername,
+            telegram_id: userData.telegramId,
+            telegram_handle: userData.telegramHandle,
+            first_name: userData.firstName,
+            last_name: userData.lastName,
         })
 
         // Log the final username (may be different if conflict occurred)
-        if (userMapping.username !== requestedUsername) {
+        if (userMapping.worker_username !== requestedUsername) {
             logger.info(
                 {
                     requestedUsername,
-                    assignedUsername: userMapping.username,
-                    telegramId,
-                    firstName,
+                    assignedUsername: userMapping.worker_username,
+                    telegramId: userData.telegramId,
+                    firstName: userData.firstName,
                 },
                 'Username conflict - number appended to new user'
             )
         } else {
             logger.debug(
-                { username: userMapping.username, telegramId, telegramUsername, firstName, lastName },
+                {
+                    workerUsername: userMapping.worker_username,
+                    telegramId: userData.telegramId,
+                    telegramHandle: userData.telegramHandle,
+                    firstName: userData.firstName,
+                    lastName: userData.lastName,
+                },
                 'User mapping captured/updated'
             )
         }
