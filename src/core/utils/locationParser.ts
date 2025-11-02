@@ -68,20 +68,20 @@ export async function extractCoordinatesFromText(text: string): Promise<Location
         return null
     }
 
-    let urlToCheck = text
+    const urlToCheck = text
 
-    // Check if URL is a short link and resolve it
-    if (isGoogleMapsShortUrl(text)) {
-        logger.debug({ url: text }, 'Detected Google Maps short URL, resolving...')
-        const resolvedUrl = await resolveGoogleMapsShortUrl(text)
-        if (resolvedUrl) {
-            urlToCheck = resolvedUrl
-            logger.info({ shortUrl: text, resolvedUrl }, 'Short URL resolved successfully')
-        } else {
-            logger.warn({ url: text }, 'Failed to resolve short URL')
-            return null // Cannot extract coordinates from unresolved short link
-        }
-    }
+    // // Check if URL is a short link and resolve it
+    // if (isGoogleMapsShortUrl(text)) {
+    //     logger.debug({ url: text }, 'Detected Google Maps short URL, resolving...')
+    //     const resolvedUrl = await resolveGoogleMapsShortUrl(text)
+    //     if (resolvedUrl) {
+    //         urlToCheck = resolvedUrl
+    //         logger.info({ shortUrl: text, resolvedUrl }, 'Short URL resolved successfully')
+    //     } else {
+    //         logger.warn({ url: text }, 'Failed to resolve short URL')
+    //         return null // Cannot extract coordinates from unresolved short link
+    //     }
+    // }
 
     // Google Maps URL patterns
     const urlPatterns = [

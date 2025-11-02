@@ -79,7 +79,7 @@ export const locationHandlerFlow = addKeyword<TelegramProvider, Database>(EVENTS
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
                 '❌ <b>Failed to extract location coordinates.</b>\n\n' +
-                    'Please try again or use manual coordinate entry with /setlocation',
+                    'Please try again',
                 { parse_mode: 'HTML' }
             )
             return endFlow()

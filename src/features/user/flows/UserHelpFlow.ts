@@ -80,7 +80,6 @@ export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/he
             helpMessage += `📍 <b>Location Updates</b>\n`
             helpMessage += `• <code>/setlocation</code> or <code>/coordinates</code> - Update customer location\n`
             helpMessage += `  Supports: Manual coordinate entry or GPS location sharing\n`
-            helpMessage += `  Example: Type "/setlocation" and follow the prompts\n`
             helpMessage += `\n`
         }
 

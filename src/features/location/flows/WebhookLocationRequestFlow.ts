@@ -79,8 +79,7 @@ export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>
                 `<b>Customer:</b> <code>${html.escape(clientUsername)}</code>\n\n` +
                 `Please share the customer's current location:\n` +
                 `• Tap the attachment icon (📎) and select "Location"\n` +
-                `• Or send a Google Maps link\n` +
-                `• Or use /setlocation command`,
+                `• Or send a Google Maps link\n`,
             { parse_mode: 'HTML' }
         )
     })
@@ -92,7 +91,7 @@ export const webhookLocationSkipFlow = addKeyword<TelegramProvider, Database>('B
     .addAction(async (ctx, { provider, endFlow }) => {
         await provider.vendor.telegram.sendMessage(
             ctx.from,
-            '⏭️ <b>Location update skipped.</b>\n\nYou can update it later with /setlocation',
+            '⏭️ <b>Location update skipped.',
             { parse_mode: 'HTML' }
         )
         return endFlow()
@@ -112,7 +111,7 @@ export const webhookLocationCancelFlow = addKeyword<TelegramProvider, Database>(
             await state.clear()
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
-                '❌ <b>Location update cancelled.</b>\n\nYou can update it later with /setlocation',
+                '❌ <b>Location update cancelled.</b>',
                 { parse_mode: 'HTML' }
             )
             return endFlow()
