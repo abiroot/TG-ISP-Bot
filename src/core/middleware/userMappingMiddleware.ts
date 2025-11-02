@@ -24,8 +24,26 @@ const logger = createFlowLogger('user-mapping-middleware')
  */
 export async function captureUserMapping(ctx: BotCtx): Promise<void> {
     try {
+        logger.debug(
+            {
+                from: ctx.from,
+                name: ctx.name,
+                body: ctx.body?.substring(0, 50)
+            },
+            'User capture starting'
+        )
+
         // Skip if we don't have telegram ID
         if (!ctx.from) {
+            logger.warn(
+                {
+                    body: ctx.body,
+                    name: ctx.name,
+                    from: ctx.from,
+                    keys: Object.keys(ctx)
+                },
+                'User capture skipped: ctx.from is missing'
+            )
             return
         }
 
