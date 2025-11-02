@@ -117,35 +117,47 @@ Flows are the fundamental building blocks for conversations:
 
 ### Middleware Pipeline
 
-Centralized middleware in `src/middleware/pipeline.ts` eliminates duplication:
+Centralized middleware eliminates code duplication and ensures consistent access control:
 
 ```typescript
-// Standard user flows
-const result = await runUserMiddleware(ctx, utils)
-if (!result.allowed) return
-const personality = result.personality!
+// Admin flows - Centralized admin access control
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 
-// Admin flows
-const result = await runAdminMiddleware(ctx, utils)
-if (!result.allowed) return
+export const myAdminFlow = addKeyword(['/admin-command']).addAction(
+    async (ctx, utils) => {
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
-// Media flows (no rate limit - handled by debouncer)
-const result = await runMediaMiddleware(ctx, utils)
+        // Admin-only logic here...
+    }
+)
 ```
 
+**Admin Middleware** (`src/core/middleware/adminMiddleware.ts`):
+- **Single source of truth** for admin access control
+- Checks both hardcoded admins (`src/config/admins.ts`) and database roles (`user_roles` table)
+- Automatically sends denial message to non-admins
+- Logs unauthorized access attempts
+- **REQUIRED** for all admin-only flows (role management, whitelist, bot management, user listing)
+
+**Admin Middleware Benefits:**
+1. ✅ Prevents future security gaps (new admin flows can't forget protection)
+2. ✅ Consistent error messages across all admin commands
+3. ✅ Centralized logging of unauthorized access attempts
+4. ✅ Single place to update admin authorization logic
+5. ✅ Easier to add features (e.g., rate limiting for admins, audit logs)
+
 **Middleware Checks (in order):**
-1. Admin verification (if `requireAdmin: true`)
+1. Admin verification (via `runAdminMiddleware()`)
 2. Maintenance mode check (admins can bypass)
 3. Rate limiting (admins can bypass)
 4. Whitelist verification (admins can bypass)
 5. Personality existence
 
-**Individual Middleware:**
+**Available Middleware:**
+- `adminMiddleware.ts` - **Centralized admin access control** (use `runAdminMiddleware()`)
 - `messageLogger.ts` - Automatic message logging (event-based in app.ts)
-- `whitelistCheck.ts` - Access control validation
-- `personalityCheck.ts` - Bot configuration loading
-- `adminCheck.ts` - Admin privilege verification
-- `rateLimitCheck.ts` - Rate limit enforcement
+- `userMappingMiddleware.ts` - Automatic Telegram user capture
 
 ### Database Schema
 
@@ -343,6 +355,75 @@ Admin-only commands (Telegram user IDs in `src/config/admins.ts`):
 **Personality:**
 - `setup personality` - Configure bot personality for current context
 - `update personality` - Update existing personality
+
+**Role Management:**
+- `/set role <user_id> <role>` - Replace user's roles
+- `/add role <user_id> <role>` - Add role (keep existing)
+- `/remove role <user_id> <role>` - Remove specific role
+- `/show role <user_id>` - Display user's roles
+- `/list roles` - Show all role assignments
+
+**User Management:**
+- `/users` - List all Telegram users
+
+### Creating New Admin Commands
+
+When creating admin-only commands, follow this checklist to ensure proper security:
+
+**Required Steps:**
+1. ✅ **Import admin middleware**
+   ```typescript
+   import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
+   ```
+
+2. ✅ **Add admin check as first action**
+   ```typescript
+   export const myAdminFlow = addKeyword(['/my-command']).addAction(
+       async (ctx, utils) => {
+           // REQUIRED: Admin check MUST be first
+           const adminCheck = await runAdminMiddleware(ctx, utils)
+           if (!adminCheck.allowed) return
+
+           // Your admin logic here...
+       }
+   )
+   ```
+
+3. ✅ **Register flow in admin section** (src/app.ts lines 113-122)
+   - Place BEFORE version command and user flows
+   - Group with other admin flows
+
+4. ✅ **Add E2E tests** (tests/e2e/flows/)
+   - Positive test: Admin can execute command
+   - Negative test: Non-admin is denied access
+   - See `tests/e2e/flows/adminAccessControl.e2e.test.ts` for examples
+
+5. ✅ **Update documentation**
+   - Add command to "Admin Commands" section in CLAUDE.md
+   - Document command syntax and usage
+
+**Common Mistakes to Avoid:**
+- ❌ Forgetting admin check (security vulnerability)
+- ❌ Using inline `userManagementService.isAdmin()` instead of middleware
+- ❌ Registering flow after welcomeFlow (flow won't trigger)
+- ❌ Missing negative access control tests
+
+**Example Admin Flow:**
+```typescript
+import { addKeyword } from '@builderbot/bot'
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
+
+export const myAdminFlow = addKeyword(['/admin-command']).addAction(
+    async (ctx, utils) => {
+        // 1. Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
+
+        // 2. Your admin logic
+        await utils.flowDynamic('Admin command executed!')
+    }
+)
+```
 
 ## Technical Details
 

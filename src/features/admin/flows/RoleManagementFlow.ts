@@ -21,6 +21,7 @@ import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { type RoleName } from '~/config/roles.js'
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 
 const roleLogger = createFlowLogger('role-management')
 
@@ -126,13 +127,11 @@ function parseShowRoleCommand(message: string): string | null {
 export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
     async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { userManagementService, roleService } = extensions!
+        const { roleService } = extensions!
 
-        // Admin check
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         roleLogger.info({ from: ctx.from, message: ctx.body }, 'Set role command received')
 
@@ -205,13 +204,11 @@ export const setRoleFlow = addKeyword(['/set role', 'set role']).addAction(
 export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
     async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { userManagementService, roleService } = extensions!
+        const { roleService } = extensions!
 
-        // Admin check
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         roleLogger.info({ from: ctx.from, message: ctx.body }, 'Add role command received')
 
@@ -274,13 +271,11 @@ export const addRoleFlow = addKeyword(['/add role', 'add role']).addAction(
 export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAction(
     async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { userManagementService, roleService } = extensions!
+        const { roleService } = extensions!
 
-        // Admin check
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         roleLogger.info({ from: ctx.from, message: ctx.body }, 'Remove role command received')
 
@@ -343,13 +338,11 @@ export const removeRoleFlow = addKeyword(['/remove role', 'remove role']).addAct
 export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
     async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { userManagementService, roleService } = extensions!
+        const { roleService } = extensions!
 
-        // Admin check
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         roleLogger.info({ from: ctx.from, message: ctx.body }, 'Show role command received')
 
@@ -389,13 +382,11 @@ export const showRoleFlow = addKeyword(['/show role', 'show role']).addAction(
 export const listRolesFlow = addKeyword(['/list roles', 'list roles']).addAction(
     async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { userManagementService, roleService } = extensions!
+        const { roleService } = extensions!
 
-        // Admin check
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         roleLogger.info({ from: ctx.from }, 'List roles command received')
 

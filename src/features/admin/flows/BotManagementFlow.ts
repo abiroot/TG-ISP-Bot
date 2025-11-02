@@ -16,6 +16,7 @@ import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { APP_VERSION } from '~/app'
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 
 const flowLogger = createFlowLogger('bot-management')
 
@@ -35,15 +36,13 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
 ])
     .addAction(async (ctx, utils) => {
         const { flowDynamic, extensions } = utils
-        const { botStateService, userManagementService } = extensions!
+        const { botStateService } = extensions!
 
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Bot management triggered')
 
-        // Check admin
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         const input = ctx.body.toLowerCase()
 

@@ -3,6 +3,7 @@ import type { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 
 const userListLogger = createFlowLogger('UserListingFlow')
 
@@ -19,13 +20,11 @@ export const userListingFlow = addKeyword<TelegramProvider, Database>([
     'users',
 ]).addAction(async (ctx, utils) => {
     const { flowDynamic, extensions } = utils
-    const { userManagementService, telegramUserService, roleService } = extensions!
+    const { telegramUserService, roleService } = extensions!
 
-    // Admin check
-    if (!(await userManagementService.isAdmin(ctx.from))) {
-        await flowDynamic('⚠️ This command is only available to administrators.')
-        return
-    }
+    // Admin check (centralized middleware)
+    const adminCheck = await runAdminMiddleware(ctx, utils)
+    if (!adminCheck.allowed) return
 
     userListLogger.info({ from: ctx.from }, 'List telegram users command received')
 

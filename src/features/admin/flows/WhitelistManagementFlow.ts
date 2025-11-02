@@ -17,6 +17,7 @@ import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { createFlowLogger } from '~/core/utils/logger'
 import { normalizeGroupId } from '~/core/utils/contextId'
 import { html } from '~/core/utils/telegramFormatting'
+import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 
 const flowLogger = createFlowLogger('whitelist-mgmt')
 
@@ -54,11 +55,9 @@ export const whitelistManagementFlow = addKeyword<TelegramProvider, Database>([
 
         flowLogger.info({ from: ctx.from, body: ctx.body }, 'Whitelist management triggered')
 
-        // Check admin
-        if (!(await userManagementService.isAdmin(ctx.from))) {
-            await flowDynamic('⚠️ This command is only available to administrators.')
-            return
-        }
+        // Admin check (centralized middleware)
+        const adminCheck = await runAdminMiddleware(ctx, utils)
+        if (!adminCheck.allowed) return
 
         const input = ctx.body.toLowerCase()
 
