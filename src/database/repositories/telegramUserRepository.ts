@@ -136,7 +136,7 @@ export class TelegramUserRepository {
                 return result.rows[0]
             } catch (error: any) {
                 // Check if error is UNIQUE constraint violation on worker_username
-                if (error.code === '23505' && error.constraint === 'telegram_user_mapping_worker_username_key') {
+                if (error.code === '23505' && error.constraint === 'telegram_user_mapping_username_key') {
                     lastError = error
 
                     // Extract base username (strip any existing number suffix)
