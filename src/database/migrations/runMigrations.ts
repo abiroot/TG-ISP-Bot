@@ -17,6 +17,7 @@ export async function runMigrations(): Promise<void> {
         '001_init.sql',
         '002_cleanup_function.sql',
         '003_customer_locations.sql',
+        '004_user_roles.sql',
     ]
 
     try {

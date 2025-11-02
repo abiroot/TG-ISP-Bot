@@ -25,6 +25,8 @@ import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
 import { ServiceError } from '~/core/errors/ServiceError'
 import type { Personality } from '~/database/schemas/personality'
+import { type ToolName } from '~/config/roles.js'
+import type { RoleService } from '~/services/roleService.js'
 
 const ispLogger = createFlowLogger('isp-service')
 
@@ -173,8 +175,10 @@ export class ISPService {
     private config: ISPConfig
     private authToken?: string
     private tokenExpiry?: Date
+    private roleService: RoleService
 
-    constructor() {
+    constructor(roleService: RoleService) {
+        this.roleService = roleService
         this.config = {
             baseUrl: env.ISP_API_BASE_URL,
             username: env.ISP_API_USERNAME,
@@ -184,7 +188,7 @@ export class ISPService {
 
         ispLogger.info(
             { enabled: this.config.enabled, baseUrl: this.config.baseUrl },
-            'ISPService initialized'
+            'ISPService initialized with role-based access control'
         )
     }
 
@@ -756,7 +760,62 @@ If you need further assistance, feel free to ask! 😊`.trim()
     }
 
     /**
-     * Get ISP tools for AI SDK v5
+     * Check if user has permission to execute a tool
+     *
+     * Uses database-backed RoleService for permission checks
+     *
+     * @param context - AI SDK experimental_context containing user info
+     * @param toolName - Name of the tool being executed
+     * @returns Promise with permission status and message
+     */
+    private async checkToolPermission(context: any, toolName: ToolName): Promise<{ allowed: boolean; message?: string }> {
+        // Extract user Telegram ID from context
+        const userTelegramId = context?.userPhone || context?.contextId?.split('_')[0]
+
+        if (!userTelegramId) {
+            ispLogger.error({ context }, 'No user ID found in context for permission check')
+            return {
+                allowed: false,
+                message: '🚫 Unable to verify user identity. Please try again.'
+            }
+        }
+
+        // Check permission using database-backed RoleService
+        const hasPermission = await this.roleService.hasToolPermission(userTelegramId, toolName)
+
+        if (!hasPermission) {
+            const userRoles = await this.roleService.getUserRoles(userTelegramId)
+            ispLogger.warn(
+                {
+                    userTelegramId,
+                    userRoles,
+                    toolName,
+                    attemptedAction: 'tool_execution'
+                },
+                'User attempted to execute tool without permission'
+            )
+
+            return {
+                allowed: false,
+                message: `🚫 **Permission Denied**\n\nYou don't have permission to use this tool.\n\n**Your roles:** ${userRoles.length > 0 ? userRoles.join(', ') : 'None'}\n**Tool:** ${toolName}\n\nContact an administrator to request access.`
+            }
+        }
+
+        const userRoles = await this.roleService.getUserRoles(userTelegramId)
+        ispLogger.info(
+            {
+                userTelegramId,
+                toolName,
+                roles: userRoles
+            },
+            'Tool permission check passed'
+        )
+
+        return { allowed: true }
+    }
+
+    /**
+     * Get ISP tools for AI SDK v5 with role-based access control
      */
     getTools() {
         return {
@@ -770,7 +829,17 @@ If you need further assistance, feel free to ask! 😊`.trim()
                             'Phone number (+1234567890, 555-1234) or username (josianeyoussef, john_doe)'
                         ),
                 }),
-                execute: async (args) => {
+                execute: async (args, { experimental_context }) => {
+                    // Permission check (database-backed)
+                    const permissionCheck = await this.checkToolPermission(experimental_context, 'searchCustomer')
+                    if (!permissionCheck.allowed) {
+                        return {
+                            success: false,
+                            message: permissionCheck.message,
+                            found: false,
+                        }
+                    }
+
                     ispLogger.info(
                         { identifier: args.identifier },
                         'searchCustomer tool called'
@@ -812,7 +881,18 @@ If you need further assistance, feel free to ask! 😊`.trim()
                             'Mikrotik interface name (e.g., "(VM-PPPoe4)-vlan1607-zone4-OLT1-eliehajjarb1", "(VM-PPPoe2)-vlan1403-MANOLLY-TO-TOURELLE")'
                         ),
                 }),
-                execute: async (args) => {
+                execute: async (args, { experimental_context }) => {
+                    // Permission check (database-backed)
+                    const permissionCheck = await this.checkToolPermission(experimental_context, 'getMikrotikUsers')
+                    if (!permissionCheck.allowed) {
+                        return {
+                            success: false,
+                            message: permissionCheck.message,
+                            found: false,
+                            users: [],
+                        }
+                    }
+
                     ispLogger.info(
                         { mikrotikInterface: args.mikrotikInterface },
                         'getMikrotikUsers tool called'
@@ -867,7 +947,16 @@ ${userList}`
                     latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
                     longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),
                 }),
-                execute: async (args) => {
+                execute: async (args, { experimental_context }) => {
+                    // Permission check (CRITICAL - Write operation, database-backed)
+                    const permissionCheck = await this.checkToolPermission(experimental_context, 'updateUserLocation')
+                    if (!permissionCheck.allowed) {
+                        return {
+                            success: false,
+                            message: permissionCheck.message,
+                        }
+                    }
+
                     ispLogger.info(
                         {
                             userName: args.userName,
@@ -905,7 +994,21 @@ ${userList}`
                     latitude: z.number().min(-90).max(90).describe('Latitude coordinate'),
                     longitude: z.number().min(-180).max(180).describe('Longitude coordinate'),
                 }),
-                execute: async (args) => {
+                execute: async (args, { experimental_context }) => {
+                    // Permission check (CRITICAL - Batch write operation, database-backed)
+                    const permissionCheck = await this.checkToolPermission(experimental_context, 'batchUpdateLocations')
+                    if (!permissionCheck.allowed) {
+                        return {
+                            success: false,
+                            message: permissionCheck.message,
+                            summary: {
+                                total: args.userNames.length,
+                                successful: 0,
+                                failed: args.userNames.length,
+                            },
+                        }
+                    }
+
                     ispLogger.info(
                         {
                             userCount: args.userNames.length,
@@ -953,5 +1056,8 @@ ${result.results
 
 /**
  * Singleton instance
+ *
+ * NOTE: This will be initialized with RoleService in app.ts
+ * DO NOT use this export directly - it's created on-demand in app.ts
  */
-export const ispService = new ISPService()
+// export const ispService = new ISPService(roleService) // Removed - initialized in app.ts now

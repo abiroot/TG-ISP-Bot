@@ -22,6 +22,13 @@ export const APP_VERSION = packageJson.version
 import { whitelistManagementFlow } from '~/features/admin/flows/WhitelistManagementFlow'
 import { botManagementFlow } from '~/features/admin/flows/BotManagementFlow'
 import { versionFlow } from '~/features/admin/flows/VersionFlow'
+import {
+    setRoleFlow,
+    addRoleFlow,
+    removeRoleFlow,
+    showRoleFlow,
+    listRolesFlow,
+} from '~/features/admin/flows/RoleManagementFlow'
 
 // Import user flows
 import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
@@ -104,6 +111,12 @@ async function main() {
         // Admin flows (consolidated management)
         whitelistManagementFlow,
         botManagementFlow,
+        // Role management flows (admin-only)
+        setRoleFlow,
+        addRoleFlow,
+        removeRoleFlow,
+        showRoleFlow,
+        listRolesFlow,
         versionFlow, // Version command (available to all users)
 
         // Onboarding flows (simple 3-step setup)
@@ -229,10 +242,23 @@ async function main() {
         })
     }
 
+    // Initialize RoleService first (required by ISPService)
+    const { RoleService } = await import('~/services/roleService.js')
+    const roleService = new RoleService()
+
+    // Auto-migrate roles from config to database on startup
+    await roleService.autoMigrateConfigRoles()
+
     // Import service singletons (already initialized)
     const { coreAIService } = await import('~/features/conversation/services/CoreAIService')
-    const { ispService } = await import('~/features/isp/services/ISPService')
-    const { locationService } = await import('~/features/location/services/LocationService')
+
+    // ISPService requires RoleService - instantiate here
+    const { ISPService } = await import('~/features/isp/services/ISPService.js')
+    const ispService = new ISPService(roleService)
+
+    // LocationService requires ISPService - instantiate here
+    const { LocationService } = await import('~/features/location/services/LocationService.js')
+    const locationService = new LocationService(ispService)
     const { userManagementService } = await import('~/features/admin/services/UserManagementService')
     const { mediaService } = await import('~/features/media/services/MediaService')
     const { auditService } = await import('~/features/audit/services/AuditService')
@@ -258,6 +284,7 @@ async function main() {
                 // Service singletons
                 coreAIService,
                 ispService,
+                roleService, // Role-based access control
                 locationService,
                 userManagementService,
                 mediaService,

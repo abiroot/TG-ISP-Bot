@@ -9,7 +9,7 @@
  * Used by money collectors to track ISP customer locations.
  */
 
-import { ispService } from '~/features/isp/services/ISPService'
+import type { ISPService } from '~/features/isp/services/ISPService.js'
 import {
     upsertCustomerLocation,
     upsertMultipleCustomerLocations,
@@ -23,6 +23,12 @@ import { createFlowLogger } from '~/core/utils/logger'
 const logger = createFlowLogger('location-service')
 
 export class LocationService {
+    private ispService: ISPService
+
+    constructor(ispService: ISPService) {
+        this.ispService = ispService
+    }
+
     /**
      * PERFORMANCE NOTE: We skip pre-verification of usernames because
      * the /user-info endpoint takes ~1 minute to respond (includes ping).
@@ -50,7 +56,7 @@ export class LocationService {
         try {
             // Step 1: Try ISP API update first (fast - returns false if user doesn't exist)
             try {
-                const apiResult = await ispService.updateUserLocation(username, latitude, longitude)
+                const apiResult = await this.ispService.updateUserLocation(username, latitude, longitude)
                 if (apiResult.success) {
                     apiSynced = true
                     logger.info({ username }, 'Location synced to ISP API')
@@ -132,7 +138,7 @@ export class LocationService {
         // Update ISP API for all usernames (will return false for non-existent users)
         let apiResults: { userName: string; success: boolean; error?: string }[] = []
         try {
-            const apiResponse = await ispService.batchUpdateLocations(
+            const apiResponse = await this.ispService.batchUpdateLocations(
                 usernames.map((userName) => ({ userName, latitude, longitude }))
             )
             apiResults = apiResponse.results
@@ -204,5 +210,8 @@ export class LocationService {
 
 /**
  * Singleton instance
+ *
+ * NOTE: This will be initialized with ISPService in app.ts
+ * DO NOT use this export directly - it's created on-demand in app.ts
  */
-export const locationService = new LocationService()
+// export const locationService = new LocationService(ispService) // Removed - initialized in app.ts now
