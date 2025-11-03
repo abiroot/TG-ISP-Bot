@@ -18,8 +18,15 @@ const envSchema = z.object({
     // OpenAI (used for embeddings)
     OPENAI_API_KEY: z.string().min(1, 'OpenAI API key is required'),
 
-    // Google AI (used for LLM)
+    // Google AI (used for LLM and Maps API)
     GOOGLE_API_KEY: z.string().min(1, 'Google API key is required'),
+
+    // Google Maps Configuration
+    GOOGLE_MAPS_ENABLED: z
+        .string()
+        .optional()
+        .default('true')
+        .transform((val) => val === 'true'),
 
     // RAG (Retrieval Augmented Generation) Configuration
     RAG_ENABLED: z

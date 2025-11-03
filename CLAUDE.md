@@ -298,7 +298,9 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `POSTGRES_DB_HOST`, `POSTGRES_DB_USER`, `POSTGRES_DB_NAME`, `POSTGRES_DB_PORT`
 - `POSTGRES_DB_PASSWORD` (can be empty string)
 - `TELEGRAM_BOT_TOKEN` - Telegram bot token from BotFather
-- `GOOGLE_API_KEY` - Google AI API key for Gemini 2.0 Flash (get from https://aistudio.google.com/apikey)
+- `GOOGLE_API_KEY` - Google AI API key for Gemini 2.0 Flash AND Google Maps API (get from https://aistudio.google.com/apikey)
+  - **IMPORTANT:** Must have **Maps API** enabled in Google Cloud Console for location parsing features
+  - Used for: AI conversations (Gemini) + Place ID resolution (Maps API)
 - `OPENAI_API_KEY` - OpenAI API key (used only for embeddings: text-embedding-3-small)
 
 **Optional:**
@@ -324,6 +326,16 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `ISP_API_USERNAME` - API authentication username
 - `ISP_API_PASSWORD` - API authentication password
 - `ISP_ENABLED` (default: true) - Enable/disable ISP tool calling features
+
+**Google Maps Configuration (Optional):**
+- `GOOGLE_MAPS_ENABLED` (default: true) - Enable/disable Google Maps API integration
+- **Note:** Uses the same `GOOGLE_API_KEY` as Gemini AI
+- **Features enabled:**
+  - Accurate Place ID resolution (URLs like `/place/ChIJXYZ...`)
+  - Short URL resolution (`maps.app.goo.gl/...`) via Geocoding API
+  - Location parsing for ISP customer webhook updates
+- **API Quota:** Geocoding/Place Details APIs have 40,000 free requests/month
+- **Setup:** Enable "Geocoding API" and "Places API (New)" in Google Cloud Console
 
 **Admin Configuration:**
 Edit `src/config/admins.ts` to add/remove admin Telegram user IDs (numeric IDs or @usernames).

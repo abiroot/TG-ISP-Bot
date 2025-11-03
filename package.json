@@ -30,6 +30,7 @@
     "@builderbot-plugins/telegram": "^2.0.0",
     "@builderbot/bot": "^1.3.4",
     "@builderbot/database-postgres": "^1.3.4",
+    "@googlemaps/google-maps-services-js": "^3.4.2",
     "@langchain/core": "^0.3.78",
     "@langchain/openai": "^0.6.14",
     "ai": "^5.0.60",

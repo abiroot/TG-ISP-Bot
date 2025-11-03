@@ -55,6 +55,7 @@ export const loggers = {
     service: createContextLogger({ module: 'service' }),
     ai: createContextLogger({ module: 'ai' }),
     telegram: createContextLogger({ module: 'telegram' }),
+    googleMaps: createContextLogger({ module: 'googleMaps' }),
 }
 
 /**
