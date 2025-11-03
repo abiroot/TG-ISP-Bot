@@ -30,6 +30,7 @@ import {
     listRolesFlow,
 } from '~/features/admin/flows/RoleManagementFlow'
 import { userListingFlow } from '~/features/admin/flows/UserListingFlow'
+import { unfulfilledLocationsFlow } from '~/features/admin/flows/UnfulfilledLocationsFlow'
 
 // Import user flows
 import { userHelpFlow } from '~/features/user/flows/UserHelpFlow'
@@ -120,6 +121,8 @@ async function main() {
         listRolesFlow,
         // User listing flow (admin-only)
         userListingFlow,
+        // Unfulfilled locations flow (admin-only)
+        unfulfilledLocationsFlow,
         versionFlow, // Version command (available to all users)
 
         // Onboarding flows (simple 3-step setup)

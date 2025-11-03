@@ -378,6 +378,9 @@ Admin-only commands (Telegram user IDs in `src/config/admins.ts`):
 **User Management:**
 - `/users` - List all Telegram users
 
+**Location Management:**
+- `/unfulfilled` - List location update requests from last 7 days that were never fulfilled (webhook sent but no location record exists)
+
 ### Creating New Admin Commands
 
 When creating admin-only commands, follow this checklist to ensure proper security:

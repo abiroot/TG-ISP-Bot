@@ -330,6 +330,55 @@ export class MessageRepository {
         const result = await pool.query('DELETE FROM messages WHERE context_id = $1', [contextId])
         return result.rowCount ?? 0
     }
+
+    /**
+     * Get unfulfilled location requests (webhook notifications without corresponding location records)
+     * Returns webhook messages from the last N days where no location was ever created
+     * @param daysBack Number of days to look back (default: 7)
+     * @returns Array of unfulfilled location requests with worker details
+     */
+    async getUnfulfilledLocationRequests(daysBack = 7): Promise<
+        Array<{
+            message_id: string
+            client_username: string
+            worker_telegram_id: string
+            webhook_tg_username: string | null
+            webhook_worker_username: string | null
+            worker_username: string | null
+            worker_first_name: string | null
+            worker_last_name: string | null
+            worker_telegram_handle: string | null
+            webhook_sent_at: Date
+        }>
+    > {
+        const query = `
+            SELECT
+                m.id AS message_id,
+                m.metadata->>'client_username' AS client_username,
+                m.sender AS worker_telegram_id,
+                m.metadata->>'tg_username' AS webhook_tg_username,
+                m.metadata->>'worker_username' AS webhook_worker_username,
+                tum.worker_username,
+                tum.first_name AS worker_first_name,
+                tum.last_name AS worker_last_name,
+                tum.telegram_handle AS worker_telegram_handle,
+                m.created_at AS webhook_sent_at
+            FROM messages m
+            LEFT JOIN telegram_user_mapping tum
+                ON tum.telegram_id = m.sender
+            LEFT JOIN customer_locations cl
+                ON cl.isp_username = m.metadata->>'client_username'
+            WHERE
+                m.metadata->>'webhook' = 'collector_payment'
+                AND m.created_at >= NOW() - INTERVAL '${daysBack} days'
+                AND cl.id IS NULL
+                AND m.is_deleted = FALSE
+            ORDER BY m.created_at DESC
+        `
+
+        const result = await pool.query(query)
+        return result.rows
+    }
 }
 
 // Export singleton instance
