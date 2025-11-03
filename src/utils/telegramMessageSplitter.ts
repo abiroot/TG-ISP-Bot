@@ -129,46 +129,29 @@ export interface ISPMessageSections {
 export function splitISPMessage(sections: ISPMessageSections): string[] {
     const messages: string[] = []
 
-    // Message 1: Essential User & Account Information
-    const essentialInfo = [
+    // Build sections in exact order specified
+    // Order: header, userDetails, accountStatus, networkDetails, stationInfo,
+    //        accessPointInfo, apUsers, billing, collector, timeline, sessionHistory, pingDiagnostics
+    const orderedSections = [
         sections.header,
         sections.userDetails,
-        sections.accountMetadata,
         sections.accountStatus,
-        sections.billing,
-    ]
-        .filter(Boolean)
-        .join('\n\n')
-
-    if (essentialInfo.trim()) {
-        messages.push(...splitLongMessage(essentialInfo))
-    }
-
-    // Message 2: Network & Infrastructure Information
-    const networkInfo = [
         sections.networkDetails,
         sections.stationInfo,
         sections.accessPointInfo,
+        sections.apUsers,
+        sections.billing,
+        sections.collector,
+        sections.timeline,
+        sections.sessionHistory,
+        sections.pingDiagnostics,
     ]
         .filter(Boolean)
         .join('\n\n')
 
-    if (networkInfo.trim()) {
-        messages.push(...splitLongMessage(networkInfo))
-    }
-
-    // Message 3: Activity & Users
-    const activityInfo = [sections.collector, sections.timeline, sections.apUsers, sections.sessionHistory]
-        .filter(Boolean)
-        .join('\n\n')
-
-    if (activityInfo.trim()) {
-        messages.push(...splitLongMessage(activityInfo))
-    }
-
-    // Message 4: Diagnostics (often the longest section)
-    if (sections.pingDiagnostics?.trim()) {
-        messages.push(...splitLongMessage(sections.pingDiagnostics))
+    // Split the full message if it exceeds Telegram's limit
+    if (orderedSections.trim()) {
+        messages.push(...splitLongMessage(orderedSections))
     }
 
     return messages

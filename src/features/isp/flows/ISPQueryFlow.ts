@@ -158,6 +158,9 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                     'ISP query completed'
                 )
             }
+
+            // Properly terminate flow so follow-up messages route to welcomeFlow
+            return endFlow()
         } catch (error) {
             // Delete loading indicator on error
             await LoadingIndicator.hide(provider, loadingMsg)
@@ -214,10 +217,6 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                     )
                     return
                 }
-
-                // Clear state and timer
-                await clearIdleTimer(ctx.from)
-                await state.clear()
 
                 // Send loading indicator
                 const loadingMsg = await LoadingIndicator.show(provider, ctx.from, '🔍 Searching...')
@@ -281,6 +280,13 @@ export const ispQueryFlow = addKeyword<TelegramProvider, Database>([
                     // Send single message
                     await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
                 }
+
+                // Clear state and timer after successful query
+                await clearIdleTimer(ctx.from)
+                await state.clear()
+
+                // Properly terminate flow so follow-up messages route to welcomeFlow
+                return endFlow()
             } catch (error) {
                 // Always clear state on error
                 await clearIdleTimer(ctx.from)

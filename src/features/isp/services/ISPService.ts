@@ -25,7 +25,7 @@ import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
 import { ServiceError } from '~/core/errors/ServiceError'
 import type { Personality } from '~/database/schemas/personality'
-import { type ToolName } from '~/config/roles.js'
+import { type ToolName, type RoleName } from '~/config/roles.js'
 import type { RoleService } from '~/services/roleService.js'
 import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierExtractor'
 import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
@@ -622,11 +622,31 @@ export class ISPService {
     }
 
     /**
-     * Format user info for display (ALL 51 FIELDS)
+     * Helper: Format interface stats for worker view (simplified)
+     * Shows only: Speed, Status, Link Downs
+     */
+    private formatInterfaceStatsWorker(stats: any[] | null): string {
+        if (!stats || stats.length === 0) {
+            return '- Speed: Unknown\n- Status: Unknown\n- Link Downs: 0'
+        }
+
+        const stat = stats[0] // Use first interface only
+        const esc = (str: any, fallback = 'N/A') => html.escape(String(str || fallback))
+
+        return `- Speed: ${esc(stat.speed, 'Unknown')}
+- Status: ${stat.running ? 'Running' : 'Down'}
+- Link Downs: ${esc(stat.linkDowns)}`
+    }
+
+    /**
+     * Format user info for display with role-based visibility
      * Async to support OLT interface handling with getMikrotikUsers
      * Returns array of messages to handle Telegram's 4096 character limit
+     *
+     * @param userInfo - ISP user information
+     * @param userRole - User's role (admin or worker)
      */
-    async formatUserInfo(userInfo: ISPUserInfo): Promise<string[]> {
+    async formatUserInfo(userInfo: ISPUserInfo, userRole: RoleName = 'admin'): Promise<string[]> {
         const statusEmoji = userInfo.online ? '🟢' : '🔴'
         const accountStatus = userInfo.activatedAccount ? '✅ Activated' : '❌ Not Activated'
         const activeStatus = userInfo.active ? '✅ Active' : '❌ Inactive'
@@ -689,9 +709,14 @@ export class ISPService {
                 .join('\n')
         }
 
-        // Build optional sections based on interface type
+        // Determine if user is admin or worker
+        const isAdmin = userRole === 'admin'
+        const isWorker = userRole === 'worker'
+
+        // Build optional sections based on interface type and role
         const stationSection = !isOLT
-            ? `
+            ? isAdmin
+                ? `
 📡 <b>Station Information:</b>
 - <b>Status:</b> ${userInfo.stationOnline ? '🟢 Online' : '🔴 Offline'}
 - <b>Name:</b> ${esc(userInfo.stationName)}
@@ -701,10 +726,15 @@ export class ISPService {
 📊 <b>Station Interface Stats:</b>
 ${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
 `
+                : `
+📡 <b>Station:</b> ${esc(userInfo.stationName)} (${userInfo.stationOnline ? 'Online' : 'Offline'})
+${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
+`
             : ''
 
         const accessPointSection = !isOLT
-            ? `
+            ? isAdmin
+                ? `
 📶 <b>Access Point:</b>
 - <b>Status:</b> ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
 - <b>Name:</b> ${esc(userInfo.accessPointName)}
@@ -716,95 +746,104 @@ ${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
 📊 <b>Access Point Interface Stats:</b>
 ${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
 `
+                : `
+📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} (${userInfo.accessPointOnline ? 'Online' : 'Offline'})
+${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
+`
             : ''
 
-        // Build message sections for intelligent splitting
-        const sections: ISPMessageSections = {
-            header: `Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} ${esc(userInfo.lastName)}</b>:`,
+        // Build message sections based on role
+        const sections: ISPMessageSections = isWorker
+            ? {
+                  // WORKER FORMAT - Simplified view
+                  header: `Here is the basic information for user <b>${esc(userInfo.userName)}</b>:`,
 
-            userDetails: `
-👤 <b>User Details:</b>
-- <b>ID:</b> <code>${userInfo.id}</code>
-- <b>Username:</b> <code>${esc(userInfo.userName)}</code>
-- <b>Mobile:</b> ${esc(userInfo.mobile)}
-- <b>Phone:</b> ${esc(userInfo.phone)}
-- <b>Email:</b> ${esc(userInfo.mailAddress, 'Not provided')}
-- <b>Address:</b> ${esc(userInfo.address)}
-- <b>Comment:</b> ${esc(userInfo.comment, 'None')}
-- <b>MOF:</b> ${esc(userInfo.mof, 'N/A')}`.trim(),
+                  userDetails: `
+👤 <b>User:</b> ${esc(userInfo.userName)}
+📍 <b>Address:</b> ${esc(userInfo.address)}
+📱 <b>Mobile:</b> ${esc(userInfo.mobile)}
+${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
+📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}`.trim(),
 
-            accountMetadata: `
-📋 <b>Account Metadata:</b>
-- <b>Created:</b> ${this.formatDateBeirut(userInfo.creationDate)}
-- <b>User Category ID:</b> ${userInfo.userCategoryId}
-- <b>Financial Category ID:</b> ${userInfo.financialCategoryId}
-- <b>User Group ID:</b> ${userInfo.userGroupId}
-- <b>Link ID:</b> ${userInfo.linkId}
-- <b>Archived:</b> ${archivedStatus}`.trim(),
+                  stationInfo: stationSection.trim() || undefined,
 
-            accountStatus: `
-📊 <b>Account Status:</b>
-- <b>Online:</b> ${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Offline'}
-- <b>Active:</b> ${activeStatus}
-- <b>Activated:</b> ${accountStatus}
-- <b>Access:</b> ${blockedStatus}
-- <b>Validity:</b> ${expiryStatus}
-- <b>Type:</b> ${esc(userInfo.accountTypeName)}
-- <b>FUP Mode:</b> ${esc(userInfo.fupMode)}`.trim(),
+                  accessPointInfo: accessPointSection.trim() || undefined,
 
-            networkDetails: `
-🌐 <b>Network Details:</b>
-- <b>IP Address:</b> <code>${esc(userInfo.ipAddress, 'Not assigned')}</code>
-- <b>Static IP:</b> ${esc(userInfo.staticIP, 'None')}
-- <b>MAC Address:</b> <code>${esc(userInfo.macAddress, 'Not registered')}</code>
-- <b>NAS Host:</b> <code>${esc(userInfo.nasHost, 'Not connected')}</code>
-- <b>Mikrotik Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>
-- <b>Router Brand:</b> ${esc(userInfo.routerBrand, 'Unknown')}
-- <b>Speeds:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
-- <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
-- <b>Monthly Quota:</b> ${formatQuota(userInfo.monthlyQuota)}`.trim(),
-
-            stationInfo: stationSection.trim() || undefined,
-
-            accessPointInfo: accessPointSection.trim() || undefined,
-
-            apUsers: `
+                  apUsers: `
 👥 <b>Users on Same AP:</b>
 ${apUsers || '• None'}`.trim(),
 
-            billing: `
+                  billing: `
+💰 <b>Account Price:</b> $${userInfo.accountPrice}`.trim(),
+
+                  pingDiagnostics: `
+🔍 <b>Ping Diagnostics:</b>
+${this.formatPingResults(userInfo.pingResult)}`.trim(),
+              }
+            : {
+                  // ADMIN FORMAT - Exact fields and order as specified
+                  header: `Here is the <b>complete information</b> for user <b>${esc(userInfo.userName)}</b>:`,
+
+                  userDetails: `
+👤 <b>User Details:</b>
+- <b>Username:</b> <code>${esc(userInfo.userName)}</code>
+- <b>Mobile:</b> ${esc(userInfo.mobile)}
+- <b>Address:</b> ${esc(userInfo.address)}
+- <b>Comment:</b> ${esc(userInfo.comment, 'None')}`.trim(),
+
+                  accountStatus: `
+📊 <b>Account Status:</b>
+- <b>Online:</b> ${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Offline'}
+- <b>Active:</b> ${activeStatus}
+- <b>Validity:</b> ${expiryStatus}
+- <b>Type:</b> ${esc(userInfo.accountTypeName)}
+- <b>FUP:</b> ${esc(userInfo.fupMode)}
+- <b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}`.trim(),
+
+                  networkDetails: `
+🌐 <b>Network Details:</b>
+- <b>IP Address:</b> <code>${esc(userInfo.ipAddress, 'Not assigned')}</code>
+- <b>Static IP:</b> ${esc(userInfo.staticIP, 'None')}
+- <b>NAS Host:</b> <code>${esc(userInfo.nasHost, 'Not connected')}</code>
+- <b>Mikrotik Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>
+- <b>Router Brand:</b> ${esc(userInfo.routerBrand, 'Unknown')}
+- <b>Speed:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
+- <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
+- <b>Monthly Quota:</b> ${formatQuota(userInfo.monthlyQuota)}`.trim(),
+
+                  stationInfo: stationSection.trim() || undefined,
+
+                  accessPointInfo: accessPointSection.trim() || undefined,
+
+                  apUsers: `
+👥 <b>Users on Same AP:</b>
+${apUsers || '• None'}`.trim(),
+
+                  billing: `
 💰 <b>Billing Information:</b>
 - <b>Account Price:</b> $${userInfo.accountPrice}
-- <b>Discount:</b> ${userInfo.discount}%
-- <b>Real IP Price:</b> $${userInfo.realIpPrice}
-- <b>IPTV Price:</b> $${userInfo.iptvPrice}
 - <b>Expires:</b> ${this.formatDateBeirut(userInfo.expiryAccount)}`.trim(),
 
-            collector: `
-👨‍💼 <b>Collector Information:</b>
-- <b>Username:</b> <code>${esc(userInfo.collectorUserName)}</code>
-- <b>Name:</b> ${esc(userInfo.collectorFirstName)} ${esc(userInfo.collectorLastName)}
-- <b>Mobile:</b> ${esc(userInfo.collectorMobile)}`.trim(),
+                  collector: `
+👨‍💼 <b>Collector:</b> ${esc(userInfo.collectorFirstName)} ${esc(userInfo.collectorLastName)}`.trim(),
 
-            timeline: `
+                  timeline: `
 📅 <b>Timeline:</b>
 - <b>Last Login:</b> ${this.formatDateBeirut(userInfo.lastLogin)}
 - <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}`.trim(),
 
-            sessionHistory: allSessions
-                ? `
+                  sessionHistory: allSessions
+                      ? `
 🕐 <b>Session History:</b>
 ${allSessions}`.trim()
-                : `
+                      : `
 🕐 <b>Session History:</b>
 • No sessions`.trim(),
 
-            pingDiagnostics: `
+                  pingDiagnostics: `
 🔍 <b>Ping Diagnostics:</b>
-${this.formatPingResults(userInfo.pingResult)}
-
-If you need further assistance, feel free to ask! 😊`.trim(),
-        }
+${this.formatPingResults(userInfo.pingResult)}`.trim(),
+              }
 
         // Split into multiple messages if needed (respects Telegram's 4096 char limit)
         return splitISPMessage(sections)
@@ -911,8 +950,14 @@ If you need further assistance, feel free to ask! 😊`.trim(),
                         }
                     }
 
+                    // Get user role for formatting (admin vs worker view)
+                    const context = experimental_context as any
+                    const userTelegramId = context?.userPhone || context?.contextId?.split('_')[0]
+                    const userRoles = await this.roleService.getUserRoles(userTelegramId || '')
+                    const primaryRole: RoleName = userRoles.includes('admin') ? 'admin' : 'worker'
+
                     ispLogger.info(
-                        { identifier: args.identifier },
+                        { identifier: args.identifier, userRole: primaryRole },
                         'searchCustomer tool called'
                     )
 
@@ -926,10 +971,10 @@ If you need further assistance, feel free to ask! 😊`.trim(),
                         }
                     }
 
-                    // Return all users with formatted messages
+                    // Return all users with formatted messages (role-aware formatting)
                     // formatUserInfo now returns string[] for each user to handle Telegram's 4096 char limit
                     // Flatten all message arrays into single array
-                    const allUserMessages = await Promise.all(users.map((user) => this.formatUserInfo(user)))
+                    const allUserMessages = await Promise.all(users.map((user) => this.formatUserInfo(user, primaryRole)))
                     const flattenedMessages = allUserMessages.flat() // Flatten string[][] to string[]
 
                     return {

@@ -84,11 +84,16 @@ export const USER_ROLES: Record<string, RoleName[]> = {
  * TOOL CATEGORIES:
  * - Read-only: searchCustomer, getMikrotikUsers
  * - Write: updateUserLocation, batchUpdateLocations
+ *
+ * NOTES:
+ * - Workers can execute searchCustomer but see simplified format
+ * - Admins see complete information with all fields
  */
 export const TOOL_PERMISSIONS: Record<ToolName, RoleName[]> = {
-    // Admin has access to everything
-    searchCustomer: ['admin'],
+    // Read-only tools - workers can query customers with simplified format
+    searchCustomer: ['admin', 'worker'],
     getMikrotikUsers: ['admin'],
+    // Write tools - all roles can update locations
     updateUserLocation: ['admin', 'collector', 'worker'],
     batchUpdateLocations: ['admin', 'collector', 'worker'],
 }

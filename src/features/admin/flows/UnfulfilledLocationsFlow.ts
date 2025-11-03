@@ -5,6 +5,7 @@ import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
 import { runAdminMiddleware } from '~/core/middleware/adminMiddleware'
 import { messageRepository } from '~/database/repositories/messageRepository'
+import { splitLongMessage } from '~/utils/telegramMessageSplitter'
 
 const unfulfilledLogger = createFlowLogger('UnfulfilledLocationsFlow')
 
@@ -33,49 +34,63 @@ export const unfulfilledLocationsFlow = addKeyword<TelegramProvider, Database>([
         // Fetch unfulfilled location requests from last 7 days
         const unfulfilledRequests = await messageRepository.getUnfulfilledLocationRequests(7)
 
-        // Format output with HTML formatting
-        let message = '<b>📍 Unfulfilled Location Requests</b>\n\n'
-        message += '<i>Showing webhook requests from last 7 days with no location record</i>\n\n'
-        message += `<b>Total Pending:</b> ${unfulfilledRequests.length}\n\n`
+        // Build header
+        let headerMessage = '<b>📍 Unfulfilled Location Requests</b>\n\n'
+        headerMessage += '<i>Showing webhook requests from last 7 days with no location record</i>\n\n'
+        headerMessage += `<b>Total Pending:</b> ${unfulfilledRequests.length}\n\n`
+
+        // Build footer
+        const footerMessage = '\n<b>Related Commands:</b>\n'
+            + '• <code>/users</code> - List all telegram users\n'
+            + '• <code>/list whitelist</code> - Show access control\n'
+            + '• <code>/bot status</code> - Check bot status'
 
         if (unfulfilledRequests.length === 0) {
-            message += '✅ No unfulfilled location requests in the last 7 days!\n\n'
-            message += '<i>All webhook notifications have been processed.</i>'
+            // No unfulfilled requests - single message
+            const emptyMessage = headerMessage
+                + '✅ No unfulfilled location requests in the last 7 days!\n\n'
+                + '<i>All webhook notifications have been processed.</i>'
+                + footerMessage
+
+            const provider = utils.provider as TelegramProvider
+            await provider.vendor.telegram.sendMessage(ctx.from, emptyMessage, { parse_mode: 'HTML' })
         } else {
-            // Display all unfulfilled requests
+            // Build request entries
+            let requestsContent = ''
+
             for (const request of unfulfilledRequests) {
                 // ISP customer username (bold header)
-                message += `• <b>${html.escape(request.client_username)}</b>\n`
+                requestsContent += `• <b>${html.escape(request.client_username)}</b>\n`
 
                 // Worker information
                 const workerName = [request.worker_first_name, request.worker_last_name]
                     .filter(Boolean)
                     .join(' ')
                 if (workerName) {
-                    message += `  └ Worker: ${html.escape(workerName)}`
+                    requestsContent += `  └ Worker: ${html.escape(workerName)}`
                     if (request.worker_telegram_handle) {
-                        message += ` (@${html.escape(request.worker_telegram_handle)})`
+                        requestsContent += ` (@${html.escape(request.worker_telegram_handle)})`
                     }
-                    message += '\n'
+                    requestsContent += '\n'
                 } else if (request.worker_telegram_handle) {
-                    message += `  └ Worker: @${html.escape(request.worker_telegram_handle)}\n`
+                    requestsContent += `  └ Worker: @${html.escape(request.worker_telegram_handle)}\n`
                 }
 
                 // Resolved Telegram ID from telegram_user_mapping (what was looked up)
-                message += `  └ Telegram ID (resolved): <code>${html.escape(request.worker_telegram_id)}</code>\n`
+                requestsContent += `  └ Telegram ID (resolved): <code>${html.escape(request.worker_telegram_id)}</code>\n`
 
                 // Webhook data (what was sent in the webhook request)
-                message += `  └ <i>Webhook Data:</i>\n`
+                requestsContent += `  └ <i>Webhook Data:</i>\n`
                 if (request.webhook_worker_username) {
-                    message += `    └ Worker Username: ${html.escape(request.webhook_worker_username)}\n`
+                    requestsContent += `    └ Worker Username: ${html.escape(request.webhook_worker_username)}\n`
                 }
                 if (request.webhook_tg_username) {
-                    message += `    └ TG Username: ${html.escape(request.webhook_tg_username)}\n`
+                    requestsContent += `    └ TG Username: ${html.escape(request.webhook_tg_username)}\n`
                 }
 
                 // Worker username from telegram_user_mapping (if available)
                 if (request.worker_username) {
-                    message += `  └ Billing System Username: ${html.escape(request.worker_username)}\n`
+                    requestsContent += `  └ Billing System Username: ${html.escape(request.worker_username)}\n`
                 }
 
                 // Webhook timestamp
@@ -88,7 +103,7 @@ export const unfulfilledLocationsFlow = addKeyword<TelegramProvider, Database>([
                     second: '2-digit',
                     hour12: false,
                 })
-                message += `  └ Requested: ${webhookTime}\n`
+                requestsContent += `  └ Requested: ${webhookTime}\n`
 
                 // Time elapsed since webhook
                 const now = new Date()
@@ -98,27 +113,40 @@ export const unfulfilledLocationsFlow = addKeyword<TelegramProvider, Database>([
                 const elapsedMinutes = Math.floor((elapsedMs % (1000 * 60 * 60)) / (1000 * 60))
 
                 if (elapsedHours > 0) {
-                    message += `  └ Elapsed: ${elapsedHours}h ${elapsedMinutes}m ago\n`
+                    requestsContent += `  └ Elapsed: ${elapsedHours}h ${elapsedMinutes}m ago\n`
                 } else {
-                    message += `  └ Elapsed: ${elapsedMinutes}m ago\n`
+                    requestsContent += `  └ Elapsed: ${elapsedMinutes}m ago\n`
                 }
 
                 // Status badge
-                message += `  └ Status: ⚠️ Never updated\n`
+                requestsContent += `  └ Status: ⚠️ Never updated\n`
 
-                message += '\n'
+                requestsContent += '\n'
+            }
+
+            // Combine header + requests + footer
+            const fullMessage = headerMessage + requestsContent + footerMessage
+
+            // Split message if it exceeds Telegram's limit
+            const messageChunks = splitLongMessage(fullMessage, 3900) // Use 3900 to leave room for formatting
+
+            // Send all chunks sequentially
+            const provider = utils.provider as TelegramProvider
+            for (let i = 0; i < messageChunks.length; i++) {
+                const chunk = messageChunks[i]
+
+                // Add page indicator if multiple messages
+                const pageIndicator = messageChunks.length > 1
+                    ? `\n\n<i>Page ${i + 1}/${messageChunks.length}</i>`
+                    : ''
+
+                await provider.vendor.telegram.sendMessage(
+                    ctx.from,
+                    chunk + pageIndicator,
+                    { parse_mode: 'HTML' }
+                )
             }
         }
-
-        // Help footer
-        message += '\n<b>Related Commands:</b>\n'
-        message += '• <code>/users</code> - List all telegram users\n'
-        message += '• <code>/list whitelist</code> - Show access control\n'
-        message += '• <code>/bot status</code> - Check bot status'
-
-        // Send with HTML formatting via telegram API directly
-        const provider = utils.provider as TelegramProvider
-        await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
 
         unfulfilledLogger.info(
             { from: ctx.from, unfulfilledCount: unfulfilledRequests.length },

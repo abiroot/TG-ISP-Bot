@@ -106,7 +106,7 @@ export class CoreAIService {
 
     constructor(ragConfig?: Partial<RAGConfig>) {
         this.ragConfig = {
-            enabled: env.RAG_ENABLED ?? true,
+            enabled: env.RAG_ENABLED ?? false,
             chunkSize: env.RAG_CHUNK_SIZE ?? 10,
             chunkOverlap: env.RAG_CHUNK_OVERLAP ?? 2,
             topK: env.RAG_TOP_K_RESULTS ?? 3,
@@ -168,7 +168,7 @@ export class CoreAIService {
                 ...conversationHistory,
                 { role: 'user', content: context.recentMessages[0]?.content || '' },
             ]
-
+            
             // 5. Token budget monitoring
             const tokenBudget = this.calculateTokenBudget(systemPrompt, conversationHistory, context.recentMessages[0]?.content || '')
 
@@ -488,6 +488,8 @@ You are ${personality.bot_name}, an intelligent ISP support assistant.
 - Call tools IMMEDIATELY without asking for confirmation
 - When a tool returns a message, you can output it directly or add helpful context
 - Handle errors gracefully with user-friendly messages
+- CRITICAL: Extract tool parameters ONLY from the user's CURRENT message, NOT from conversation history
+- Example: If user says "check mohamad", use identifier="mohamad" (not "acccheck mohamad" or other concatenations)
 
 💬 MESSAGE FORMATTING (CRITICAL):
 Use HTML formatting in ALL responses (messages are sent with parse_mode='HTML'):
