@@ -291,7 +291,7 @@ export const locationDirectUserModeFlow = addKeyword<TelegramProvider, Database>
                     ctx.from,
                     '❌ <b>Invalid username format.</b>\n\n' +
                         'Username must:\n' +
-                        '• Start with a letter\n' +
+                        '• Start with a letter or digit\n' +
                         '• Be 3-32 characters\n' +
                         '• Contain only letters, numbers, underscore, or dot\n\n' +
                         'Please try again or type <b>cancel</b>.',

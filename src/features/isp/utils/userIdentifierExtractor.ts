@@ -3,6 +3,8 @@
  * Extracts and normalizes both phone numbers and usernames from messages
  */
 
+import { validateIspUsername } from '~/core/utils/validators'
+
 export interface ExtractedIdentifier {
     value: string
     type: 'phone' | 'username'
@@ -111,7 +113,7 @@ export function extractUserIdentifiers(message: string): ExtractedIdentifier[] {
                 username = username.trim()
 
                 // Validate username format
-                if (!isValidUsername(username)) continue
+                if (!validateIspUsername(username)) continue
                 if (foundUsernames.has(username)) continue
                 if (foundPhones.has(username)) continue // Skip if it was identified as a phone number
 
@@ -158,26 +160,6 @@ export function extractFirstUserIdentifier(message: string): ExtractedIdentifier
     return identifiers.find(id => id.type === 'username') || null
 }
 
-/**
- * Check if a string is a valid username format
- *
- * @param username The username to validate
- * @returns true if valid username format
- */
-export function isValidUsername(username: string): boolean {
-    if (!username || typeof username !== 'string') return false
-
-    // Username validation: 3-32 characters, alphanumeric + underscore + dot
-    // Can start with letter or digit, cannot be all numbers
-    const usernameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_.]{2,31}$/
-
-    // Additional checks
-    if (!usernameRegex.test(username)) return false
-    if (/^\d+$/.test(username)) return false // Not all numbers
-    if (username.length > 32) return false
-
-    return true
-}
 
 /**
  * Check if a string is a phone number
@@ -212,7 +194,7 @@ export function isUsername(input: string): boolean {
     if (/^\d+$/.test(clean)) return false // Not all numbers
 
     // Username pattern
-    return isValidUsername(clean)
+    return validateIspUsername(clean)
 }
 
 /**

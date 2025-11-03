@@ -240,7 +240,7 @@ export async function validateCoordinates(input: string): Promise<CoordinateVali
  * Validate ISP username format
  *
  * Valid usernames:
- * - Start with a letter
+ * - Start with a letter or digit
  * - 3-32 characters
  * - Alphanumeric + underscore + dot
  * - Cannot be all numbers
@@ -254,7 +254,8 @@ export function validateIspUsername(username: string): boolean {
     const trimmed = username.trim()
 
     // Username validation: 3-32 characters, alphanumeric + underscore + dot
-    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_.]{2,31}$/
+    // Can start with letter or digit, cannot be all numbers
+    const usernameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_.]{2,31}$/
 
     // Additional checks
     if (!usernameRegex.test(trimmed)) return false

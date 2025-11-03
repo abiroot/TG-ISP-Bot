@@ -154,7 +154,7 @@ export class MockISPService {
         }
 
         // Try username pattern
-        const usernamePattern = /(?:user|username|account)\s*[:-]?\s*([a-zA-Z][a-zA-Z0-9_.]{2,31})/gi
+        const usernamePattern = /(?:user|username|account)\s*[:-]?\s*([a-zA-Z0-9][a-zA-Z0-9_.]{2,31})/gi
         const usernameMatch = cleanMessage.match(usernamePattern)
         if (usernameMatch) {
             return usernameMatch[1]
