@@ -83,16 +83,16 @@ export function extractUserIdentifiers(message: string): ExtractedIdentifier[] {
     // 2. Extract usernames (patterns that suggest usernames)
     const usernamePatterns = [
         // User references: @username, user josianeyoussef, username: john_doe
-        /(?:user|username|account|customer)\s*[:-]?\s*([a-zA-Z][a-zA-Z0-9_.]{2,31})/gi,
+        /(?:user|username|account|customer)\s*[:-]?\s*([a-zA-Z0-9][a-zA-Z0-9_.]{2,31})/gi,
         // @ mentions: @username
-        /@([a-zA-Z][a-zA-Z0-9_.]{2,31})/g,
+        /@([a-zA-Z0-9][a-zA-Z0-9_.]{2,31})/g,
         // Common username patterns in context - very specific patterns only
-        /(?:check|info|details|status|lookup|find|search|get|show)\s+([a-zA-Z][a-zA-Z0-9_.]{4,31})\s+(?:for|me)$/gi,
-        /(?:check|info|details|status|lookup|find|search|get|show)\s+(?:customer|user|account)\s+([a-zA-Z][a-zA-Z0-9_.]{2,31})\b/gi,
+        /(?:check|info|details|status|lookup|find|search|get|show)\s+([a-zA-Z0-9][a-zA-Z0-9_.]{4,31})\s+(?:for|me)$/gi,
+        /(?:check|info|details|status|lookup|find|search|get|show)\s+(?:customer|user|account)\s+([a-zA-Z0-9][a-zA-Z0-9_.]{2,31})\b/gi,
         // More restrictive pattern for standalone usernames (avoid common words)
         // Only match if it contains underscore/dot or is longer than typical words
-        /\b([a-zA-Z][a-zA-Z0-9_.]{7,31})\b(?!@\w)/g, // 8+ chars
-        /\b([a-zA-Z][a-zA-Z0-9]*[_.][a-zA-Z0-9_.]*)\b(?!@\w)/g, // Contains underscore or dot
+        /\b([a-zA-Z0-9][a-zA-Z0-9_.]{7,31})\b(?!@\w)/g, // 8+ chars
+        /\b([a-zA-Z0-9][a-zA-Z0-9]*[_.][a-zA-Z0-9_.]*)\b(?!@\w)/g, // Contains underscore or dot
     ]
 
     // Extract usernames, avoiding phone numbers already found
@@ -168,8 +168,8 @@ export function isValidUsername(username: string): boolean {
     if (!username || typeof username !== 'string') return false
 
     // Username validation: 3-32 characters, alphanumeric + underscore + dot
-    // Must start with a letter, cannot be all numbers
-    const usernameRegex = /^[a-zA-Z][a-zA-Z0-9_.]{2,31}$/
+    // Can start with letter or digit, cannot be all numbers
+    const usernameRegex = /^[a-zA-Z0-9][a-zA-Z0-9_.]{2,31}$/
 
     // Additional checks
     if (!usernameRegex.test(username)) return false

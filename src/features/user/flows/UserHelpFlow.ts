@@ -141,7 +141,7 @@ export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/he
             if (userRoles.includes('worker')) {
                 helpMessage += `• <b>Worker</b> - Can update customer locations\n`
             }
-            helpMessage += `• Use <code>/setlocation</code> to update single or multiple customers\n`
+            helpMessage += `• Update single or multiple customers\n`
             helpMessage += `\n`
         }
 

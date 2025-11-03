@@ -4,16 +4,36 @@
  * Exports all menu-related flows for registration in app.ts
  */
 
-// Main menu
+// Main menu (Admin-only)
 export { mainMenuFlow, menuBackFlow } from './MainMenuFlow'
 
-// User Info submenu
+// Admin submenus
 export {
-    userInfoMenuFlow,
-    checkCustomerFlow,
-    accountStatusFlow,
-    networkInfoFlow,
-} from './UserInfoMenuFlow'
+    adminWhitelistFlow,
+    adminBotFlow,
+    adminRolesFlow,
+    adminUsersFlow,
+    adminLocationsFlow,
+    cmdWhitelistFlow,
+    cmdRemoveWhitelistFlow,
+    cmdListWhitelistFlow,
+    cmdBotStatusFlow,
+    cmdToggleMaintenanceFlow,
+    confirmToggleMaintenanceFlow,
+    cmdToggleAIFlow,
+    cmdToggleRAGFlow,
+    cmdToggleVoiceFlow,
+    cmdToggleMediaFlow,
+    cmdToggleISPFlow,
+    cmdListRolesFlow,
+    cmdShowRoleFlow,
+    cmdAddRoleFlow,
+    cmdSetRoleFlow,
+    cmdRemoveRoleFlow,
+} from './AdminMenuFlow'
+
+// User Info submenu (kept for potential future use)
+export { userInfoMenuFlow, checkCustomerFlow } from './UserInfoMenuFlow'
 
 // Settings submenu
 export { settingsMenuFlow, updatePersonalityFlow } from './SettingsMenuFlow'

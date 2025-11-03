@@ -15,6 +15,8 @@ const flowLogger = createFlowLogger('user-info-menu')
 
 /**
  * User Info Menu - ISP query options
+ * Note: This flow is currently not used in the main menu (menu is admin-only)
+ * but kept for potential future use or direct button access
  */
 export const userInfoMenuFlow = addKeyword<TelegramProvider, Database>('BUTTON_MENU_USERINFO')
     .addAction(async (ctx, utils) => {
@@ -26,8 +28,6 @@ export const userInfoMenuFlow = addKeyword<TelegramProvider, Database>('BUTTON_M
             '👤 <b>User Information</b>\n\n' + 'What would you like to check?',
             [
                 [createCallbackButton('🔍 Check Customer', 'userinfo_check')],
-                [createCallbackButton('📊 Account Status', 'userinfo_status')],
-                [createCallbackButton('🌐 Network Info', 'userinfo_network')],
                 [createCallbackButton('← Back to Menu', 'menu_back')],
             ],
             { parseMode: 'HTML' }
@@ -120,26 +120,3 @@ export const checkCustomerFlow = addKeyword<TelegramProvider, Database>('BUTTON_
         }
     )
 
-/**
- * Account Status - Placeholder
- */
-export const accountStatusFlow = addKeyword<TelegramProvider, Database>('BUTTON_USERINFO_STATUS')
-    .addAction(async (ctx, { flowDynamic }) => {
-        await flowDynamic(
-            '📊 <b>Account Status Check</b>\n\n' +
-                'This feature allows you to check account status.\n\n' +
-                'To use it, send: <code>check [phone number]</code>'
-        )
-    })
-
-/**
- * Network Info - Placeholder
- */
-export const networkInfoFlow = addKeyword<TelegramProvider, Database>('BUTTON_USERINFO_NETWORK')
-    .addAction(async (ctx, { flowDynamic }) => {
-        await flowDynamic(
-            '🌐 <b>Network Information</b>\n\n' +
-                'This feature shows network details.\n\n' +
-                'To use it, send: <code>check [phone number]</code>'
-        )
-    })

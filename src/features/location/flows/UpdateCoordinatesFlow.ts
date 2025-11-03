@@ -184,7 +184,7 @@ export const locationUserModeFlow = addKeyword<TelegramProvider, Database>('BUTT
             await state.clear()
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
-                '⏰ <b>Timeout</b>\n\nPlease start over with /setlocation',
+                '⏰ <b>Timeout</b>',
                 { parse_mode: 'HTML' }
             )
         })

@@ -63,16 +63,40 @@ import {
 import {
     mainMenuFlow,
     menuBackFlow,
+    // Admin menu flows
+    adminWhitelistFlow,
+    adminBotFlow,
+    adminRolesFlow,
+    adminUsersFlow,
+    adminLocationsFlow,
+    cmdWhitelistFlow,
+    cmdRemoveWhitelistFlow,
+    cmdListWhitelistFlow,
+    cmdBotStatusFlow,
+    cmdToggleMaintenanceFlow,
+    confirmToggleMaintenanceFlow,
+    cmdToggleAIFlow,
+    cmdToggleRAGFlow,
+    cmdToggleVoiceFlow,
+    cmdToggleMediaFlow,
+    cmdToggleISPFlow,
+    cmdListRolesFlow,
+    cmdShowRoleFlow,
+    cmdAddRoleFlow,
+    cmdSetRoleFlow,
+    cmdRemoveRoleFlow,
+    // User Info submenu (kept for future use)
     userInfoMenuFlow,
     checkCustomerFlow,
-    accountStatusFlow,
-    networkInfoFlow,
+    // Settings submenu
     settingsMenuFlow,
     updatePersonalityFlow,
+    // Help submenu
     helpMenuFlow,
     helpStartFlow,
     helpCommandsFlow,
     helpISPFlow,
+    // Privacy submenu
     privacyMenuFlow,
     viewDataFlow,
     deleteDataFlow,
@@ -129,15 +153,36 @@ async function main() {
         // Button handlers MUST come before trigger flows
         onboardingWelcomeFlow, // Entry flow
 
-        // Menu system (button-based navigation)
+        // Menu system (button-based navigation - admin-only)
         // IMPORTANT: Button handler flows MUST come before mainMenuFlow
         // to prevent 'menu' keyword from matching button events
         menuBackFlow,
-        // User Info submenu
+        // Admin menu submenus
+        adminWhitelistFlow,
+        adminBotFlow,
+        adminRolesFlow,
+        adminUsersFlow,
+        adminLocationsFlow,
+        // Admin command buttons
+        cmdWhitelistFlow,
+        cmdRemoveWhitelistFlow,
+        cmdListWhitelistFlow,
+        cmdBotStatusFlow,
+        cmdToggleMaintenanceFlow,
+        confirmToggleMaintenanceFlow,
+        cmdToggleAIFlow,
+        cmdToggleRAGFlow,
+        cmdToggleVoiceFlow,
+        cmdToggleMediaFlow,
+        cmdToggleISPFlow,
+        cmdListRolesFlow,
+        cmdShowRoleFlow,
+        cmdAddRoleFlow,
+        cmdSetRoleFlow,
+        cmdRemoveRoleFlow,
+        // User Info submenu (kept for potential future use)
         userInfoMenuFlow,
         checkCustomerFlow,
-        accountStatusFlow,
-        networkInfoFlow,
         // Settings submenu
         settingsMenuFlow,
         updatePersonalityFlow,
@@ -150,7 +195,7 @@ async function main() {
         privacyMenuFlow,
         viewDataFlow,
         deleteDataFlow,
-        // Main menu LAST (after all button handlers)
+        // Main menu LAST (after all button handlers) - ADMIN ONLY
         mainMenuFlow,
 
         // User flows (help, data wipe, ID retrieval)

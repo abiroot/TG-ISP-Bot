@@ -37,7 +37,7 @@ export const webhookLocationRequestFlow = addKeyword<TelegramProvider, Database>
         if (!clientUsername || !validateIspUsername(clientUsername)) {
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
-                '❌ <b>Invalid customer username.</b>\n\nPlease use /setlocation to manually update location.',
+                '❌ <b>Invalid customer username.</b>\n',
                 { parse_mode: 'HTML' }
             )
             return endFlow()
