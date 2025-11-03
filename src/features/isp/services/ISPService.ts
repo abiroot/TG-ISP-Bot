@@ -28,6 +28,7 @@ import type { Personality } from '~/database/schemas/personality'
 import { type ToolName } from '~/config/roles.js'
 import type { RoleService } from '~/services/roleService.js'
 import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierExtractor'
+import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
 
 const ispLogger = createFlowLogger('isp-service')
 
@@ -623,8 +624,9 @@ export class ISPService {
     /**
      * Format user info for display (ALL 51 FIELDS)
      * Async to support OLT interface handling with getMikrotikUsers
+     * Returns array of messages to handle Telegram's 4096 character limit
      */
-    async formatUserInfo(userInfo: ISPUserInfo): Promise<string> {
+    async formatUserInfo(userInfo: ISPUserInfo): Promise<string[]> {
         const statusEmoji = userInfo.online ? '🟢' : '🔴'
         const accountStatus = userInfo.activatedAccount ? '✅ Activated' : '❌ Not Activated'
         const activeStatus = userInfo.active ? '✅ Active' : '❌ Inactive'
@@ -716,9 +718,11 @@ ${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
 `
             : ''
 
-        return `
-Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} ${esc(userInfo.lastName)}</b>:
+        // Build message sections for intelligent splitting
+        const sections: ISPMessageSections = {
+            header: `Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} ${esc(userInfo.lastName)}</b>:`,
 
+            userDetails: `
 👤 <b>User Details:</b>
 - <b>ID:</b> <code>${userInfo.id}</code>
 - <b>Username:</b> <code>${esc(userInfo.userName)}</code>
@@ -727,16 +731,18 @@ Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} $
 - <b>Email:</b> ${esc(userInfo.mailAddress, 'Not provided')}
 - <b>Address:</b> ${esc(userInfo.address)}
 - <b>Comment:</b> ${esc(userInfo.comment, 'None')}
-- <b>MOF:</b> ${esc(userInfo.mof, 'N/A')}
+- <b>MOF:</b> ${esc(userInfo.mof, 'N/A')}`.trim(),
 
+            accountMetadata: `
 📋 <b>Account Metadata:</b>
 - <b>Created:</b> ${this.formatDateBeirut(userInfo.creationDate)}
 - <b>User Category ID:</b> ${userInfo.userCategoryId}
 - <b>Financial Category ID:</b> ${userInfo.financialCategoryId}
 - <b>User Group ID:</b> ${userInfo.userGroupId}
 - <b>Link ID:</b> ${userInfo.linkId}
-- <b>Archived:</b> ${archivedStatus}
+- <b>Archived:</b> ${archivedStatus}`.trim(),
 
+            accountStatus: `
 📊 <b>Account Status:</b>
 - <b>Online:</b> ${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Offline'}
 - <b>Active:</b> ${activeStatus}
@@ -744,8 +750,9 @@ Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} $
 - <b>Access:</b> ${blockedStatus}
 - <b>Validity:</b> ${expiryStatus}
 - <b>Type:</b> ${esc(userInfo.accountTypeName)}
-- <b>FUP Mode:</b> ${esc(userInfo.fupMode)}
+- <b>FUP Mode:</b> ${esc(userInfo.fupMode)}`.trim(),
 
+            networkDetails: `
 🌐 <b>Network Details:</b>
 - <b>IP Address:</b> <code>${esc(userInfo.ipAddress, 'Not assigned')}</code>
 - <b>Static IP:</b> ${esc(userInfo.staticIP, 'None')}
@@ -755,34 +762,52 @@ Here is the <b>complete information</b> for user <b>${esc(userInfo.firstName)} $
 - <b>Router Brand:</b> ${esc(userInfo.routerBrand, 'Unknown')}
 - <b>Speeds:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
 - <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
-- <b>Monthly Quota:</b> ${formatQuota(userInfo.monthlyQuota)}
-${stationSection}${accessPointSection}
-👥 <b>Users on Same AP:</b>
-${apUsers || '• None'}
+- <b>Monthly Quota:</b> ${formatQuota(userInfo.monthlyQuota)}`.trim(),
 
+            stationInfo: stationSection.trim() || undefined,
+
+            accessPointInfo: accessPointSection.trim() || undefined,
+
+            apUsers: `
+👥 <b>Users on Same AP:</b>
+${apUsers || '• None'}`.trim(),
+
+            billing: `
 💰 <b>Billing Information:</b>
 - <b>Account Price:</b> $${userInfo.accountPrice}
 - <b>Discount:</b> ${userInfo.discount}%
 - <b>Real IP Price:</b> $${userInfo.realIpPrice}
 - <b>IPTV Price:</b> $${userInfo.iptvPrice}
-- <b>Expires:</b> ${this.formatDateBeirut(userInfo.expiryAccount)}
+- <b>Expires:</b> ${this.formatDateBeirut(userInfo.expiryAccount)}`.trim(),
 
+            collector: `
 👨‍💼 <b>Collector Information:</b>
 - <b>Username:</b> <code>${esc(userInfo.collectorUserName)}</code>
 - <b>Name:</b> ${esc(userInfo.collectorFirstName)} ${esc(userInfo.collectorLastName)}
-- <b>Mobile:</b> ${esc(userInfo.collectorMobile)}
+- <b>Mobile:</b> ${esc(userInfo.collectorMobile)}`.trim(),
 
+            timeline: `
 📅 <b>Timeline:</b>
 - <b>Last Login:</b> ${this.formatDateBeirut(userInfo.lastLogin)}
-- <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}
+- <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}`.trim(),
 
+            sessionHistory: allSessions
+                ? `
 🕐 <b>Session History:</b>
-${allSessions || '• No sessions'}
+${allSessions}`.trim()
+                : `
+🕐 <b>Session History:</b>
+• No sessions`.trim(),
 
+            pingDiagnostics: `
 🔍 <b>Ping Diagnostics:</b>
 ${this.formatPingResults(userInfo.pingResult)}
 
-If you need further assistance, feel free to ask! 😊`.trim()
+If you need further assistance, feel free to ask! 😊`.trim(),
+        }
+
+        // Split into multiple messages if needed (respects Telegram's 4096 char limit)
+        return splitISPMessage(sections)
     }
 
     /**
@@ -902,14 +927,15 @@ If you need further assistance, feel free to ask! 😊`.trim()
                     }
 
                     // Return all users with formatted messages
-                    // If multiple users, set multipleResults flag for CoreAIService to handle
-                    // formatUserInfo is now async to support OLT interface handling
-                    const messages = await Promise.all(users.map((user) => this.formatUserInfo(user)))
+                    // formatUserInfo now returns string[] for each user to handle Telegram's 4096 char limit
+                    // Flatten all message arrays into single array
+                    const allUserMessages = await Promise.all(users.map((user) => this.formatUserInfo(user)))
+                    const flattenedMessages = allUserMessages.flat() // Flatten string[][] to string[]
 
                     return {
                         success: true,
-                        message: messages[0], // First message for AI SDK compatibility
-                        messages, // All messages for multi-user handling
+                        message: flattenedMessages[0], // First message for AI SDK compatibility
+                        messages: flattenedMessages, // All messages (flattened) for multi-message handling
                         found: true,
                         users,
                         multipleResults: users.length > 1,
