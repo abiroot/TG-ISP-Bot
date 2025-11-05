@@ -61,8 +61,12 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
                 const userRoles = await roleService.getUserRoles(userId)
                 const primaryRole = userRoles.includes('admin') ? 'admin' : 'worker'
 
-                // Format and send results
-                const formattedMessages = await ispService.formatUserInfo(users, primaryRole)
+                // Format and send results (handle array of users)
+                // formatUserInfo returns string[] for each user, so we need to flatten
+                const allUserMessages = await Promise.all(
+                    users.map((user) => ispService.formatUserInfo(user, primaryRole))
+                )
+                const formattedMessages = allUserMessages.flat()
 
                 for (const message of formattedMessages) {
                     await provider.vendor.telegram.sendMessage(ctx.from, message, {
