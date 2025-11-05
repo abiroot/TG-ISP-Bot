@@ -19,13 +19,14 @@ export const userHelpFlow = addKeyword<TelegramProvider, Database>(['help', '/he
 })
     .addAction(async (ctx, utils) => {
         const { userManagementService, roleService } = utils.extensions!
+        const userId = String(ctx.from) // Normalize to string for consistent type handling
 
         flowLogger.info({ user: ctx.from }, 'User requested help')
 
         // Get user access context
-        const isAdmin = await userManagementService.isAdmin(ctx.from)
-        const isWhitelisted = await userManagementService.isWhitelisted(ctx.from)
-        const userRoles = await roleService.getUserRoles(ctx.from)
+        const isAdmin = await userManagementService.isAdmin(userId)
+        const isWhitelisted = await userManagementService.isWhitelisted(userId)
+        const userRoles = await roleService.getUserRoles(userId)
 
         // Determine access level label with priority: Admin > Role-based > Whitelisted > Public
         let accessLevel = 'Public User'

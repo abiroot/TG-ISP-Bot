@@ -202,7 +202,8 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
         if (identifier && identifier.value) {
             // Check if user is admin or worker
             const { roleService } = extensions!
-            const userRoles = await roleService.getUserRoles(ctx.from)
+            const userId = String(ctx.from) // Normalize to string for consistent type handling
+            const userRoles = await roleService.getUserRoles(userId)
             const isAdminOrWorker = userRoles.includes('admin') || userRoles.includes('worker')
 
             if (isAdminOrWorker) {
