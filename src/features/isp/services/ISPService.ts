@@ -613,12 +613,12 @@ export class ISPService {
     }
 
     /**
-     * Check if a Mikrotik interface is an OLT interface
-     * OLT interfaces contain "OLT" followed by a digit (case-insensitive)
+     * Check if a Mikrotik interface is an OLT or ether interface
+     * These interfaces contain "OLT" or "ether" (case-insensitive)
      */
     private isOLTInterface(mikrotikInterface: string | null | undefined): boolean {
         if (!mikrotikInterface) return false
-        return /OLT/i.test(mikrotikInterface)
+        return /OLT|ether/i.test(mikrotikInterface)
     }
 
     /**
