@@ -94,6 +94,16 @@ const envSchema = z.object({
         .optional()
         .default('true')
         .transform((val) => val === 'true'),
+
+    // Billing API Configuration
+    BILLING_API_BASE_URL: z.string().min(1, 'Billing API base URL is required'),
+    BILLING_USERNAME: z.string().min(1, 'Billing username is required'),
+    BILLING_PASSWORD: z.string().min(1, 'Billing password is required'),
+    BILLING_ENABLED: z
+        .string()
+        .optional()
+        .default('true')
+        .transform((val) => val === 'true'),
 })
 
 export type Env = z.infer<typeof envSchema>

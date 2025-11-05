@@ -29,12 +29,92 @@ export class MockISPService {
     batchUpdateLocationsCalls: Array<{ updates: Array<{ userName: string; latitude: number; longitude: number }> }> =
         []
 
+    // Custom customers for testing
+    private customCustomers: ISPUserInfo[] = []
+
+    /**
+     * Add a custom customer for testing
+     */
+    addCustomer(customer: Partial<ISPUserInfo>): void {
+        const fullCustomer: ISPUserInfo = {
+            id: this.customCustomers.length + 1000,
+            userName: customer.userName || 'test',
+            firstName: customer.firstName || 'Test',
+            lastName: customer.lastName || 'Customer',
+            mobile: customer.mobile || '00000000',
+            phone: customer.phone || '00000000',
+            mailAddress: customer.mailAddress || '',
+            address: customer.address || '',
+            comment: customer.comment || '',
+            mof: customer.mof || '',
+            creationDate: customer.creationDate || '',
+            lastLogin: customer.lastLogin || '',
+            lastLogOut: customer.lastLogOut || '',
+            userCategoryId: customer.userCategoryId || 0,
+            financialCategoryId: customer.financialCategoryId || 0,
+            userGroupId: customer.userGroupId || 0,
+            linkId: customer.linkId || 0,
+            archived: customer.archived || false,
+            online: customer.online !== undefined ? customer.online : true,
+            active: customer.active !== undefined ? customer.active : true,
+            activatedAccount: customer.activatedAccount !== undefined ? customer.activatedAccount : true,
+            blocked: customer.blocked || false,
+            expiryAccount: customer.expiryAccount || '',
+            accountTypeName: customer.accountTypeName || 'Standard',
+            userUpTime: customer.userUpTime || '',
+            fupMode: customer.fupMode || '',
+            ipAddress: customer.ipAddress || '',
+            staticIP: customer.staticIP || '',
+            macAddress: customer.macAddress || '',
+            nasHost: customer.nasHost || '',
+            mikrotikInterface: customer.mikrotikInterface || '',
+            routerBrand: customer.routerBrand || '',
+            stationOnline: customer.stationOnline || false,
+            stationName: customer.stationName || '',
+            stationIpAddress: customer.stationIpAddress || '',
+            stationUpTime: customer.stationUpTime || '',
+            stationInterfaceStats: customer.stationInterfaceStats || [],
+            accessPointOnline: customer.accessPointOnline || false,
+            accessPointName: customer.accessPointName || '',
+            accessPointIpAddress: customer.accessPointIpAddress || '',
+            accessPointUpTime: customer.accessPointUpTime || '',
+            accessPointSignal: customer.accessPointSignal || '',
+            accessPointElectrical: customer.accessPointElectrical || false,
+            accessPointInterfaceStats: customer.accessPointInterfaceStats || [],
+            accessPointUsers: customer.accessPointUsers || [],
+            basicSpeedUp: customer.basicSpeedUp || 0,
+            basicSpeedDown: customer.basicSpeedDown || 0,
+            dailyQuota: customer.dailyQuota || '',
+            monthlyQuota: customer.monthlyQuota || '',
+            accountPrice: customer.accountPrice || 0,
+            discount: customer.discount || 0,
+            realIpPrice: customer.realIpPrice || 0,
+            iptvPrice: customer.iptvPrice || 0,
+            collectorId: customer.collectorId || 0,
+            collectorUserName: customer.collectorUserName || '',
+            collectorFirstName: customer.collectorFirstName || '',
+            collectorLastName: customer.collectorLastName || '',
+            collectorMobile: customer.collectorMobile || '',
+            userSessions: customer.userSessions || [],
+            pingResult: customer.pingResult || null,
+        }
+        this.customCustomers.push(fullCustomer)
+    }
+
     /**
      * Search for customer by phone or username
      * Returns array of matching customers (realistic behavior)
      */
     async searchCustomer(identifier: string): Promise<ISPUserInfo[]> {
         this.searchCustomerCalls.push({ identifier })
+
+        // Check custom customers first
+        const customMatch = this.customCustomers.find(
+            (c) => c.userName === identifier || c.mobile === identifier || c.phone === identifier
+        )
+        if (customMatch) {
+            return [customMatch]
+        }
 
         // Simulate API behavior: exact match or partial search
         const exactMatch = findCustomer(identifier)

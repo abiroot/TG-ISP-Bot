@@ -190,6 +190,86 @@ const { aiService } = extensions
 
 Never import services directly in flows - always use extensions.
 
+### BillingService - Cookie-Based Authentication
+
+**Overview:**
+The BillingService provides cookie-based session authentication for the billing system, separate from the JWT-based ISPService. This service handles task creation and management for the billing platform.
+
+**Location:** `src/features/billing/services/BillingService.ts`
+
+**Key Features:**
+- Cookie-based session management (stores session cookies in memory)
+- Automatic re-authentication on cookie expiry (12-hour session lifetime)
+- Task creation with form data submission
+- Built-in retry logic for authentication failures
+
+**Usage in Flows:**
+```typescript
+const { billingService } = extensions
+
+// Check if billing service is enabled
+if (billingService.isEnabled()) {
+    // Authenticate (returns cookies, automatically cached)
+    const cookies = await billingService.authenticate()
+
+    // Create a task
+    const taskData = {
+        type: 'maintenance', // 'maintenance' | 'installation' | 'support' | 'upgrade'
+        message: 'Customer reported connection issues',
+        customer_username: 'customer123',
+        worker_ids: [13, 15], // Worker IDs from billing system
+        send_whatsapp: 1, // 1 = send, 0 = don't send
+    }
+
+    const response = await billingService.createTask(taskData)
+    console.log(response.success) // true if created successfully
+}
+```
+
+**Methods:**
+- `authenticate()` - Returns session cookies (cached, auto-refreshes)
+- `createTask(taskData)` - Create task in billing system
+- `clearCookies()` - Force re-authentication on next request
+- `getCookieStatus()` - Get current cookie validity status
+- `isEnabled()` - Check if billing service is enabled
+
+**Authentication Flow:**
+1. First call to `authenticate()` sends POST to `/index.php` with credentials
+2. Extracts cookies from `Set-Cookie` headers
+3. Stores cookies with 12-hour expiry
+4. Subsequent calls reuse cached cookies until expiry
+5. `createTask()` automatically authenticates if needed
+
+**Error Handling:**
+All errors are wrapped in `BillingServiceError` with:
+- `message` - Human-readable error description
+- `code` - Machine-readable error code
+- `retryable` - Whether operation can be retried
+- `cause` - Original error for debugging
+
+**Common Error Codes:**
+- `AUTH_HTTP_ERROR` - Authentication HTTP request failed (retryable)
+- `AUTH_NO_COOKIES` - No cookies received from authentication
+- `AUTH_REQUEST_FAILED` - Network/fetch error during auth (retryable)
+- `TASK_CREATE_HTTP_ERROR` - Task creation HTTP error (retryable)
+- `TASK_CREATE_REQUEST_FAILED` - Network error during task creation (retryable)
+- `SERVICE_DISABLED` - Billing service is disabled via `BILLING_ENABLED=false`
+
+**Testing:**
+Run the test script to verify authentication and task creation:
+```bash
+npm run tsx scripts/test-billing-task-creation.ts
+```
+
+The test script validates:
+- Authentication (cookie retrieval)
+- Task creation
+- Cookie caching
+- Cookie clearing and re-authentication
+
+**Configuration:**
+See "Billing API Configuration" in Environment Configuration section.
+
 ### Langchain Intent Classification
 
 **Hybrid AI Architecture:**
@@ -326,6 +406,12 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `ISP_API_USERNAME` - API authentication username
 - `ISP_API_PASSWORD` - API authentication password
 - `ISP_ENABLED` (default: true) - Enable/disable ISP tool calling features
+
+**Billing API Configuration (Optional):**
+- `BILLING_API_BASE_URL` - Billing system base URL
+- `BILLING_USERNAME` - Billing authentication username
+- `BILLING_PASSWORD` - Billing authentication password
+- `BILLING_ENABLED` (default: true) - Enable/disable Billing service features
 
 **Google Maps Configuration (Optional):**
 - `GOOGLE_MAPS_ENABLED` (default: true) - Enable/disable Google Maps API integration

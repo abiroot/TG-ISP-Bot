@@ -41,7 +41,18 @@ import { getMyIdFlow } from '~/features/user/flows/GetMyIdFlow'
 import { welcomeFlow } from '~/features/conversation/flows/WelcomeFlow'
 
 // Import ISP flows
-import { ispQueryFlow } from '~/features/isp/flows/ISPQueryFlow'
+import {
+    customerSearchFlow,
+    customerCancelFlow,
+} from '~/features/isp/flows/CustomerActionMenuFlow'
+import {
+    customerTaskFlow,
+    taskTypeSelectionFlow,
+    taskWorkerSelectionFlow,
+    taskWhatsAppToggleFlow,
+    taskConfirmFlow,
+    taskCancelFlow,
+} from '~/features/isp/flows/TaskCreationFlow'
 
 // Import location flows
 import {
@@ -214,8 +225,17 @@ async function main() {
         locationHandlerFlow, // Direct location sharing (EVENTS.LOCATION)
         updateCoordinatesFlow, // Main entry flow
 
-        // ISP Support flow (customer lookup)
-        ispQueryFlow,
+        // Customer action menu flows (Search or Create Task)
+        // Button handlers for menu interaction (menu is displayed directly from WelcomeFlow)
+        customerSearchFlow, // Search customer button handler
+        customerCancelFlow, // Cancel button handler
+        // Task creation wizard flows
+        customerTaskFlow, // Task creation entry (verifies customer)
+        taskTypeSelectionFlow, // Task type selection + message capture (merged flow)
+        taskWorkerSelectionFlow, // Worker selection
+        taskWhatsAppToggleFlow, // WhatsApp notification toggle
+        taskConfirmFlow, // Confirm and create task
+        taskCancelFlow, // Cancel task creation
 
         // Test flows (for development and testing)
         pingFlow,
@@ -316,6 +336,14 @@ async function main() {
     const { botStateService } = await import('~/features/admin/services/BotStateService')
     const { onboardingStateService } = await import('~/features/onboarding/services/OnboardingStateService')
 
+    // BillingService - cookie-based billing system integration
+    const { BillingService } = await import('~/features/billing/index.js')
+    const billingService = new BillingService()
+
+    // TaskCreationStore - in-memory store for task creation wizard (prevents state race conditions)
+    const { TaskCreationStore } = await import('~/features/isp/stores/TaskCreationStore.js')
+    const taskCreationStore = new TaskCreationStore()
+
     // Core shared services
     const { messageService } = await import('~/core/services/messageService')
     const { telegramUserService } = await import('~/core/services/telegramUserService')
@@ -336,6 +364,7 @@ async function main() {
                 // Service singletons
                 coreAIService,
                 ispService,
+                billingService,
                 roleService, // Role-based access control
                 locationService,
                 userManagementService,
@@ -345,6 +374,7 @@ async function main() {
                 onboardingStateService,
                 messageService,
                 telegramUserService,
+                taskCreationStore, // In-memory store for task creation wizard
             },
         }
     )

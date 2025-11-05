@@ -194,6 +194,48 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
             return
         }
 
+        // Check for customer identifier (phone/username) and show menu if found
+        // Only for admin and worker roles
+        const { extractFirstUserIdentifier } = await import('~/features/isp/utils/userIdentifierExtractor')
+        const identifier = extractFirstUserIdentifier(ctx.body)
+
+        if (identifier && identifier.value) {
+            // Check if user is admin or worker
+            const { roleService } = extensions!
+            const userRoles = await roleService.getUserRoles(ctx.from)
+            const isAdminOrWorker = userRoles.includes('admin') || userRoles.includes('worker')
+
+            if (isAdminOrWorker) {
+                flowLogger.info(
+                    { from: ctx.from, identifier: identifier.value, type: identifier.type },
+                    'Customer identifier detected - showing action menu'
+                )
+
+                // Show customer action menu
+                // Pass identifier via callback_data (not state) so it persists across flows
+                const { sendWithInlineButtons } = await import('~/core/utils/flowHelpers')
+                const { createCallbackButton } = await import('~/core/utils/telegramButtons')
+                const { html } = await import('~/core/utils/telegramFormatting')
+
+                await sendWithInlineButtons(
+                    ctx,
+                    utils,
+                    `<b>📞 Customer Detected</b>\n\n` +
+                        `<b>Identifier:</b> <code>${html.escape(identifier.value)}</code>\n` +
+                        `<b>Type:</b> ${identifier.type}\n\n` +
+                        `What would you like to do?`,
+                    [
+                        [createCallbackButton('🔍 Search Customer Info', `customer_search:${identifier.value}`)],
+                        [createCallbackButton('📋 Create Task', `customer_task:${identifier.value}`)],
+                        [createCallbackButton('❌ Cancel', 'customer_cancel')],
+                    ],
+                    { parseMode: 'HTML' }
+                )
+
+                return // Stop flow, wait for button click
+            }
+        }
+
         // Send loading indicator
         const loadingMsg = await LoadingIndicator.show(provider, ctx.from)
 
