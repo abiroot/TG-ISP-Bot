@@ -25,6 +25,7 @@ const logger = createFlowLogger('customer-action-menu')
 export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON_CUSTOMER_SEARCH')
     .addAction(async (ctx, { extensions, provider, endFlow }) => {
         const { ispService } = extensions!
+        const userId = String(ctx.from) // Normalize to string for consistent type handling
         const identifier = ctx._button_data as string
 
         if (!identifier) {
@@ -57,7 +58,7 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
             } else {
                 // Get user's role for formatting
                 const { roleService } = extensions!
-                const userRoles = await roleService.getUserRoles(ctx.from)
+                const userRoles = await roleService.getUserRoles(userId)
                 const primaryRole = userRoles.includes('admin') ? 'admin' : 'worker'
 
                 // Format and send results
