@@ -247,10 +247,13 @@ describe('InsightEngine', () => {
 
     describe('Capacity Analysis', () => {
         it('should detect severe AP congestion', () => {
+            // Create 55 users + current user = 56 total (55 others after excluding current)
             const users = Array.from({ length: 55 }, (_, i) => ({
                 userName: `user${i}`,
                 online: i % 2 === 0,
             }))
+            // Add current user to the list (will be excluded from capacity count)
+            users.push({ userName: 'testuser', online: true })
 
             const userInfo = createMockUserInfo({ accessPointUsers: users })
             const insights = insightEngine.generateInsights(userInfo)
@@ -261,10 +264,13 @@ describe('InsightEngine', () => {
         })
 
         it('should detect moderate congestion', () => {
+            // Create 35 users + current user = 36 total (35 others after excluding current)
             const users = Array.from({ length: 35 }, (_, i) => ({
                 userName: `user${i}`,
                 online: i % 2 === 0,
             }))
+            // Add current user to the list (will be excluded from capacity count)
+            users.push({ userName: 'testuser', online: true })
 
             const userInfo = createMockUserInfo({ accessPointUsers: users })
             const insights = insightEngine.generateInsights(userInfo)
@@ -281,6 +287,22 @@ describe('InsightEngine', () => {
                 (i) => i.category === 'capacity' && i.severity === 'critical'
             )
             expect(criticalCapacity.length).toBe(0)
+        })
+
+        it('should exclude current user from capacity count', () => {
+            // Create 20 users + current user = 21 total, but only 20 should be counted
+            const users = Array.from({ length: 20 }, (_, i) => ({
+                userName: `user${i}`,
+                online: i % 2 === 0,
+            }))
+            users.push({ userName: 'testuser', online: true }) // Current user
+
+            const userInfo = createMockUserInfo({ accessPointUsers: users })
+            const insights = insightEngine.generateInsights(userInfo)
+
+            const capacityInsights = insights.filter((i) => i.category === 'capacity')
+            // With 20 other users (16-30 range), should get moderate capacity info
+            expect(capacityInsights.some((i) => i.title.includes('Moderate'))).toBe(true)
         })
     })
 

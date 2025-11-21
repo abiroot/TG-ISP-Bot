@@ -408,10 +408,12 @@ export class InsightEngine {
     private analyzeCapacity(userInfo: ISPUserInfo): ISPInsight[] {
         const insights: ISPInsight[] = []
 
-        const totalUsers = userInfo.accessPointUsers?.length || 0
+        // Exclude current user from AP user count (we want OTHER users on same AP)
+        const otherUsers = userInfo.accessPointUsers?.filter((u) => u.userName !== userInfo.userName) || []
+        const totalUsers = otherUsers.length
         if (totalUsers === 0) return insights
 
-        const onlineUsers = userInfo.accessPointUsers?.filter((u) => u.online).length || 0
+        const onlineUsers = otherUsers.filter((u) => u.online).length
         const onlinePercentage = (onlineUsers / totalUsers) * 100
 
         // Critical: Severe AP congestion

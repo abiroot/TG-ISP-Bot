@@ -291,9 +291,6 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 }
             )
 
-            // Delete loading indicator before sending response
-            await LoadingIndicator.hide(provider, loadingMsg)
-
             // Send response with HTML formatting via telegram API directly
             // Note: provider.sendMessage() doesn't forward parse_mode, so we use telegram API directly
 
@@ -303,6 +300,9 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 for (const message of response.multipleMessages) {
                     await provider.vendor.telegram.sendMessage(ctx.from, message, { parse_mode: 'HTML' })
                 }
+
+                // Delete loading indicator after all messages sent
+                await LoadingIndicator.hide(provider, loadingMsg)
 
                 flowLogger.info(
                     {
@@ -318,6 +318,9 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 // Send single message
                 await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
 
+                // Delete loading indicator after response sent
+                await LoadingIndicator.hide(provider, loadingMsg)
+
                 flowLogger.info(
                     {
                         contextId,
@@ -329,7 +332,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 )
             }
         } catch (error) {
-            // Delete loading indicator on error
+            // Delete loading indicator before showing error
             await LoadingIndicator.hide(provider, loadingMsg)
 
             // AI SDK v5 Enhanced Error Handling

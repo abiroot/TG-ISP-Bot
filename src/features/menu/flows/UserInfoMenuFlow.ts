@@ -99,9 +99,6 @@ export const checkCustomerFlow = addKeyword<TelegramProvider, Database>('BUTTON_
                     ispService.getTools()
                 )
 
-                // Delete loading indicator
-                await LoadingIndicator.hide(provider, loadingMsg)
-
                 // Send response
                 if (response.multipleMessages && response.multipleMessages.length > 1) {
                     for (const message of response.multipleMessages) {
@@ -110,8 +107,11 @@ export const checkCustomerFlow = addKeyword<TelegramProvider, Database>('BUTTON_
                 } else {
                     await provider.vendor.telegram.sendMessage(ctx.from, response.text, { parse_mode: 'HTML' })
                 }
+
+                // Delete loading indicator after sending response
+                await LoadingIndicator.hide(provider, loadingMsg)
             } catch (error) {
-                // Delete loading indicator on error
+                // Delete loading indicator before showing error
                 await LoadingIndicator.hide(provider, loadingMsg)
 
                 flowLogger.error({ err: error, from: ctx.from }, 'Customer lookup failed')

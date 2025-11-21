@@ -28,6 +28,7 @@ import type { Personality } from '~/database/schemas/personality'
 import { type ToolName, type RoleName } from '~/config/roles.js'
 import type { RoleService } from '~/services/roleService.js'
 import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierExtractor'
+import type { LoadingMessage } from '~/core/utils/loadingIndicator'
 import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
 import { InsightEngine, type ISPInsight } from './InsightEngine'
 
@@ -712,14 +713,213 @@ export class ISPService {
     }
 
     /**
+     * Calculate dynamic batch size based on total user count
+     * Small APs: batch 3, Medium APs: batch 5, Large APs: batch 10
+     */
+    private getBatchSize(totalUsers: number): number {
+        if (totalUsers <= 10) return 3  // Conservative for small APs
+        if (totalUsers <= 30) return 5  // Balanced for medium APs
+        return 10                        // Aggressive for large APs
+    }
+
+    /**
+     * Split array into chunks (batches) of specified size
+     */
+    private chunkArray<T>(array: T[], chunkSize: number): T[][] {
+        const chunks: T[][] = []
+        for (let i = 0; i < array.length; i += chunkSize) {
+            chunks.push(array.slice(i, i + chunkSize))
+        }
+        return chunks
+    }
+
+    /**
+     * Update loading message with progress
+     */
+    private async updateLoadingProgress(
+        provider: any,
+        loadingMsg: LoadingMessage | null,
+        completed: number,
+        total: number
+    ): Promise<void> {
+        if (!provider || !loadingMsg) return
+
+        try {
+            await provider.vendor.telegram.editMessageText(
+                `🔍 Fetching AP users... (${completed}/${total})`,
+                {
+                    chat_id: loadingMsg.chat_id,
+                    message_id: loadingMsg.message_id,
+                }
+            )
+            ispLogger.info({ completed, total }, 'Progress updated')
+        } catch (error) {
+            ispLogger.warn({ err: error, completed, total }, 'Failed to update progress')
+        }
+    }
+
+    /**
+     * Fetch detailed information for all users on the same Access Point
+     * Makes individual API calls for each user to retrieve complete details
+     * Uses parallel fetching with dynamic batch sizing for performance
+     *
+     * @param apUsers - Array of AP users from initial API response (userName + online only)
+     * @param currentUserName - Current user's username to exclude from the list
+     * @param provider - Optional provider for progress updates
+     * @param loadingMsg - Optional loading message to update with progress
+     * @returns Formatted string with detailed AP user information
+     */
+    private async fetchAPUserDetails(
+        apUsers: Array<{ userName: string; online: boolean }>,
+        currentUserName: string,
+        provider?: any,
+        loadingMsg?: LoadingMessage | null
+    ): Promise<string> {
+        // Exclude current user from the list
+        const otherUsers = apUsers.filter((u) => u.userName !== currentUserName)
+
+        if (otherUsers.length === 0) {
+            return '• No other users on this AP'
+        }
+
+        const userDetails: string[] = []
+        let successCount = 0
+        let failureCount = 0
+
+        // Determine batch size dynamically
+        const batchSize = this.getBatchSize(otherUsers.length)
+
+        ispLogger.info(
+            {
+                totalUsers: otherUsers.length,
+                currentUser: currentUserName,
+                batchSize
+            },
+            'Starting AP user details fetch (parallel batches)'
+        )
+
+        const startTime = Date.now()
+
+        // Split users into batches
+        const batches = this.chunkArray(otherUsers, batchSize)
+
+        // Process each batch in parallel
+        for (let batchIndex = 0; batchIndex < batches.length; batchIndex++) {
+            const batch = batches[batchIndex]
+            const batchStartTime = Date.now()
+
+            ispLogger.info(
+                {
+                    batchIndex: batchIndex + 1,
+                    totalBatches: batches.length,
+                    batchSize: batch.length
+                },
+                'Processing batch'
+            )
+
+            // Fetch all users in this batch in parallel
+            const batchResults = await Promise.all(
+                batch.map(async (apUser) => {
+                    try {
+                        const userInfoArray = await this.searchCustomer(apUser.userName)
+
+                        if (userInfoArray.length === 0) {
+                            return {
+                                success: false,
+                                userName: apUser.userName,
+                                formatted: `• ${html.escape(apUser.userName)}:\n    - ⚠️ User not found`
+                            }
+                        }
+
+                        const userInfo = userInfoArray[0]
+
+                        // Format user details
+                        const onlineStatus = userInfo.online ? '🟢 Online' : '🔴 Offline'
+                        const electricalStatus = userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'
+                        const uptime = html.escape(userInfo.userUpTime || '0m')
+
+                        return {
+                            success: true,
+                            userName: apUser.userName,
+                            formatted: `• ${html.escape(apUser.userName)}:\n    - ${onlineStatus}\n    - Electrical: ${electricalStatus}\n    - Uptime: ${uptime}`
+                        }
+                    } catch (error) {
+                        ispLogger.error(
+                            { err: error, userName: apUser.userName },
+                            'Failed to fetch AP user details'
+                        )
+                        return {
+                            success: false,
+                            userName: apUser.userName,
+                            formatted: `• ${html.escape(apUser.userName)}:\n    - ⚠️ Data unavailable`
+                        }
+                    }
+                })
+            )
+
+            // Collect results
+            for (const result of batchResults) {
+                userDetails.push(result.formatted)
+                if (result.success) {
+                    successCount++
+                } else {
+                    failureCount++
+                }
+            }
+
+            const batchDuration = ((Date.now() - batchStartTime) / 1000).toFixed(1)
+            ispLogger.info(
+                {
+                    batchIndex: batchIndex + 1,
+                    successful: batchResults.filter(r => r.success).length,
+                    failed: batchResults.filter(r => !r.success).length,
+                    durationSeconds: batchDuration
+                },
+                'Batch completed'
+            )
+
+            // Update progress after each batch
+            const completed = (batchIndex + 1) * batch.length
+            if (batchIndex < batches.length - 1) {
+                // Don't update on last batch (loading message will be deleted soon)
+                await this.updateLoadingProgress(provider, loadingMsg, completed, otherUsers.length)
+            }
+        }
+
+        const endTime = Date.now()
+        const durationSeconds = ((endTime - startTime) / 1000).toFixed(1)
+
+        ispLogger.info(
+            {
+                totalUsers: otherUsers.length,
+                successful: successCount,
+                failed: failureCount,
+                batchSize,
+                totalBatches: batches.length,
+                durationSeconds,
+            },
+            'AP user details fetch completed (parallel)'
+        )
+
+        return userDetails.join('\n')
+    }
+
+    /**
      * Format user info for display with role-based visibility
      * Async to support OLT interface handling with getMikrotikUsers
      * Returns array of messages to handle Telegram's 4096 character limit
      *
      * @param userInfo - ISP user information
      * @param userRole - User's role (admin or worker)
+     * @param provider - Optional provider for AP user progress updates
+     * @param loadingMsg - Optional loading message to update with progress
      */
-    async formatUserInfo(userInfo: ISPUserInfo, userRole: RoleName = 'admin'): Promise<string[]> {
+    async formatUserInfo(
+        userInfo: ISPUserInfo,
+        userRole: RoleName = 'admin',
+        provider?: any,
+        loadingMsg?: LoadingMessage | null
+    ): Promise<string[]> {
         const statusEmoji = userInfo.online ? '🟢' : '🔴'
         const accountStatus = userInfo.activatedAccount ? '✅ Activated' : '❌ Not Activated'
         const activeStatus = userInfo.active ? '✅ Active' : '❌ Inactive'
@@ -758,7 +958,7 @@ export class ISPService {
             })
             .join('\n')
 
-        // Access point users - handle OLT interfaces differently
+        // Access point users - fetch detailed information for each user
         let apUsers: string
         if (isOLT && userInfo.mikrotikInterface) {
             // For OLT interfaces, fetch users from getMikrotikUsers
@@ -767,19 +967,31 @@ export class ISPService {
                 if (mikrotikUsers.length === 0) {
                     apUsers = '• No users found on this interface'
                 } else {
-                    apUsers = mikrotikUsers
-                        .map((u) => `• ${esc(u.userName)} ${u.online ? '🟢' : '🔴'}`)
-                        .join('\n')
+                    // Fetch detailed information for each Mikrotik user (with progress updates)
+                    apUsers = await this.fetchAPUserDetails(
+                        mikrotikUsers,
+                        userInfo.userName,
+                        provider,
+                        loadingMsg
+                    )
                 }
             } catch (error) {
                 ispLogger.error({ err: error, mikrotikInterface: userInfo.mikrotikInterface }, 'Failed to fetch Mikrotik users for OLT interface')
                 apUsers = '• Unable to fetch user list'
             }
         } else {
-            // For non-OLT interfaces, use existing accessPointUsers
-            apUsers = userInfo.accessPointUsers
-                .map((u) => `• ${esc(u.userName)} ${u.online ? '🟢' : '🔴'}`)
-                .join('\n')
+            // For non-OLT interfaces, fetch detailed information for accessPointUsers (with progress updates)
+            try {
+                apUsers = await this.fetchAPUserDetails(
+                    userInfo.accessPointUsers,
+                    userInfo.userName,
+                    provider,
+                    loadingMsg
+                )
+            } catch (error) {
+                ispLogger.error({ err: error }, 'Failed to fetch AP user details')
+                apUsers = '• Unable to fetch AP user details'
+            }
         }
 
         // Determine if user is admin or worker

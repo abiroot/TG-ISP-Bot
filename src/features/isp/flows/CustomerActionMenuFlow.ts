@@ -46,8 +46,6 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
             // Search for customer
             const users = await ispService.searchCustomer(identifier)
 
-            await LoadingIndicator.hide(provider, loadingMsg)
-
             if (!users || users.length === 0) {
                 await provider.vendor.telegram.sendMessage(
                     ctx.from,
@@ -55,6 +53,9 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
                         `No customer found with identifier: <code>${html.escape(identifier)}</code>`,
                     { parse_mode: 'HTML' }
                 )
+
+                // Hide loading indicator after sending "not found" message
+                await LoadingIndicator.hide(provider, loadingMsg)
             } else {
                 // Get user's role for formatting
                 const { roleService } = extensions!
@@ -63,8 +64,9 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
 
                 // Format and send results (handle array of users)
                 // formatUserInfo returns string[] for each user, so we need to flatten
+                // Pass provider and loadingMsg for AP user progress updates
                 const allUserMessages = await Promise.all(
-                    users.map((user) => ispService.formatUserInfo(user, primaryRole))
+                    users.map((user) => ispService.formatUserInfo(user, primaryRole, provider, loadingMsg))
                 )
                 const formattedMessages = allUserMessages.flat()
 
@@ -74,12 +76,16 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
                     })
                 }
 
+                // Hide loading indicator after all results are sent
+                await LoadingIndicator.hide(provider, loadingMsg)
+
                 logger.info(
                     { from: ctx.from, identifier, resultCount: users.length },
                     'Customer search completed'
                 )
             }
         } catch (error) {
+            // Hide loading indicator before showing error message
             await LoadingIndicator.hide(provider, loadingMsg)
 
             logger.error({ err: error, from: ctx.from, identifier }, 'Customer search failed')
