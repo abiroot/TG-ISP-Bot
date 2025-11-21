@@ -124,6 +124,7 @@ export interface ISPMessageSections {
     timeline?: string
     sessionHistory?: string
     pingDiagnostics?: string
+    insights?: string
 }
 
 export function splitISPMessage(sections: ISPMessageSections): string[] {
@@ -131,7 +132,7 @@ export function splitISPMessage(sections: ISPMessageSections): string[] {
 
     // Build sections in exact order specified
     // Order: header, userDetails, accountStatus, networkDetails, stationInfo,
-    //        accessPointInfo, apUsers, billing, collector, timeline, sessionHistory, pingDiagnostics
+    //        accessPointInfo, apUsers, billing, collector, timeline, sessionHistory, pingDiagnostics, insights
     const orderedSections = [
         sections.header,
         sections.userDetails,
@@ -145,6 +146,7 @@ export function splitISPMessage(sections: ISPMessageSections): string[] {
         sections.timeline,
         sections.sessionHistory,
         sections.pingDiagnostics,
+        sections.insights,
     ]
         .filter(Boolean)
         .join('\n\n')

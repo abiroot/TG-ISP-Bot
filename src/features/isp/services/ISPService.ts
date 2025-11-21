@@ -29,6 +29,7 @@ import { type ToolName, type RoleName } from '~/config/roles.js'
 import type { RoleService } from '~/services/roleService.js'
 import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierExtractor'
 import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
+import { InsightEngine, type ISPInsight } from './InsightEngine'
 
 const ispLogger = createFlowLogger('isp-service')
 
@@ -178,9 +179,11 @@ export class ISPService {
     private authToken?: string
     private tokenExpiry?: Date
     private roleService: RoleService
+    private insightEngine: InsightEngine
 
     constructor(roleService: RoleService) {
         this.roleService = roleService
+        this.insightEngine = new InsightEngine()
         this.config = {
             baseUrl: env.ISP_API_BASE_URL,
             username: env.ISP_API_USERNAME,
@@ -190,7 +193,7 @@ export class ISPService {
 
         ispLogger.info(
             { enabled: this.config.enabled, baseUrl: this.config.baseUrl },
-            'ISPService initialized with role-based access control'
+            'ISPService initialized with role-based access control and intelligent insights'
         )
     }
 
@@ -657,6 +660,58 @@ export class ISPService {
     }
 
     /**
+     * Format insights for display
+     * Groups by severity and formats with proper HTML
+     */
+    private formatInsights(insights: ISPInsight[]): string | undefined {
+        if (insights.length === 0) return undefined
+
+        const critical = insights.filter((i) => i.severity === 'critical')
+        const warnings = insights.filter((i) => i.severity === 'warning')
+        const info = insights.filter((i) => i.severity === 'info')
+        const healthy = insights.filter((i) => i.severity === 'healthy')
+
+        let output = '🔍 <b>Intelligent Insights:</b>\n'
+
+        // Critical issues
+        if (critical.length > 0) {
+            output += '\n<b>🔴 CRITICAL ISSUES:</b>\n'
+            for (const insight of critical) {
+                output += `• <b>${html.escape(insight.title)}:</b> ${html.escape(insight.message)}\n`
+                output += `  → ${html.escape(insight.recommendation)}\n\n`
+            }
+        }
+
+        // Warnings
+        if (warnings.length > 0) {
+            output += '<b>🟡 WARNINGS:</b>\n'
+            for (const insight of warnings) {
+                output += `• <b>${html.escape(insight.title)}:</b> ${html.escape(insight.message)}\n`
+                output += `  → ${html.escape(insight.recommendation)}\n\n`
+            }
+        }
+
+        // Info/Optimization opportunities
+        if (info.length > 0) {
+            output += '<b>🔵 OPTIMIZATION:</b>\n'
+            for (const insight of info) {
+                output += `• <b>${html.escape(insight.title)}:</b> ${html.escape(insight.message)}\n`
+                output += `  → ${html.escape(insight.recommendation)}\n\n`
+            }
+        }
+
+        // Healthy status (only show if no critical/warnings)
+        if (critical.length === 0 && warnings.length === 0 && healthy.length > 0) {
+            output += '<b>🟢 HEALTHY:</b>\n'
+            for (const insight of healthy) {
+                output += `• ${html.escape(insight.message)}\n`
+            }
+        }
+
+        return output.trim()
+    }
+
+    /**
      * Format user info for display with role-based visibility
      * Async to support OLT interface handling with getMikrotikUsers
      * Returns array of messages to handle Telegram's 4096 character limit
@@ -731,6 +786,10 @@ export class ISPService {
         const isAdmin = userRole === 'admin'
         const isWorker = userRole === 'worker'
 
+        // Generate intelligent insights
+        const insights = this.insightEngine.generateInsights(userInfo)
+        const insightsSection = this.formatInsights(insights)
+
         // Build optional sections based on interface type and role
         const stationSection = !isOLT
             ? isAdmin
@@ -797,6 +856,8 @@ ${apUsers || '• None'}`.trim(),
                   pingDiagnostics: `
 🔍 <b>Ping Diagnostics:</b>
 ${this.formatPingResults(userInfo.pingResult)}`.trim(),
+
+                  insights: insightsSection,
               }
             : {
                   // ADMIN FORMAT - Exact fields and order as specified
@@ -861,6 +922,8 @@ ${allSessions}`.trim()
                   pingDiagnostics: `
 🔍 <b>Ping Diagnostics:</b>
 ${this.formatPingResults(userInfo.pingResult)}`.trim(),
+
+                  insights: insightsSection,
               }
 
         // Split into multiple messages if needed (respects Telegram's 4096 char limit)
