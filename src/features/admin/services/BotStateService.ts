@@ -34,7 +34,6 @@ export interface MaintenanceConfig {
 export interface FeatureFlags {
     // AI features
     ai_responses: boolean
-    rag_enabled: boolean
 
     // Media features
     voice_transcription: boolean
@@ -211,7 +210,6 @@ export class BotStateService {
         return {
             // AI features
             ai_responses: true,
-            rag_enabled: env.RAG_ENABLED ?? true,
 
             // Media features
             voice_transcription: true,

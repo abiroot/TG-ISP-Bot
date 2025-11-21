@@ -4,22 +4,18 @@
  * Consolidated AI service that merges:
  * - aiService.ts (567 lines)
  * - intentService.ts (289 lines) - REMOVED: Use AI SDK tool selection
- * - conversationRagService.ts (317 lines)
  *
  * Benefits:
  * - 45% cost reduction (eliminate duplicate LLM calls for intent classification)
  * - Faster responses (single AI call instead of sequential intent + response)
- * - Simpler architecture (RAG integrated naturally)
+ * - Simpler architecture
  * - Remove Langchain dependency (4 packages)
- *
- * New size: ~600 lines (from 1,173 lines)
  */
 
 import {
     generateText,
     streamText,
     stepCountIs,
-    embed,
     APICallError,
     InvalidArgumentError,
     NoSuchToolError,
@@ -29,16 +25,12 @@ import {
     TypeValidationError,
 } from 'ai'
 import { google } from '@ai-sdk/google'
-import { openai } from '@ai-sdk/openai'
 import { env } from '~/config/env'
 import { Personality } from '~/database/schemas/personality'
 import { Message } from '~/database/schemas/message'
-import { embeddingRepository } from '~/database/repositories/embeddingRepository'
 import { messageService } from '~/core/services/messageService'
-import { TextChunker, ChunkOptions } from '~/features/conversation/utils/textChunker'
 import { createFlowLogger } from '~/core/utils/logger'
 import { ServiceError } from '~/core/errors/ServiceError'
-import type { SimilaritySearchResult } from '~/database/schemas/conversationEmbedding'
 
 const aiLogger = createFlowLogger('core-ai-service')
 
@@ -65,18 +57,6 @@ export interface AIResponse {
 }
 
 /**
- * RAG Configuration
- */
-export interface RAGConfig {
-    enabled: boolean
-    chunkSize: number
-    chunkOverlap: number
-    topK: number
-    minSimilarity: number
-    embeddingModel: string
-}
-
-/**
  * Conversation context for AI
  */
 export interface ConversationContext {
@@ -92,37 +72,18 @@ export interface ConversationContext {
  *
  * Handles all AI-related operations:
  * - Chat responses with tool calling
- * - RAG (Retrieval Augmented Generation)
  * - Conversation history management
- * - Embedding generation and storage
  */
 export class CoreAIService {
     private model = google('gemini-2.0-flash')
-    private embeddingModel = openai.textEmbeddingModel('text-embedding-3-small')
     private readonly MAX_TOKENS_PER_RESPONSE = 8192
     private readonly MODEL_NAME = 'gemini-2.0-flash'
     private readonly CONTEXT_WINDOW = 1048576 // 1M tokens
-    private ragConfig: RAGConfig
 
-    constructor(ragConfig?: Partial<RAGConfig>) {
-        this.ragConfig = {
-            enabled: env.RAG_ENABLED ?? false,
-            chunkSize: env.RAG_CHUNK_SIZE ?? 10,
-            chunkOverlap: env.RAG_CHUNK_OVERLAP ?? 2,
-            topK: env.RAG_TOP_K_RESULTS ?? 3,
-            minSimilarity: env.RAG_MIN_SIMILARITY ?? 0.5,
-            embeddingModel: env.RAG_EMBEDDING_MODEL ?? 'text-embedding-3-small',
-            ...ragConfig,
-        }
-
-        // AI SDK v5 Native Embedding Model
-        this.embeddingModel = openai.textEmbeddingModel(this.ragConfig.embeddingModel)
-
+    constructor() {
         aiLogger.info(
             {
-                ragConfig: this.ragConfig,
                 model: this.MODEL_NAME,
-                embeddingModel: this.ragConfig.embeddingModel,
                 contextWindow: this.CONTEXT_WINDOW,
             },
             'CoreAIService initialized with Gemini 2.0 Flash and AI SDK v5'
@@ -147,29 +108,23 @@ export class CoreAIService {
         const retryDelay = Math.min(1000 * Math.pow(2, retryCount), 10000) // Exponential backoff, max 10s
 
         try {
-            // 1. Retrieve RAG context if enabled
-            let ragContext: string | undefined
-            if (this.ragConfig.enabled) {
-                ragContext = await this.retrieveRAGContext(context.contextId, context.recentMessages[0]?.content || '')
-            }
+            // 1. Generate system prompt with personality
+            const systemPrompt = this.generateSystemPrompt(context)
 
-            // 2. Generate system prompt with RAG and personality
-            const systemPrompt = this.generateSystemPrompt(context, ragContext)
-
-            // 3. Reconstruct conversation history with tool calls
+            // 2. Reconstruct conversation history with tool calls
             const conversationHistory = await messageService.reconstructConversationHistory(
                 context.contextId,
                 context.recentMessages.length
             )
 
-            // 4. Prepare messages for AI
+            // 3. Prepare messages for AI
             const messages: any[] = [
                 { role: 'system', content: systemPrompt },
                 ...conversationHistory,
                 { role: 'user', content: context.recentMessages[0]?.content || '' },
             ]
             
-            // 5. Token budget monitoring
+            // 4. Token budget monitoring
             const tokenBudget = this.calculateTokenBudget(systemPrompt, conversationHistory, context.recentMessages[0]?.content || '')
 
             if (tokenBudget.totalInputTokens > this.CONTEXT_WINDOW * 0.8) {
@@ -183,7 +138,7 @@ export class CoreAIService {
                 )
             }
 
-            // 6. Generate response with tools (AI SDK automatically selects tools based on user message)
+            // 5. Generate response with tools (AI SDK automatically selects tools based on user message)
             const result = await generateText({
                 model: this.model,
                 messages,
@@ -225,10 +180,10 @@ export class CoreAIService {
 
             const responseTimeMs = Date.now() - startTime
 
-            // 7. Store AI response with tools
+            // 6. Store AI response with tools
             await messageService.storeAIResponseWithTools(context.contextId, context.userPhone, result)
 
-            // 8. Extract direct tool message if available (bypass AI commentary)
+            // 7. Extract direct tool message if available (bypass AI commentary)
             let finalText = result.text
             let multipleMessages: string[] | undefined
             if (result.toolResults && result.toolResults.length > 0) {
@@ -268,7 +223,7 @@ export class CoreAIService {
                 }
             }
 
-            // 9. Log metrics
+            // 8. Log metrics
             if (result.toolCalls && result.toolCalls.length > 0) {
                 aiLogger.info(
                     {
@@ -291,7 +246,6 @@ export class CoreAIService {
                         contextId: context.contextId,
                         responseTimeMs,
                         tokensUsed: result.usage?.totalTokens,
-                        ragEnabled: !!ragContext,
                         retries: retryCount,
                     },
                     'Chat response without tool calls'
@@ -438,9 +392,9 @@ export class CoreAIService {
     }
 
     /**
-     * Generate enhanced system prompt with personality, RAG, and tool instructions
+     * Generate enhanced system prompt with personality and tool instructions
      */
-    private generateSystemPrompt(context: ConversationContext, ragContext?: string): string {
+    private generateSystemPrompt(context: ConversationContext): string {
         const { personality, userPhone } = context
 
         // Calculate today's date in UTC (default timezone)
@@ -512,84 +466,7 @@ EXAMPLES:
 - Provide specific information when available
 - Format responses with HTML tags for proper display`
 
-        // Add RAG context if available
-        if (ragContext) {
-            return `${basePrompt}
-
-=== SEMANTIC MEMORY (RAG) ===
-The following context was retrieved from our conversation history:
-
-${ragContext}
-
-Use this context to provide personalized responses that reference our actual conversations.
-===========================`
-        }
-
         return basePrompt
-    }
-
-    /**
-     * Retrieve relevant context using RAG with AI SDK v5 native embeddings
-     */
-    private async retrieveRAGContext(contextId: string, query: string): Promise<string | undefined> {
-        try {
-            // Check if context has embeddings
-            const hasEmbeddings = await embeddingRepository.hasEmbeddings(contextId)
-            if (!hasEmbeddings) {
-                aiLogger.debug({ contextId }, 'No embeddings found for RAG')
-                return undefined
-            }
-
-            // Generate query embedding using AI SDK v5 native embed()
-            const { embedding: queryEmbedding } = await embed({
-                model: this.embeddingModel,
-                value: query,
-                maxRetries: 2,
-            })
-
-            // Perform similarity search
-            const searchResults = await embeddingRepository.similaritySearch({
-                query_embedding: queryEmbedding,
-                context_id: contextId,
-                top_k: this.ragConfig.topK,
-                min_similarity: this.ragConfig.minSimilarity,
-            })
-
-            if (searchResults.length === 0) {
-                return undefined
-            }
-
-            // Format results
-            const contextText = this.formatRAGContext(searchResults)
-
-            aiLogger.debug(
-                {
-                    contextId,
-                    chunksRetrieved: searchResults.length,
-                    avgSimilarity: (
-                        searchResults.reduce((sum, r) => sum + r.similarity, 0) / searchResults.length
-                    ).toFixed(3),
-                },
-                'RAG context retrieved with AI SDK v5 embeddings'
-            )
-
-            return contextText
-        } catch (error) {
-            aiLogger.error({ err: error, contextId }, 'RAG retrieval failed')
-            return undefined // Fail gracefully
-        }
-    }
-
-    /**
-     * Format RAG search results as context
-     */
-    private formatRAGContext(searchResults: SimilaritySearchResult[]): string {
-        return searchResults
-            .map((result, index) => {
-                const relevanceScore = (result.similarity * 100).toFixed(1)
-                return `[Context ${index + 1} - ${relevanceScore}% relevant]\n${result.embedding.chunk_text}`
-            })
-            .join('\n\n')
     }
 
     /**
@@ -615,108 +492,6 @@ Use this context to provide personalized responses that reference our actual con
         }
     }
 
-    /**
-     * Embed and store conversation chunks using AI SDK v5 native embeddings
-     * Called by background worker
-     */
-    async embedConversationChunk(contextId: string, messages: Message[]): Promise<void> {
-        if (messages.length === 0) {
-            return
-        }
-
-        try {
-            const chunkOptions: ChunkOptions = {
-                chunkSize: this.ragConfig.chunkSize,
-                overlap: this.ragConfig.chunkOverlap,
-            }
-
-            const chunks = TextChunker.chunkMessages(messages, chunkOptions)
-            const latestIndex = await embeddingRepository.getLatestChunkIndex(contextId)
-
-            for (const chunk of chunks) {
-                // Generate embedding using AI SDK v5 native embed()
-                const { embedding } = await embed({
-                    model: this.embeddingModel,
-                    value: chunk.chunkText,
-                    maxRetries: 2,
-                })
-
-                await embeddingRepository.create({
-                    context_id: contextId,
-                    context_type: messages[0].context_type,
-                    chunk_text: chunk.chunkText,
-                    embedding: embedding,
-                    message_ids: chunk.messageIds,
-                    chunk_index: latestIndex + chunk.chunkIndex + 1,
-                    timestamp_start: chunk.timestampStart,
-                    timestamp_end: chunk.timestampEnd,
-                })
-            }
-
-            aiLogger.info(
-                { contextId, chunksStored: chunks.length },
-                'Conversation chunks embedded with AI SDK v5'
-            )
-        } catch (error) {
-            aiLogger.error({ err: error, contextId }, 'Failed to embed conversation chunk')
-            throw error
-        }
-    }
-
-    /**
-     * Process unembedded messages for a context (called by background worker)
-     */
-    async processUnembeddedMessages(contextId: string): Promise<number> {
-        try {
-            const stats = await embeddingRepository.getStats(contextId)
-            const lastEmbeddedTime = stats.latest_timestamp || new Date(0)
-
-            const unembeddedMessages = await messageService.getConversationHistory(contextId, 1000, 0)
-            const messagesToEmbed = unembeddedMessages.filter(
-                (msg) => new Date(msg.created_at) > lastEmbeddedTime && msg.content
-            )
-
-            if (messagesToEmbed.length === 0) {
-                return 0
-            }
-
-            await this.embedConversationChunk(contextId, messagesToEmbed)
-            return messagesToEmbed.length
-        } catch (error) {
-            aiLogger.error({ err: error, contextId }, 'Failed to process unembedded messages')
-            throw error
-        }
-    }
-
-    /**
-     * Get RAG configuration
-     */
-    getRAGConfig(): RAGConfig {
-        return { ...this.ragConfig }
-    }
-
-    /**
-     * Update RAG configuration
-     */
-    updateRAGConfig(newConfig: Partial<RAGConfig>): void {
-        this.ragConfig = { ...this.ragConfig, ...newConfig }
-        aiLogger.info({ ragConfig: this.ragConfig }, 'RAG configuration updated')
-    }
-
-    /**
-     * Check if context has embeddings
-     */
-    async hasEmbeddings(contextId: string): Promise<boolean> {
-        return await embeddingRepository.hasEmbeddings(contextId)
-    }
-
-    /**
-     * Delete all embeddings for a context (GDPR compliance)
-     */
-    async deleteEmbeddings(contextId: string): Promise<number> {
-        aiLogger.info({ contextId }, 'Deleting embeddings')
-        return await embeddingRepository.deleteByContextId(contextId)
-    }
 }
 
 /**

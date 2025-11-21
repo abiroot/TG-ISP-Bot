@@ -21,7 +21,6 @@ import { pool } from '~/config/database'
 import { personalityRepository } from '~/database/repositories/personalityRepository'
 import { whitelistRepository } from '~/database/repositories/whitelistRepository'
 import { messageRepository } from '~/database/repositories/messageRepository'
-import { embeddingRepository } from '~/database/repositories/embeddingRepository'
 import { telegramUserRepository } from '~/database/repositories/telegramUserRepository'
 import { toolExecutionAuditRepository } from '~/database/repositories/toolExecutionAuditRepository'
 import { admins } from '~/config/admins'
@@ -315,11 +314,10 @@ export class UserManagementService {
 
     /**
      * Delete all user data (GDPR compliance)
-     * Deletes: messages, embeddings, personality, user mapping, tool audit logs, whitelist entry
+     * Deletes: messages, personality, user mapping, tool audit logs, whitelist entry
      */
     async deleteAllUserData(userIdentifier: string): Promise<{
         messagesDeleted: number
-        embeddingsDeleted: number
         personalityDeleted: boolean
         userMappingDeleted: boolean
         auditLogsDeleted: number
@@ -331,11 +329,8 @@ export class UserManagementService {
             // Delete messages
             const messagesDeleted = await messageRepository.deleteByUser(userIdentifier)
 
-            // Delete embeddings
-            const contextId = getContextId(userIdentifier)
-            const embeddingsDeleted = await embeddingRepository.deleteByContextId(contextId)
-
             // Delete personality
+            const contextId = getContextId(userIdentifier)
             const personalityDeleted = await this.deletePersonality(contextId)
 
             // Delete telegram user mapping (GDPR compliance)
@@ -349,7 +344,6 @@ export class UserManagementService {
 
             const result = {
                 messagesDeleted,
-                embeddingsDeleted,
                 personalityDeleted,
                 userMappingDeleted,
                 auditLogsDeleted,
@@ -375,15 +369,13 @@ export class UserManagementService {
      */
     async deleteConversationHistory(contextId: string): Promise<{
         messagesDeleted: number
-        embeddingsDeleted: number
     }> {
         try {
             userMgmtLogger.info({ contextId }, 'Starting conversation history deletion')
 
             const messagesDeleted = await messageRepository.deleteByContextId(contextId)
-            const embeddingsDeleted = await embeddingRepository.deleteByContextId(contextId)
 
-            const result = { messagesDeleted, embeddingsDeleted }
+            const result = { messagesDeleted }
 
             userMgmtLogger.info({ contextId, result }, 'Conversation history deletion completed')
 
@@ -399,15 +391,13 @@ export class UserManagementService {
      */
     async getUserDataStats(contextId: string): Promise<{
         messageCount: number
-        embeddingCount: number
         hasPersonality: boolean
         isWhitelisted: boolean
         isAdmin: boolean
     }> {
         try {
-            const [messageCount, embeddingStats, personality, isWhitelisted, isAdmin] = await Promise.all([
+            const [messageCount, personality, isWhitelisted, isAdmin] = await Promise.all([
                 messageRepository.getMessageCount(contextId),
-                embeddingRepository.getStats(contextId),
                 personalityRepository.getByContextId(contextId),
                 this.isWhitelisted(contextId),
                 this.isAdmin(contextId),
@@ -415,7 +405,6 @@ export class UserManagementService {
 
             return {
                 messageCount,
-                embeddingCount: embeddingStats.total_chunks,
                 hasPersonality: !!personality,
                 isWhitelisted,
                 isAdmin,

@@ -31,7 +31,6 @@ export const botManagementFlow = addKeyword<TelegramProvider, Database>([
     'toggle ai',
     'toggle voice',
     'toggle media',
-    'toggle rag',
     'toggle isp',
 ])
     .addAction(async (ctx, utils) => {
@@ -85,7 +84,6 @@ async function handleBotStatus(ctx: any, utils: any, botStateService: any) {
 
     message += `<b>Features:</b>\n`
     message += `• AI Responses: ${state.features.ai_responses ? '✅' : '❌'}\n`
-    message += `• RAG: ${state.features.rag_enabled ? '✅' : '❌'}\n`
     message += `• Voice Transcription: ${state.features.voice_transcription ? '✅' : '❌'}\n`
     message += `• Image Analysis: ${state.features.image_analysis ? '✅' : '❌'}\n`
     message += `• ISP Tools: ${state.features.isp_tools ? '✅' : '❌'}\n`
@@ -109,13 +107,12 @@ async function handleToggleFeature(ctx: any, flowDynamic: any, botStateService: 
 
     let feature: string | null = null
     if (input.includes('ai')) feature = 'ai_responses'
-    else if (input.includes('rag')) feature = 'rag_enabled'
     else if (input.includes('voice')) feature = 'voice_transcription'
     else if (input.includes('media')) feature = 'image_analysis'
     else if (input.includes('isp')) feature = 'isp_tools'
 
     if (!feature) {
-        await flowDynamic('❌ Unknown feature. Available: ai, rag, voice, media, isp')
+        await flowDynamic('❌ Unknown feature. Available: ai, voice, media, isp')
         return
     }
 

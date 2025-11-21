@@ -21,7 +21,6 @@ export {
     cmdToggleMaintenanceFlow,
     confirmToggleMaintenanceFlow,
     cmdToggleAIFlow,
-    cmdToggleRAGFlow,
     cmdToggleVoiceFlow,
     cmdToggleMediaFlow,
     cmdToggleISPFlow,

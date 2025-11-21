@@ -3,7 +3,6 @@ import { TelegramProvider } from '@builderbot-plugins/telegram'
 import { PostgreSQLAdapter as Database } from '@builderbot/database-postgres'
 import { messageRepository } from '~/database/repositories/messageRepository'
 import { personalityRepository } from '~/database/repositories/personalityRepository'
-import { embeddingRepository } from '~/database/repositories/embeddingRepository'
 import { createFlowLogger } from '~/core/utils/logger'
 import { startIdleTimer, clearIdleTimer, TIMEOUT_PRESETS } from '~/core/utils/flowTimeout'
 
@@ -21,7 +20,6 @@ const flowLogger = createFlowLogger('wipedata')
  * Deletes:
  * - All messages where user is sender
  * - User's personality settings (private chat only)
- * - User's conversation embeddings (RAG data)
  */
 export const wipeDataFlow = addKeyword<TelegramProvider, Database>(
     ['wipedata', '/wipedata', 'wipe data', '/wipe data', 'delete my data', '/delete my data'],
@@ -41,7 +39,6 @@ You are about to *permanently delete* ALL your data:
 
 ✅ All your messages and conversations
 ✅ Your bot personality settings
-✅ Your conversation history (RAG embeddings)
 
 ⚠️ *THIS CANNOT BE UNDONE!*
 
@@ -97,10 +94,9 @@ Or type "cancel" to abort.`
             await utils.flowDynamic('🔄 Deleting your data... Please wait.')
 
             // Delete all data in parallel
-            const [messagesDeleted, personalitiesDeleted, embeddingsDeleted] = await Promise.all([
+            const [messagesDeleted, personalitiesDeleted] = await Promise.all([
                 messageRepository.deleteByUser(userIdentifier),
                 personalityRepository.deleteByUser(userIdentifier),
-                embeddingRepository.deleteByUser(userIdentifier),
             ])
 
             flowLogger.info(
@@ -108,7 +104,6 @@ Or type "cancel" to abort.`
                     userIdentifier,
                     messagesDeleted,
                     personalitiesDeleted,
-                    embeddingsDeleted,
                 },
                 'User data successfully wiped'
             )
@@ -120,7 +115,6 @@ Your data has been permanently deleted:
 
 📨 Messages deleted: ${messagesDeleted}
 ⚙️ Personality settings deleted: ${personalitiesDeleted}
-🧠 Conversation embeddings deleted: ${embeddingsDeleted}
 
 Your account is now clean. You can start fresh or stop using the bot.
 

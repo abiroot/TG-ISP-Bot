@@ -525,13 +525,31 @@ export class ISPService {
 
     /**
      * Format date to DD/MM/YYYY HH:mm in Beirut timezone
+     *
+     * Handles TWO different date formats from the API:
+     * 1. Session dates: "2025-11-21 03:05:07" (simple format, ALREADY in Beirut time)
+     * 2. Other dates: "2025-12-18T16:59:19.000-0500" (ISO-8601 with timezone offset)
+     *
+     * For format 1: Parse directly without conversion (already Beirut time)
+     * For format 2: Parse as ISO-8601 and convert to Beirut timezone
      */
     private formatDateBeirut(dateStr: string | null): string {
         if (!dateStr) return 'N/A'
 
         try {
+            // Format 1: Session dates "2025-11-21 03:05:07" (ALREADY Beirut time)
+            const simpleMatch = dateStr.match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})$/)
+            if (simpleMatch) {
+                const [, year, month, day, hour, minute] = simpleMatch
+                return `${day}/${month}/${year} ${hour}:${minute}`
+            }
+
+            // Format 2: ISO-8601 dates "2025-12-18T16:59:19.000-0500"
+            // These include timezone offset, so we parse and convert to Beirut
             const date = new Date(dateStr)
-            // Format in Asia/Beirut timezone
+            if (isNaN(date.getTime())) return 'Invalid Date'
+
+            // Convert to Beirut timezone (Asia/Beirut)
             return date.toLocaleString('en-GB', {
                 timeZone: 'Asia/Beirut',
                 day: '2-digit',

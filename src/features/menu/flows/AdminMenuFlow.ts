@@ -67,7 +67,6 @@ export const adminBotFlow = addKeyword<TelegramProvider, Database>('BUTTON_ADMIN
             '<b>Current Status:</b>\n' +
             `• Maintenance: ${state.maintenance.enabled ? '🔧 ON' : '✅ OFF'}\n` +
             `• AI Responses: ${state.features.ai_responses ? '✅ ON' : '❌ OFF'}\n` +
-            `• RAG Context: ${state.features.rag_enabled ? '✅ ON' : '❌ OFF'}\n` +
             `• Voice Notes: ${state.features.voice_transcription ? '✅ ON' : '❌ OFF'}\n` +
             `• Image Analysis: ${state.features.image_analysis ? '✅ ON' : '❌ OFF'}\n` +
             `• ISP Tools: ${state.features.isp_tools ? '✅ ON' : '❌ OFF'}`
@@ -84,10 +83,7 @@ export const adminBotFlow = addKeyword<TelegramProvider, Database>('BUTTON_ADMIN
                         'cmd_toggle_maintenance'
                     ),
                 ],
-                [
-                    createCallbackButton('🤖 Toggle AI', 'cmd_toggle_ai'),
-                    createCallbackButton('🧠 Toggle RAG', 'cmd_toggle_rag'),
-                ],
+                [createCallbackButton('🤖 Toggle AI', 'cmd_toggle_ai')],
                 [
                     createCallbackButton('🎤 Toggle Voice', 'cmd_toggle_voice'),
                     createCallbackButton('🖼️ Toggle Media', 'cmd_toggle_media'),
@@ -257,12 +253,6 @@ export const cmdToggleAIFlow = addKeyword<TelegramProvider, Database>(
     'BUTTON_CMD_TOGGLE_AI'
 ).addAction(async (ctx, { flowDynamic }) => {
     await flowDynamic('🤖 <b>Toggle AI</b>\n\n' + 'Use: <code>toggle ai</code>')
-})
-
-export const cmdToggleRAGFlow = addKeyword<TelegramProvider, Database>(
-    'BUTTON_CMD_TOGGLE_RAG'
-).addAction(async (ctx, { flowDynamic }) => {
-    await flowDynamic('🧠 <b>Toggle RAG</b>\n\n' + 'Use: <code>toggle rag</code>')
 })
 
 export const cmdToggleVoiceFlow = addKeyword<TelegramProvider, Database>(
