@@ -227,6 +227,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                         `What would you like to do?`,
                     [
                         [createCallbackButton('🔍 Search Customer Info', `customer_search:${identifier.value}`)],
+                        [createCallbackButton('📡 PING User', `customer_ping:${identifier.value}`)],
                         [createCallbackButton('📋 Create Task', `customer_task:${identifier.value}`)],
                         [createCallbackButton('❌ Cancel', 'customer_cancel')],
                     ],

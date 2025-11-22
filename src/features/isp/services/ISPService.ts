@@ -528,6 +528,79 @@ export class ISPService {
     }
 
     /**
+     * Ping customer (network diagnostics)
+     * Calls external ISP API /api/user-ping?mobile={identifier}
+     *
+     * @param identifier - Phone number or username
+     * @returns Ping response data from ISP API
+     */
+    async pingCustomer(identifier: string): Promise<any> {
+        if (!this.config.enabled) {
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
+        }
+
+        try {
+            const token = await this.authenticate()
+
+            const response = await fetch(
+                `${this.config.baseUrl}/api/user-ping?mobile=${encodeURIComponent(identifier)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new ISPServiceError(
+                        'Customer not found',
+                        'CUSTOMER_NOT_FOUND',
+                        undefined,
+                        false
+                    )
+                }
+
+                if (response.status === 401) {
+                    // Token expired, clear it and retry once
+                    this.authToken = null
+                    this.tokenExpiry = null
+                    throw new ISPServiceError('Authentication expired', 'AUTH_EXPIRED', undefined, true)
+                }
+
+                throw new ISPServiceError(
+                    `Ping request failed: ${response.statusText}`,
+                    'PING_REQUEST_FAILED',
+                    undefined,
+                    response.status >= 500
+                )
+            }
+
+            const data = await response.json()
+            ispLogger.info({ identifier }, 'Customer ping successful')
+            return data
+        } catch (error) {
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
+            ispLogger.error({ err: error, identifier }, 'Customer ping failed')
+            throw new ISPServiceError(
+                'Ping request failed with network error',
+                'PING_NETWORK_ERROR',
+                error,
+                true
+            )
+        }
+    }
+
+    /**
      * Format date to DD/MM/YYYY HH:mm in Beirut timezone
      *
      * Handles TWO different date formats from the API:
