@@ -495,6 +495,89 @@ async function main() {
         )
     })
 
+    // Message sending API endpoint
+    // POST /api/send-message
+    // Headers: X-API-Key (required)
+    // Body: { worker_username: string, message: string }
+    adapterProvider.server.post('/api/send-message', async (req: any, res) => {
+        try {
+            // Authentication - validate API key
+            const apiKey = req.headers['x-api-key']
+            if (!apiKey || apiKey !== env.API_KEY) {
+                loggers.app.warn({ ip: req.connection?.remoteAddress }, 'Unauthorized API access attempt')
+                res.writeHead(401, { 'Content-Type': 'application/json' })
+                return res.end(JSON.stringify({ error: 'Unauthorized' }))
+            }
+
+            // Parse and validate request body
+            const { worker_username, message } = req.body || {}
+
+            if (!worker_username || !message) {
+                res.writeHead(400, { 'Content-Type': 'application/json' })
+                return res.end(
+                    JSON.stringify({
+                        error: 'Missing required fields',
+                        required: ['worker_username', 'message'],
+                    })
+                )
+            }
+
+            loggers.app.info({ worker_username }, 'Message sending API request received')
+
+            // Lookup Telegram ID by worker username
+            const { telegramUserService } = await import('~/core/services/telegramUserService')
+            const telegramId = await telegramUserService.getTelegramIdByUsername(worker_username)
+
+            if (!telegramId) {
+                loggers.app.warn({ worker_username }, 'Worker not found in telegram_user_mapping')
+                res.writeHead(404, { 'Content-Type': 'application/json' })
+                return res.end(
+                    JSON.stringify({
+                        error: 'Worker not found',
+                        worker_username,
+                        note: 'User must interact with bot at least once to be registered',
+                    })
+                )
+            }
+
+            // Send message via Telegram
+            await adapterProvider.vendor.telegram.sendMessage(telegramId, message, {
+                parse_mode: 'HTML',
+            })
+
+            // Log outgoing message
+            const { MessageLogger } = await import('~/core/middleware/messageLogger')
+            await MessageLogger.logOutgoing(telegramId, telegramId, message, undefined, {
+                webhook: 'send-message-api',
+                worker_username,
+            })
+
+            loggers.app.info(
+                { worker_username, telegram_id: telegramId },
+                'Message sent successfully via API'
+            )
+
+            // Return success response
+            res.writeHead(200, { 'Content-Type': 'application/json' })
+            return res.end(
+                JSON.stringify({
+                    success: true,
+                    telegram_id: telegramId,
+                    worker_username,
+                })
+            )
+        } catch (error) {
+            loggers.app.error({ err: error }, 'Message sending API error')
+            res.writeHead(500, { 'Content-Type': 'application/json' })
+            return res.end(
+                JSON.stringify({
+                    error: 'Internal server error',
+                    message: error instanceof Error ? error.message : 'Unknown error',
+                })
+            )
+        }
+    })
+
     // Payment collection webhook endpoint
     // POST /webhook/collector_payment
     // Body: { tg_username: string, client_username: string, worker_username?: string }

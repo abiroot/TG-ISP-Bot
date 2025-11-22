@@ -353,6 +353,68 @@ addKeyword('CUSTOM_EVENT').addAction(...)
 **Built-in Endpoints:**
 - `GET /health` - Health check (returns version, status, timestamp)
 - `POST /webhook` - Telegram webhook (handled by BuilderBot)
+- `POST /api/send-message` - Send messages to workers/collectors via Telegram (authenticated)
+
+**Message Sending API:**
+
+Send messages to workers, collectors, or admins via the Telegram bot from external systems (e.g., UltraMsg, billing webhooks).
+
+**Endpoint:** `POST /api/send-message`
+
+**Authentication:** API Key via `X-API-Key` header (configured in `.env` as `API_KEY`)
+
+**Request:**
+```bash
+curl -X POST http://localhost:3010/api/send-message \
+  -H "Content-Type: application/json" \
+  -H "X-API-Key: your_api_key_here" \
+  -d '{
+    "worker_username": "wtest",
+    "message": "<b>Alert:</b> Payment collected from customer ABC. Please verify."
+  }'
+```
+
+**Request Body:**
+- `worker_username` (required): Worker username from `telegram_user_mapping` table
+- `message` (required): Message text (HTML formatting supported)
+
+**Response (Success - 200):**
+```json
+{
+  "success": true,
+  "telegram_id": "123456789",
+  "worker_username": "wtest"
+}
+```
+
+**Response (Error - 401 Unauthorized):**
+```json
+{
+  "error": "Unauthorized"
+}
+```
+
+**Response (Error - 404 Not Found):**
+```json
+{
+  "error": "Worker not found",
+  "worker_username": "wtest",
+  "note": "User must interact with bot at least once to be registered"
+}
+```
+
+**HTML Formatting:**
+Messages support HTML formatting tags:
+- `<b>bold</b>` - Bold text
+- `<i>italic</i>` - Italic text
+- `<code>code</code>` - Monospace code
+- `<a href="url">link</a>` - Hyperlinks
+
+**Important Notes:**
+- User must have interacted with the bot at least once to be in `telegram_user_mapping` table
+- Messages are automatically logged to the `messages` table
+- Always escape user-generated content to prevent XSS: `html.escape(userInput)`
+- API key must be kept secure and not committed to version control
 
 **Add Custom Endpoints (in src/app.ts):**
 ```typescript
@@ -402,6 +464,12 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 **Billing API Configuration (Optional):**
 - `BILLING_API_BASE_URL` - Billing system base URL (task_api.php endpoint)
 - `BILLING_ENABLED` (default: true) - Enable/disable Billing service features
+
+**Message Sending API Configuration (Required):**
+- `API_KEY` - API key for `/api/send-message` endpoint authentication
+  - Generate secure key: `openssl rand -hex 32`
+  - Used by external systems (UltraMsg, billing webhooks) to send Telegram messages
+  - Keep secret and do not commit to version control
 
 **Google Maps Configuration (Optional):**
 - `GOOGLE_MAPS_ENABLED` (default: true) - Enable/disable Google Maps API integration

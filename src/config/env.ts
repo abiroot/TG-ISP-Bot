@@ -45,6 +45,9 @@ const envSchema = z.object({
         .optional()
         .default('true')
         .transform((val) => val === 'true'),
+
+    // Message Sending API Configuration
+    API_KEY: z.string().min(1, 'API key is required for message sending endpoint'),
 })
 
 export type Env = z.infer<typeof envSchema>
