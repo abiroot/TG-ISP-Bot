@@ -190,18 +190,18 @@ const { aiService } = extensions
 
 Never import services directly in flows - always use extensions.
 
-### BillingService - Cookie-Based Authentication
+### BillingService - Task API Integration
 
 **Overview:**
-The BillingService provides cookie-based session authentication for the billing system, separate from the JWT-based ISPService. This service handles task creation and management for the billing platform.
+The BillingService provides direct task creation for the billing system using the task_api.php endpoint. This service uses worker ID based authentication instead of cookie sessions.
 
 **Location:** `src/features/billing/services/BillingService.ts`
 
 **Key Features:**
-- Cookie-based session management (stores session cookies in memory)
-- Automatic re-authentication on cookie expiry (12-hour session lifetime)
-- Task creation with form data submission
-- Built-in retry logic for authentication failures
+- Direct API task creation without session management
+- Worker ID (username) based authentication
+- Simplified form data submission
+- No cookie caching required
 
 **Usage in Flows:**
 ```typescript
@@ -209,16 +209,12 @@ const { billingService } = extensions
 
 // Check if billing service is enabled
 if (billingService.isEnabled()) {
-    // Authenticate (returns cookies, automatically cached)
-    const cookies = await billingService.authenticate()
-
     // Create a task
     const taskData = {
-        type: 'maintenance', // 'maintenance' | 'installation' | 'support' | 'upgrade'
+        type: 'maintenance', // 'maintenance' | 'uninstall'
         message: 'Customer reported connection issues',
         customer_username: 'customer123',
-        worker_ids: [13, 15], // Worker IDs from billing system
-        send_whatsapp: 1, // 1 = send, 0 = don't send
+        wid: 'wtest', // Worker username (e.g., wtest, wmarwan, walewe)
     }
 
     const response = await billingService.createTask(taskData)
@@ -227,18 +223,18 @@ if (billingService.isEnabled()) {
 ```
 
 **Methods:**
-- `authenticate()` - Returns session cookies (cached, auto-refreshes)
 - `createTask(taskData)` - Create task in billing system
-- `clearCookies()` - Force re-authentication on next request
-- `getCookieStatus()` - Get current cookie validity status
 - `isEnabled()` - Check if billing service is enabled
 
-**Authentication Flow:**
-1. First call to `authenticate()` sends POST to `/index.php` with credentials
-2. Extracts cookies from `Set-Cookie` headers
-3. Stores cookies with 12-hour expiry
-4. Subsequent calls reuse cached cookies until expiry
-5. `createTask()` automatically authenticates if needed
+**Task Data Interface:**
+```typescript
+interface CreateTaskData {
+    type: 'maintenance' | 'uninstall'
+    message: string
+    customer_username: string
+    wid: string // Worker ID (username)
+}
+```
 
 **Error Handling:**
 All errors are wrapped in `BillingServiceError` with:
@@ -248,24 +244,20 @@ All errors are wrapped in `BillingServiceError` with:
 - `cause` - Original error for debugging
 
 **Common Error Codes:**
-- `AUTH_HTTP_ERROR` - Authentication HTTP request failed (retryable)
-- `AUTH_NO_COOKIES` - No cookies received from authentication
-- `AUTH_REQUEST_FAILED` - Network/fetch error during auth (retryable)
 - `TASK_CREATE_HTTP_ERROR` - Task creation HTTP error (retryable)
 - `TASK_CREATE_REQUEST_FAILED` - Network error during task creation (retryable)
 - `SERVICE_DISABLED` - Billing service is disabled via `BILLING_ENABLED=false`
 
 **Testing:**
-Run the test script to verify authentication and task creation:
+Run the test script to verify task creation:
 ```bash
 npm run tsx scripts/test-billing-task-creation.ts
 ```
 
 The test script validates:
-- Authentication (cookie retrieval)
-- Task creation
-- Cookie caching
-- Cookie clearing and re-authentication
+- Basic task creation
+- Multiple task types (maintenance, uninstall)
+- Repeated task creation
 
 **Configuration:**
 See "Billing API Configuration" in Environment Configuration section.
@@ -408,9 +400,7 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `ISP_ENABLED` (default: true) - Enable/disable ISP tool calling features
 
 **Billing API Configuration (Optional):**
-- `BILLING_API_BASE_URL` - Billing system base URL
-- `BILLING_USERNAME` - Billing authentication username
-- `BILLING_PASSWORD` - Billing authentication password
+- `BILLING_API_BASE_URL` - Billing system base URL (task_api.php endpoint)
 - `BILLING_ENABLED` (default: true) - Enable/disable Billing service features
 
 **Google Maps Configuration (Optional):**

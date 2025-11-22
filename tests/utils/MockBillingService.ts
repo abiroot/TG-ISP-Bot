@@ -12,22 +12,7 @@ import type { CreateTaskData, CreateTaskResponse } from '~/features/billing/inde
  */
 export class MockBillingService {
     // Track method calls for testing
-    authenticateCalls: number = 0
     createTaskCalls: CreateTaskData[] = []
-    clearCookiesCalls: number = 0
-
-    // Mock state
-    private isAuthenticated: boolean = false
-    private mockCookies: string[] = ['PHPSESSID=mock-session-id']
-
-    /**
-     * Mock authenticate - simulates cookie-based authentication
-     */
-    async authenticate(): Promise<string[]> {
-        this.authenticateCalls++
-        this.isAuthenticated = true
-        return this.mockCookies
-    }
 
     /**
      * Mock create task - simulates task creation in billing system
@@ -36,13 +21,8 @@ export class MockBillingService {
         // Track the call
         this.createTaskCalls.push(taskData)
 
-        // Auto-authenticate if needed
-        if (!this.isAuthenticated) {
-            await this.authenticate()
-        }
-
         // Validate required fields (realistic validation)
-        if (!taskData.type || !taskData.message || !taskData.customer_username || !taskData.worker_ids) {
+        if (!taskData.type || !taskData.message || !taskData.customer_username || !taskData.wid) {
             return {
                 success: false,
                 message: 'Missing required fields',
@@ -58,15 +38,6 @@ export class MockBillingService {
     }
 
     /**
-     * Mock clear cookies
-     */
-    clearCookies(): void {
-        this.clearCookiesCalls++
-        this.isAuthenticated = false
-        this.mockCookies = []
-    }
-
-    /**
      * Check if service is enabled
      */
     isEnabled(): boolean {
@@ -77,11 +48,7 @@ export class MockBillingService {
      * Reset mock state (for testing)
      */
     reset(): void {
-        this.authenticateCalls = 0
         this.createTaskCalls = []
-        this.clearCookiesCalls = 0
-        this.isAuthenticated = false
-        this.mockCookies = ['PHPSESSID=mock-session-id']
     }
 }
 

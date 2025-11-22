@@ -2,7 +2,7 @@
 /**
  * Billing Service Test Script
  *
- * Tests cookie-based authentication and task creation for the billing system.
+ * Tests task creation for the billing system using the task_api.php endpoint.
  * Useful for development/testing the BillingService integration.
  *
  * Usage:
@@ -17,61 +17,26 @@ import { BillingService } from '../src/features/billing/index.js'
 import type { CreateTaskData } from '../src/features/billing/index.js'
 
 /**
- * Test authentication
- */
-async function testAuthentication(billingService: BillingService) {
-    console.log('\n📋 Testing Authentication...\n')
-
-    try {
-        console.log('1️⃣  Authenticating to billing system...')
-        const cookies = await billingService.authenticate()
-
-        console.log('✅ Authentication successful!')
-        console.log(`   Cookies received: ${cookies.length}`)
-        cookies.forEach((cookie, index) => {
-            // Only show first 50 chars of each cookie for security
-            const displayCookie = cookie.length > 50 ? `${cookie.substring(0, 50)}...` : cookie
-            console.log(`   ${index + 1}. ${displayCookie}`)
-        })
-
-        // Show cookie status
-        const status = billingService.getCookieStatus()
-        console.log(`   Valid until: ${status.expiresAt}`)
-        console.log(`   Is valid: ${status.isValid}`)
-
-        return true
-    } catch (error) {
-        console.error('❌ Authentication failed:', error)
-        if (error instanceof Error) {
-            console.error('   Message:', error.message)
-        }
-        return false
-    }
-}
-
-/**
  * Test task creation
  */
-async function testTaskCreation(billingService: BillingService) {
-    console.log('\n📋 Testing Task Creation...\n')
+async function testTaskCreation(billingService: BillingService, testNumber: number = 1) {
+    console.log(`\n📋 Test ${testNumber}: Creating Task...\n`)
 
     // Sample task data
     const taskData: CreateTaskData = {
         type: 'maintenance',
-        message: 'Test task from BillingService - Please ignore this test message',
-        customer_username: 'test1',
-        worker_ids: [13],
-        send_whatsapp: 1,
+        message: `Test task ${testNumber} from BillingService - Please ignore this test message`,
+        customer_username: 'abedissa2',
+        wid: 'wtest',
     }
 
     try {
-        console.log('2️⃣  Creating task...')
+        console.log(`${testNumber}️⃣  Creating task...`)
         console.log('   Task details:')
         console.log(`     Type: ${taskData.type}`)
         console.log(`     Message: ${taskData.message}`)
         console.log(`     Customer: ${taskData.customer_username}`)
-        console.log(`     Worker IDs: [${taskData.worker_ids.join(', ')}]`)
-        console.log(`     Send WhatsApp: ${taskData.send_whatsapp ? 'Yes' : 'No'}`)
+        console.log(`     Worker ID: ${taskData.wid}`)
 
         const response = await billingService.createTask(taskData)
 
@@ -95,54 +60,38 @@ async function testTaskCreation(billingService: BillingService) {
 }
 
 /**
- * Test cookie caching
+ * Test multiple task types
  */
-async function testCookieCaching(billingService: BillingService) {
-    console.log('\n📋 Testing Cookie Caching...\n')
+async function testMultipleTaskTypes(billingService: BillingService) {
+    console.log('\n📋 Testing Multiple Task Types...\n')
 
-    try {
-        console.log('3️⃣  Calling authenticate() again (should use cached cookies)...')
-        const startTime = Date.now()
-        const cookies = await billingService.authenticate()
-        const duration = Date.now() - startTime
+    const taskTypes: Array<{ type: 'maintenance' | 'uninstall'; message: string }> = [
+        { type: 'maintenance', message: 'Test maintenance task from API' },
+        { type: 'uninstall', message: 'Test uninstall task from API' },
+    ]
 
-        console.log('✅ Cookie caching works!')
-        console.log(`   Duration: ${duration}ms (should be very fast if cached)`)
-        console.log(`   Cookies returned: ${cookies.length}`)
+    const results: boolean[] = []
 
-        return true
-    } catch (error) {
-        console.error('❌ Cookie caching test failed:', error)
-        return false
+    for (const [index, taskConfig] of taskTypes.entries()) {
+        const taskData: CreateTaskData = {
+            type: taskConfig.type,
+            message: taskConfig.message,
+            customer_username: 'abedissa2',
+            wid: 'wtest',
+        }
+
+        try {
+            console.log(`\n${index + 1}. Testing ${taskConfig.type} task...`)
+            const response = await billingService.createTask(taskData)
+            console.log(`   ✅ ${taskConfig.type} task created successfully`)
+            results.push(true)
+        } catch (error) {
+            console.error(`   ❌ ${taskConfig.type} task failed:`, error)
+            results.push(false)
+        }
     }
-}
 
-/**
- * Test cookie clearing
- */
-async function testCookieClearing(billingService: BillingService) {
-    console.log('\n📋 Testing Cookie Clearing...\n')
-
-    try {
-        console.log('4️⃣  Clearing cookies...')
-        billingService.clearCookies()
-
-        const status = billingService.getCookieStatus()
-        console.log('✅ Cookies cleared!')
-        console.log(`   Has cookies: ${status.hasCookies}`)
-        console.log(`   Is valid: ${status.isValid}`)
-
-        console.log('\n5️⃣  Authenticating again (should fetch fresh cookies)...')
-        const cookies = await billingService.authenticate()
-
-        console.log('✅ Re-authentication successful!')
-        console.log(`   New cookies received: ${cookies.length}`)
-
-        return true
-    } catch (error) {
-        console.error('❌ Cookie clearing test failed:', error)
-        return false
-    }
+    return results.every((result) => result)
 }
 
 /**
@@ -163,25 +112,22 @@ async function main() {
     }
 
     console.log('\nℹ️  Running tests against billing system...')
-    console.log('   Make sure your .env has valid credentials:\n')
+    console.log('   Make sure your .env has valid configuration:\n')
     console.log('   - BILLING_API_BASE_URL')
-    console.log('   - BILLING_USERNAME')
-    console.log('   - BILLING_PASSWORD')
+    console.log('   - BILLING_ENABLED=true')
 
     const results = {
-        authentication: false,
-        taskCreation: false,
-        cookieCaching: false,
-        cookieClearing: false,
+        basicTaskCreation: false,
+        multipleTaskTypes: false,
+        repeatedCreation: false,
     }
 
     // Run tests sequentially
-    results.authentication = await testAuthentication(billingService)
+    results.basicTaskCreation = await testTaskCreation(billingService, 1)
 
-    if (results.authentication) {
-        results.taskCreation = await testTaskCreation(billingService)
-        results.cookieCaching = await testCookieCaching(billingService)
-        results.cookieClearing = await testCookieClearing(billingService)
+    if (results.basicTaskCreation) {
+        results.multipleTaskTypes = await testMultipleTaskTypes(billingService)
+        results.repeatedCreation = await testTaskCreation(billingService, 2)
     }
 
     // Print summary
@@ -190,10 +136,9 @@ async function main() {
     console.log('========================================\n')
 
     console.log('Test Results:')
-    console.log(`  ${results.authentication ? '✅' : '❌'} Authentication`)
-    console.log(`  ${results.taskCreation ? '✅' : '❌'} Task Creation`)
-    console.log(`  ${results.cookieCaching ? '✅' : '❌'} Cookie Caching`)
-    console.log(`  ${results.cookieClearing ? '✅' : '❌'} Cookie Clearing`)
+    console.log(`  ${results.basicTaskCreation ? '✅' : '❌'} Basic Task Creation`)
+    console.log(`  ${results.multipleTaskTypes ? '✅' : '❌'} Multiple Task Types`)
+    console.log(`  ${results.repeatedCreation ? '✅' : '❌'} Repeated Creation`)
 
     const passedTests = Object.values(results).filter(Boolean).length
     const totalTests = Object.keys(results).length

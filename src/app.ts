@@ -49,7 +49,6 @@ import {
     customerTaskFlow,
     taskTypeSelectionFlow,
     taskWorkerSelectionFlow,
-    taskWhatsAppToggleFlow,
     taskConfirmFlow,
     taskCancelFlow,
 } from '~/features/isp/flows/TaskCreationFlow'
@@ -230,8 +229,7 @@ async function main() {
         // Task creation wizard flows
         customerTaskFlow, // Task creation entry (verifies customer)
         taskTypeSelectionFlow, // Task type selection + message capture (merged flow)
-        taskWorkerSelectionFlow, // Worker selection
-        taskWhatsAppToggleFlow, // WhatsApp notification toggle
+        taskWorkerSelectionFlow, // Worker selection (shows confirmation directly)
         taskConfirmFlow, // Confirm and create task
         taskCancelFlow, // Cancel task creation
 

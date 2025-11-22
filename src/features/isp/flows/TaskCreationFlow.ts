@@ -288,11 +288,10 @@ export const taskWorkerSelectionFlow = addKeyword<TelegramProvider, Database>('B
         }
 
         // Store worker info in taskCreationStore
-        const workerIds = [workerId]
         const workerData = {
             selectedWorkerId: workerId,
             selectedWorkerName: selectedWorker.name,
-            workerIds,
+            wid: selectedWorker.name, // Worker username for new API
         }
 
         taskCreationStore.set(userId, workerData)
@@ -318,86 +317,18 @@ export const taskWorkerSelectionFlow = addKeyword<TelegramProvider, Database>('B
             'Worker selected'
         )
 
-        // Ask for WhatsApp notification
-        await sendWithInlineButtons(
-            ctx,
-            { provider, state } as any,
-            `✅ <b>Worker Selected:</b> ${html.escape(selectedWorker.name)}\n\n` +
-                `<b>Send WhatsApp Notification?</b>`,
-            [
-                [createCallbackButton('✅ Yes, Send WhatsApp', 'whatsapp:1')],
-                [createCallbackButton('❌ No WhatsApp', 'whatsapp:0')],
-                [createCallbackButton('🔙 Back', 'task_cancel')],
-            ],
-            { parseMode: 'HTML' }
-        )
-    })
-
-/**
- * Step 5: Handle WhatsApp notification toggle
- */
-export const taskWhatsAppToggleFlow = addKeyword<TelegramProvider, Database>('BUTTON_WHATSAPP')
-    .addAction(async (ctx, { state, provider, extensions }) => {
-        const { taskCreationStore } = extensions!
-        const userId = String(ctx.from) // Normalize to string for consistent store keys
-        const sendWhatsApp = parseInt(ctx._button_data as string, 10) as 0 | 1
-
-        if (sendWhatsApp !== 0 && sendWhatsApp !== 1) {
-            await provider.vendor.telegram.sendMessage(
-                ctx.from,
-                '❌ <b>Invalid option.</b>',
-                { parse_mode: 'HTML' }
-            )
-            return
-        }
-
-        // Store WhatsApp preference in taskCreationStore
-        taskCreationStore.set(userId, { sendWhatsApp })
-
-        // DEBUG: Get store data BEFORE reading individual fields
-        const taskData = taskCreationStore.get(userId)
-
-        logger.info(
-            {
-                from: ctx.from,
-                sendWhatsApp,
-                completeStoreData: taskData,
-                storeSize: taskCreationStore.size()
-            },
-            '🔍 DEBUG: WhatsApp preference stored, showing complete task data'
-        )
-
-        logger.info({ from: ctx.from, sendWhatsApp }, 'WhatsApp notification preference set')
-
         // Get all task data from taskCreationStore for confirmation
-        const customerUsername = taskData?.customerUsername
-        const customerName = taskData?.customerName
-        const taskType = taskData?.taskType
-        const taskMessage = taskData?.taskMessage
-        const selectedWorkerName = taskData?.selectedWorkerName
-
-        // DEBUG: Log extracted fields
-        logger.info(
-            {
-                from: ctx.from,
-                customerUsername,
-                customerName,
-                taskType,
-                taskMessage,
-                selectedWorkerName,
-                sendWhatsApp,
-                hasTaskMessage: !!taskMessage,
-                taskMessageValue: taskMessage
-            },
-            '🔍 DEBUG: Extracted fields from store for summary display'
-        )
+        const customerUsername = storedData?.customerUsername
+        const customerName = storedData?.customerName
+        const taskType = storedData?.taskType
+        const taskMessage = storedData?.taskMessage
 
         const taskTypeLabels: Record<TaskType, string> = {
             maintenance: '🔧 Maintenance',
             uninstall: '🛠️ Uninstall',
         }
 
-        // Show confirmation
+        // Show confirmation (skipping WhatsApp notification step)
         await sendWithInlineButtons(
             ctx,
             { provider, state } as any,
@@ -406,8 +337,7 @@ export const taskWhatsAppToggleFlow = addKeyword<TelegramProvider, Database>('BU
                 `<b>Username:</b> <code>${html.escape(customerUsername || 'Unknown')}</code>\n\n` +
                 `<b>Task Type:</b> ${taskTypeLabels[taskType!]}\n` +
                 `<b>Description:</b>\n<i>${html.escape(taskMessage || 'No description')}</i>\n\n` +
-                `<b>Assigned To:</b> ${html.escape(selectedWorkerName || 'Unknown')}\n` +
-                `<b>WhatsApp:</b> ${sendWhatsApp ? '✅ Yes' : '❌ No'}\n\n` +
+                `<b>Assigned To:</b> ${html.escape(selectedWorker.name)}\n\n` +
                 `<b>Confirm to create this task?</b>`,
             [
                 [createCallbackButton('✅ Confirm & Create', 'task_confirm')],
@@ -418,7 +348,7 @@ export const taskWhatsAppToggleFlow = addKeyword<TelegramProvider, Database>('BU
     })
 
 /**
- * Step 6: Confirm and create task
+ * Step 5: Confirm and create task
  */
 export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TASK_CONFIRM')
     .addAction(async (ctx, { state, extensions, provider, endFlow }) => {
@@ -442,34 +372,31 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
         const customerUsername = taskData?.customerUsername
         const taskType = taskData?.taskType
         const taskMessage = taskData?.taskMessage
-        const workerIds = taskData?.workerIds
-        const sendWhatsApp = taskData?.sendWhatsApp
+        const wid = taskData?.wid
 
         // DEBUG: Log validation check
         const validation = {
             hasCustomerUsername: !!customerUsername,
             hasTaskType: !!taskType,
             hasTaskMessage: !!taskMessage,
-            hasWorkerIds: !!workerIds,
-            hasSendWhatsApp: sendWhatsApp !== undefined,
+            hasWid: !!wid,
             customerUsername,
             taskType,
             taskMessage,
-            workerIds,
-            sendWhatsApp
+            wid
         }
 
         logger.info(
             {
                 from: ctx.from,
                 validation,
-                willFail: !customerUsername || !taskType || !taskMessage || !workerIds || sendWhatsApp === undefined
+                willFail: !customerUsername || !taskType || !taskMessage || !wid
             },
             '🔍 DEBUG: VALIDATION CHECK - Field presence'
         )
 
         // Validate all required fields
-        if (!customerUsername || !taskType || !taskMessage || !workerIds || sendWhatsApp === undefined) {
+        if (!customerUsername || !taskType || !taskMessage || !wid) {
             logger.error(
                 {
                     from: ctx.from,
@@ -495,7 +422,7 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
                 from: ctx.from,
                 customerUsername,
                 taskType,
-                workerIds,
+                wid,
             },
             'Creating billing task'
         )
@@ -504,16 +431,15 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
         const loadingMsg = await LoadingIndicator.show(provider, ctx.from, '📋 Creating task...')
 
         try {
-            // Create task
-            const taskData: CreateTaskData = {
+            // Create task using new API format
+            const createTaskData: CreateTaskData = {
                 type: taskType,
                 message: taskMessage,
                 customer_username: customerUsername,
-                worker_ids: workerIds,
-                send_whatsapp: sendWhatsApp,
+                wid: wid,
             }
 
-            const result = await billingService.createTask(taskData)
+            const result = await billingService.createTask(createTaskData)
 
             await LoadingIndicator.hide(provider, loadingMsg)
 
@@ -523,8 +449,8 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
                     '✅ <b>Task Created Successfully!</b>\n\n' +
                         `<b>Customer:</b> <code>${html.escape(customerUsername)}</code>\n` +
                         `<b>Type:</b> ${taskType}\n` +
-                        `<b>WhatsApp:</b> ${sendWhatsApp ? 'Sent' : 'Not sent'}\n\n` +
-                        `<i>The task has been assigned and ${sendWhatsApp ? 'the worker has been notified via WhatsApp' : 'is now visible in the billing system'}.</i>`,
+                        `<b>Worker:</b> ${html.escape(wid)}\n\n` +
+                        `<i>The task has been assigned and is now visible in the billing system.</i>`,
                     { parse_mode: 'HTML' }
                 )
 
