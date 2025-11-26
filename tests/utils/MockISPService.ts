@@ -76,6 +76,7 @@ export class MockISPService {
             stationInterfaceStats: customer.stationInterfaceStats || [],
             accessPointOnline: customer.accessPointOnline || false,
             accessPointName: customer.accessPointName || '',
+            accessPointBoardName: customer.accessPointBoardName || '',
             accessPointIpAddress: customer.accessPointIpAddress || '',
             accessPointUpTime: customer.accessPointUpTime || '',
             accessPointSignal: customer.accessPointSignal || '',

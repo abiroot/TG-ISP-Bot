@@ -105,6 +105,7 @@ export interface ISPUserInfo {
     // Access point info
     accessPointOnline: boolean
     accessPointName: string
+    accessPointBoardName: string
     accessPointIpAddress: string
     accessPointUpTime: string
     accessPointSignal: string
@@ -1100,6 +1101,7 @@ ${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
 📶 <b>Access Point:</b>
 - <b>Status:</b> ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
 - <b>Name:</b> ${esc(userInfo.accessPointName)}
+- <b>Board:</b> ${esc(userInfo.accessPointBoardName)}
 - <b>IP:</b> <code>${esc(userInfo.accessPointIpAddress)}</code>
 - <b>Uptime:</b> ${esc(userInfo.accessPointUpTime)}
 - <b>Signal:</b> ${esc(userInfo.accessPointSignal)}
@@ -1109,7 +1111,7 @@ ${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
 ${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
 `
                 : `
-📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} (${userInfo.accessPointOnline ? 'Online' : 'Offline'})
+📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} - ${esc(userInfo.accessPointBoardName)} (${userInfo.accessPointOnline ? 'Online' : 'Offline'})
 ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 `
             : ''

@@ -65,6 +65,7 @@ export const onlineCustomer: ISPUserInfo = {
     // Access point info
     accessPointOnline: true,
     accessPointName: 'AP-Beirut-Tower-A',
+    accessPointBoardName: 'RB750Gr3',
     accessPointIpAddress: '10.50.1.10',
     accessPointUpTime: '30d 8h 15m',
     accessPointSignal: '-65 dBm',
@@ -185,6 +186,7 @@ export const offlineCustomer: ISPUserInfo = {
     // Access point info
     accessPointOnline: false,
     accessPointName: 'AP-Tripoli-Building-B',
+    accessPointBoardName: 'hAP ac2',
     accessPointIpAddress: '10.60.1.20',
     accessPointUpTime: '0h 0m 0s',
     accessPointSignal: 'N/A',
@@ -289,6 +291,7 @@ export const expiredCustomer: ISPUserInfo = {
     // Access point info
     accessPointOnline: true,
     accessPointName: 'AP-Saida-Zone-C',
+    accessPointBoardName: 'RB4011iGS+',
     accessPointIpAddress: '10.70.1.30',
     accessPointUpTime: '15d 3h 45m',
     accessPointSignal: 'N/A',

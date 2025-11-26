@@ -5,6 +5,23 @@ import {
     UpdateTelegramUserMapping,
 } from '../schemas/telegramUserMapping'
 
+/**
+ * Lookup strategy used to find a Telegram ID
+ */
+export type TelegramIdLookupStrategy =
+    | 'worker_username_exact'
+    | 'worker_username_ilike'
+    | 'telegram_handle_exact'
+    | 'telegram_id_direct'
+
+/**
+ * Result of a multi-strategy Telegram ID lookup
+ */
+export interface TelegramIdLookupResult {
+    telegramId: string
+    strategy: TelegramIdLookupStrategy
+}
+
 export class TelegramUserRepository {
     /**
      * Get Telegram ID by worker username (primary use case for webhook)
@@ -15,6 +32,57 @@ export class TelegramUserRepository {
             [username]
         )
         return result.rows.length > 0 ? result.rows[0].telegram_id : null
+    }
+
+    /**
+     * Smart lookup for Telegram ID using multiple fallback strategies:
+     * 1. Exact match on worker_username
+     * 2. Case-insensitive match on worker_username
+     * 3. Exact match on telegram_handle (@username)
+     * 4. Direct telegram_id check (if identifier looks numeric)
+     *
+     * Returns both the telegram_id and which strategy succeeded.
+     */
+    async lookupTelegramId(identifier: string): Promise<TelegramIdLookupResult | null> {
+        // Strategy 1: Exact match on worker_username
+        const exactResult = await pool.query(
+            'SELECT telegram_id FROM telegram_user_mapping WHERE worker_username = $1',
+            [identifier]
+        )
+        if (exactResult.rows.length > 0) {
+            return { telegramId: exactResult.rows[0].telegram_id, strategy: 'worker_username_exact' }
+        }
+
+        // Strategy 2: Case-insensitive match on worker_username
+        const ilikeResult = await pool.query(
+            'SELECT telegram_id FROM telegram_user_mapping WHERE LOWER(worker_username) = LOWER($1)',
+            [identifier]
+        )
+        if (ilikeResult.rows.length > 0) {
+            return { telegramId: ilikeResult.rows[0].telegram_id, strategy: 'worker_username_ilike' }
+        }
+
+        // Strategy 3: Exact match on telegram_handle (@username)
+        const handleResult = await pool.query(
+            'SELECT telegram_id FROM telegram_user_mapping WHERE telegram_handle = $1',
+            [identifier]
+        )
+        if (handleResult.rows.length > 0) {
+            return { telegramId: handleResult.rows[0].telegram_id, strategy: 'telegram_handle_exact' }
+        }
+
+        // Strategy 4: Direct telegram_id check (only if identifier looks like a numeric ID)
+        if (/^\d+$/.test(identifier)) {
+            const directResult = await pool.query(
+                'SELECT telegram_id FROM telegram_user_mapping WHERE telegram_id = $1',
+                [identifier]
+            )
+            if (directResult.rows.length > 0) {
+                return { telegramId: directResult.rows[0].telegram_id, strategy: 'telegram_id_direct' }
+            }
+        }
+
+        return null
     }
 
     /**

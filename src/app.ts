@@ -526,46 +526,67 @@ async function main() {
 
             loggers.app.info({ worker_username }, 'Message sending API request received')
 
-            // Lookup Telegram ID by worker username
+            // Lookup Telegram ID using multi-strategy fallback
             const { telegramUserService } = await import('~/core/services/telegramUserService')
-            const telegramId = await telegramUserService.getTelegramIdByUsername(worker_username)
+            const lookupResult = await telegramUserService.lookupTelegramId(worker_username)
 
-            if (!telegramId) {
-                loggers.app.warn({ worker_username }, 'Worker not found in telegram_user_mapping')
+            if (!lookupResult) {
+                loggers.app.warn(
+                    {
+                        worker_username,
+                        strategies_tried: [
+                            'worker_username_exact',
+                            'worker_username_ilike',
+                            'telegram_handle_exact',
+                            'telegram_id_direct',
+                        ],
+                    },
+                    'Worker not found in telegram_user_mapping (all strategies exhausted)'
+                )
                 res.writeHead(404, { 'Content-Type': 'application/json' })
                 return res.end(
                     JSON.stringify({
                         error: 'Worker not found',
                         worker_username,
+                        strategies_tried: [
+                            'worker_username_exact',
+                            'worker_username_ilike',
+                            'telegram_handle_exact',
+                            'telegram_id_direct',
+                        ],
                         note: 'User must interact with bot at least once to be registered',
                     })
                 )
             }
+
+            const { telegramId, strategy: lookupStrategy } = lookupResult
 
             // Send message via Telegram
             await adapterProvider.vendor.telegram.sendMessage(telegramId, message, {
                 parse_mode: 'HTML',
             })
 
-            // Log outgoing message
+            // Log outgoing message with lookup strategy
             const { MessageLogger } = await import('~/core/middleware/messageLogger')
             await MessageLogger.logOutgoing(telegramId, telegramId, message, undefined, {
                 webhook: 'send-message-api',
                 worker_username,
+                lookup_strategy: lookupStrategy,
             })
 
             loggers.app.info(
-                { worker_username, telegram_id: telegramId },
+                { worker_username, telegram_id: telegramId, lookup_strategy: lookupStrategy },
                 'Message sent successfully via API'
             )
 
-            // Return success response
+            // Return success response with lookup strategy
             res.writeHead(200, { 'Content-Type': 'application/json' })
             return res.end(
                 JSON.stringify({
                     success: true,
                     telegram_id: telegramId,
                     worker_username,
+                    lookup_strategy: lookupStrategy,
                 })
             )
         } catch (error) {

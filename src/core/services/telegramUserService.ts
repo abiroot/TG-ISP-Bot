@@ -5,7 +5,14 @@
  * Auto-captures user data from bot interactions
  */
 
-import { telegramUserRepository } from '~/database/repositories/telegramUserRepository'
+import {
+    telegramUserRepository,
+    type TelegramIdLookupResult,
+    type TelegramIdLookupStrategy,
+} from '~/database/repositories/telegramUserRepository'
+
+// Re-export types for consumers
+export type { TelegramIdLookupResult, TelegramIdLookupStrategy }
 import { createFlowLogger } from '~/core/utils/logger'
 import { ServiceError } from '~/core/errors/ServiceError'
 import type {
@@ -57,6 +64,55 @@ export class TelegramUserService {
                 'TELEGRAM_ID_LOOKUP_ERROR',
                 error,
                 true // Database errors may be transient
+            )
+        }
+    }
+
+    /**
+     * Smart lookup for Telegram ID using multiple fallback strategies:
+     * 1. Exact match on worker_username
+     * 2. Case-insensitive match on worker_username
+     * 3. Exact match on telegram_handle (@username)
+     * 4. Direct telegram_id check (if identifier looks numeric)
+     *
+     * @param identifier - The identifier to lookup (username, @handle, or telegram_id)
+     * @returns The telegram_id and which strategy succeeded, or null if not found
+     */
+    async lookupTelegramId(identifier: string): Promise<TelegramIdLookupResult | null> {
+        try {
+            // Validate input
+            if (!identifier || typeof identifier !== 'string' || identifier.trim() === '') {
+                throw new TelegramUserServiceError(
+                    'Invalid identifier provided',
+                    'INVALID_IDENTIFIER',
+                    undefined,
+                    false
+                )
+            }
+
+            const trimmedIdentifier = identifier.trim()
+            const result = await telegramUserRepository.lookupTelegramId(trimmedIdentifier)
+
+            if (result) {
+                logger.info(
+                    { identifier: trimmedIdentifier, telegramId: result.telegramId, strategy: result.strategy },
+                    'User lookup succeeded'
+                )
+            } else {
+                logger.debug({ identifier: trimmedIdentifier }, 'User lookup failed - no match found')
+            }
+
+            return result
+        } catch (error) {
+            if (error instanceof TelegramUserServiceError) {
+                throw error
+            }
+            logger.error({ err: error, identifier }, 'Failed to lookup Telegram ID')
+            throw new TelegramUserServiceError(
+                'Failed to lookup Telegram ID',
+                'TELEGRAM_ID_LOOKUP_ERROR',
+                error,
+                true
             )
         }
     }
