@@ -2,7 +2,7 @@
  * Customer Ping Flow
  *
  * Shows network ping diagnostics when user clicks "PING User" button.
- * Calls external ISP API /api/user-ping?mobile={identifier} endpoint.
+ * Calls external ISP API /user-ping?mobile={identifier} endpoint.
  *
  * Access: Admin and Worker roles only
  */

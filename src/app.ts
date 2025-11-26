@@ -226,7 +226,7 @@ async function main() {
         // Customer action menu flows (Search or Create Task)
         // Button handlers for menu interaction (menu is displayed directly from WelcomeFlow)
         customerSearchFlow, // Search customer button handler
-        customerPingFlow, // Ping customer button handler (calls ISP API /api/user-ping)
+        customerPingFlow, // Ping customer button handler (calls ISP API /user-ping)
         customerCancelFlow, // Cancel button handler
         // Task creation wizard flows
         customerTaskFlow, // Task creation entry (verifies customer)

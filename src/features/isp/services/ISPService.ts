@@ -530,7 +530,7 @@ export class ISPService {
 
     /**
      * Ping customer (network diagnostics)
-     * Calls external ISP API /api/user-ping?mobile={identifier}
+     * Calls external ISP API /user-ping?mobile={identifier}
      *
      * @param identifier - Phone number or username
      * @returns Ping response data from ISP API
@@ -549,7 +549,7 @@ export class ISPService {
             const token = await this.authenticate()
 
             const response = await fetch(
-                `${this.config.baseUrl}/api/user-ping?mobile=${encodeURIComponent(identifier)}`,
+                `${this.config.baseUrl}/user-ping?mobile=${encodeURIComponent(identifier)}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
