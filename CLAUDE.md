@@ -215,6 +215,7 @@ if (billingService.isEnabled()) {
         message: 'Customer reported connection issues',
         customer_username: 'customer123',
         wid: 'wtest', // Worker username (e.g., wtest, wmarwan, walewe)
+        whatsapp: 'yes', // 'yes' | 'no' - Whether to send WhatsApp notification
     }
 
     const response = await billingService.createTask(taskData)
@@ -233,6 +234,7 @@ interface CreateTaskData {
     message: string
     customer_username: string
     wid: string // Worker ID (username)
+    whatsapp: 'yes' | 'no' // Whether to send WhatsApp notification to customer
 }
 ```
 

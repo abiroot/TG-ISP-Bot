@@ -38,6 +38,7 @@ export interface CreateTaskData {
     message: string
     customer_username: string
     wid: string // Worker ID (username)
+    whatsapp: 'yes' | 'no' // Whether to send WhatsApp notification to customer
 }
 
 /**
@@ -111,6 +112,7 @@ export class BillingService {
                 message: taskData.message,
                 customer_username: taskData.customer_username,
                 wid: taskData.wid,
+                whatsapp: taskData.whatsapp,
             })
 
             const response = await fetch(`${this.config.baseUrl}/task_api.php`, {
@@ -131,7 +133,7 @@ export class BillingService {
             }
 
             billingLogger.info(
-                { customer: taskData.customer_username, type: taskData.type, worker: taskData.wid },
+                { customer: taskData.customer_username, type: taskData.type, worker: taskData.wid, whatsapp: taskData.whatsapp },
                 'Billing task created'
             )
 

@@ -5,12 +5,12 @@
  * Requires customer to exist in ISP system.
  *
  * Steps:
- * 1. Verify customer exists
- * 2. Select task type (maintenance/uninstall)
- * 3. Enter task message/description
- * 4. Select worker(s)
- * 5. Toggle WhatsApp notification
- * 6. Confirm and create task
+ * 1. Verify customer exists (customerTaskFlow)
+ * 2. Select task type (maintenance/uninstall) (taskTypeSelectionFlow)
+ * 3. Enter task message/description (taskTypeSelectionFlow - capture)
+ * 4. Select worker (taskWorkerSelectionFlow)
+ * 5. Choose WhatsApp notification (taskWhatsAppToggleFlow)
+ * 6. Confirm and create task (taskConfirmFlow)
  *
  * Access: Admin and Worker roles only
  */
@@ -328,7 +328,75 @@ export const taskWorkerSelectionFlow = addKeyword<TelegramProvider, Database>('B
             uninstall: '🛠️ Uninstall',
         }
 
-        // Show confirmation (skipping WhatsApp notification step)
+        // Show WhatsApp notification selection
+        await sendWithInlineButtons(
+            ctx,
+            { provider, state } as any,
+            `<b>📋 Task Details</b>\n\n` +
+                `<b>Customer:</b> ${html.escape(customerName || customerUsername || 'Unknown')}\n` +
+                `<b>Username:</b> <code>${html.escape(customerUsername || 'Unknown')}</code>\n\n` +
+                `<b>Task Type:</b> ${taskTypeLabels[taskType!]}\n` +
+                `<b>Description:</b>\n<i>${html.escape(taskMessage || 'No description')}</i>\n\n` +
+                `<b>Assigned To:</b> ${html.escape(selectedWorker.name)}\n\n` +
+                `<b>Send WhatsApp notification to customer?</b>`,
+            [
+                [createCallbackButton('✅ Yes, send WhatsApp', 'task_whatsapp:yes')],
+                [createCallbackButton('❌ No WhatsApp', 'task_whatsapp:no')],
+                [createCallbackButton('🚫 Cancel', 'task_cancel')],
+            ],
+            { parseMode: 'HTML' }
+        )
+    })
+
+/**
+ * Step 5: Handle WhatsApp notification toggle
+ */
+export const taskWhatsAppToggleFlow = addKeyword<TelegramProvider, Database>('BUTTON_TASK_WHATSAPP')
+    .addAction(async (ctx, { state, provider, extensions }) => {
+        const { taskCreationStore } = extensions!
+        const userId = String(ctx.from)
+        const whatsappChoice = ctx._button_data as 'yes' | 'no'
+
+        if (!['yes', 'no'].includes(whatsappChoice)) {
+            await provider.vendor.telegram.sendMessage(
+                ctx.from,
+                '❌ <b>Invalid selection.</b>',
+                { parse_mode: 'HTML' }
+            )
+            return
+        }
+
+        // Store WhatsApp preference
+        taskCreationStore.set(userId, { sendWhatsApp: whatsappChoice === 'yes' ? 1 : 0 })
+
+        const storedData = taskCreationStore.get(userId)
+        logger.info(
+            {
+                from: ctx.from,
+                whatsappChoice,
+                storeAfterSet: storedData,
+                storeSize: taskCreationStore.size()
+            },
+            '🔍 DEBUG: WhatsApp preference stored in taskCreationStore'
+        )
+
+        // Get all task data for final confirmation
+        const customerUsername = storedData?.customerUsername
+        const customerName = storedData?.customerName
+        const taskType = storedData?.taskType
+        const taskMessage = storedData?.taskMessage
+        const selectedWorkerName = storedData?.selectedWorkerName
+
+        const taskTypeLabels: Record<TaskType, string> = {
+            maintenance: '🔧 Maintenance',
+            uninstall: '🛠️ Uninstall',
+        }
+
+        const whatsAppStatus = whatsappChoice === 'yes' ? '✅ Yes' : '❌ No'
+
+        logger.info({ from: ctx.from, whatsappChoice }, 'WhatsApp preference selected')
+
+        // Show final confirmation
         await sendWithInlineButtons(
             ctx,
             { provider, state } as any,
@@ -337,7 +405,8 @@ export const taskWorkerSelectionFlow = addKeyword<TelegramProvider, Database>('B
                 `<b>Username:</b> <code>${html.escape(customerUsername || 'Unknown')}</code>\n\n` +
                 `<b>Task Type:</b> ${taskTypeLabels[taskType!]}\n` +
                 `<b>Description:</b>\n<i>${html.escape(taskMessage || 'No description')}</i>\n\n` +
-                `<b>Assigned To:</b> ${html.escape(selectedWorker.name)}\n\n` +
+                `<b>Assigned To:</b> ${html.escape(selectedWorkerName || 'Unknown')}\n` +
+                `<b>WhatsApp Notification:</b> ${whatsAppStatus}\n\n` +
                 `<b>Confirm to create this task?</b>`,
             [
                 [createCallbackButton('✅ Confirm & Create', 'task_confirm')],
@@ -348,7 +417,7 @@ export const taskWorkerSelectionFlow = addKeyword<TelegramProvider, Database>('B
     })
 
 /**
- * Step 5: Confirm and create task
+ * Step 6: Confirm and create task
  */
 export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TASK_CONFIRM')
     .addAction(async (ctx, { state, extensions, provider, endFlow }) => {
@@ -373,6 +442,7 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
         const taskType = taskData?.taskType
         const taskMessage = taskData?.taskMessage
         const wid = taskData?.wid
+        const sendWhatsApp = taskData?.sendWhatsApp
 
         // DEBUG: Log validation check
         const validation = {
@@ -380,23 +450,25 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
             hasTaskType: !!taskType,
             hasTaskMessage: !!taskMessage,
             hasWid: !!wid,
+            hasSendWhatsApp: sendWhatsApp !== undefined,
             customerUsername,
             taskType,
             taskMessage,
-            wid
+            wid,
+            sendWhatsApp
         }
 
         logger.info(
             {
                 from: ctx.from,
                 validation,
-                willFail: !customerUsername || !taskType || !taskMessage || !wid
+                willFail: !customerUsername || !taskType || !taskMessage || !wid || sendWhatsApp === undefined
             },
             '🔍 DEBUG: VALIDATION CHECK - Field presence'
         )
 
         // Validate all required fields
-        if (!customerUsername || !taskType || !taskMessage || !wid) {
+        if (!customerUsername || !taskType || !taskMessage || !wid || sendWhatsApp === undefined) {
             logger.error(
                 {
                     from: ctx.from,
@@ -417,12 +489,15 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
             return endFlow()
         }
 
+        const whatsappValue: 'yes' | 'no' = sendWhatsApp === 1 ? 'yes' : 'no'
+
         logger.info(
             {
                 from: ctx.from,
                 customerUsername,
                 taskType,
                 wid,
+                whatsapp: whatsappValue,
             },
             'Creating billing task'
         )
@@ -437,6 +512,7 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
                 message: taskMessage,
                 customer_username: customerUsername,
                 wid: wid,
+                whatsapp: whatsappValue,
             }
 
             const result = await billingService.createTask(createTaskData)
@@ -444,12 +520,15 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
             await LoadingIndicator.hide(provider, loadingMsg)
 
             if (result.success) {
+                const whatsAppStatusText = whatsappValue === 'yes' ? '✅ Sent' : '❌ Not sent'
+
                 await provider.vendor.telegram.sendMessage(
                     ctx.from,
                     '✅ <b>Task Created Successfully!</b>\n\n' +
                         `<b>Customer:</b> <code>${html.escape(customerUsername)}</code>\n` +
                         `<b>Type:</b> ${taskType}\n` +
-                        `<b>Worker:</b> ${html.escape(wid)}\n\n` +
+                        `<b>Worker:</b> ${html.escape(wid)}\n` +
+                        `<b>WhatsApp:</b> ${whatsAppStatusText}\n\n` +
                         `<i>The task has been assigned and is now visible in the billing system.</i>`,
                     { parse_mode: 'HTML' }
                 )
@@ -459,6 +538,7 @@ export const taskConfirmFlow = addKeyword<TelegramProvider, Database>('BUTTON_TA
                         from: ctx.from,
                         customerUsername,
                         taskType,
+                        whatsapp: whatsappValue,
                     },
                     'Task created successfully'
                 )

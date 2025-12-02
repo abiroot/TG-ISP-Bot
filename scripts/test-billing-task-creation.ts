@@ -28,6 +28,7 @@ async function testTaskCreation(billingService: BillingService, testNumber: numb
         message: `Test task ${testNumber} from BillingService - Please ignore this test message`,
         customer_username: 'abedissa2',
         wid: 'wtest',
+        whatsapp: 'no', // Don't send WhatsApp notifications during tests
     }
 
     try {
@@ -37,6 +38,7 @@ async function testTaskCreation(billingService: BillingService, testNumber: numb
         console.log(`     Message: ${taskData.message}`)
         console.log(`     Customer: ${taskData.customer_username}`)
         console.log(`     Worker ID: ${taskData.wid}`)
+        console.log(`     WhatsApp: ${taskData.whatsapp}`)
 
         const response = await billingService.createTask(taskData)
 
@@ -78,6 +80,7 @@ async function testMultipleTaskTypes(billingService: BillingService) {
             message: taskConfig.message,
             customer_username: 'abedissa2',
             wid: 'wtest',
+            whatsapp: 'no', // Don't send WhatsApp notifications during tests
         }
 
         try {
