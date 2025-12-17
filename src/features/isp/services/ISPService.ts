@@ -709,12 +709,12 @@ export class ISPService {
     }
 
     /**
-     * Check if a Mikrotik interface is an OLT or ether interface
-     * These interfaces contain "OLT" or "ether" (case-insensitive)
+     * Check if a Mikrotik interface is an OLT, ether, or base interface
+     * These interfaces contain "OLT", "ether", or "base" (case-insensitive)
      */
     private isOLTInterface(mikrotikInterface: string | null | undefined): boolean {
         if (!mikrotikInterface) return false
-        return /OLT|ether/i.test(mikrotikInterface)
+        return /OLT|ether|base/i.test(mikrotikInterface)
     }
 
     /**
@@ -907,15 +907,32 @@ export class ISPService {
 
                         const userInfo = userInfoArray[0]
 
-                        // Format user details
-                        const onlineStatus = userInfo.online ? '🟢 Online' : '🔴 Offline'
+                        // Check if account is expired
+                        const expiryDate = new Date(userInfo.expiryAccount)
+                        const isExpired = expiryDate < new Date()
+
+                        // Determine status: Online > Expired > Offline
+                        let onlineStatus: string
+                        if (userInfo.online) {
+                            onlineStatus = '🟢 Online'
+                        } else if (isExpired) {
+                            onlineStatus = '⏳ Expired'
+                        } else {
+                            onlineStatus = '🔴 Offline'
+                        }
+
                         const electricalStatus = userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'
                         const uptime = html.escape(userInfo.userUpTime || '0m')
+
+                        // Format lastLogout for offline/expired users
+                        const lastLogoutLine = !userInfo.online && userInfo.lastLogOut
+                            ? `\n    - Last Logout: ${this.formatDateBeirut(userInfo.lastLogOut)}`
+                            : ''
 
                         return {
                             success: true,
                             userName: apUser.userName,
-                            formatted: `• ${html.escape(apUser.userName)}:\n    - ${onlineStatus}\n    - Electrical: ${electricalStatus}\n    - Uptime: ${uptime}`
+                            formatted: `• ${html.escape(apUser.userName)}:\n    - ${onlineStatus}\n    - Electrical: ${electricalStatus}\n    - Uptime: ${uptime}${lastLogoutLine}`
                         }
                     } catch (error) {
                         ispLogger.error(
@@ -1144,7 +1161,7 @@ ${apUsers || '• None'}`.trim(),
 🔍 <b>Ping Diagnostics:</b>
 ${this.formatPingResults(userInfo.pingResult)}`.trim(),
 
-                  insights: insightsSection,
+                  insights: !isOLT ? insightsSection : undefined,
               }
             : {
                   // ADMIN FORMAT - Exact fields and order as specified
@@ -1210,7 +1227,7 @@ ${allSessions}`.trim()
 🔍 <b>Ping Diagnostics:</b>
 ${this.formatPingResults(userInfo.pingResult)}`.trim(),
 
-                  insights: insightsSection,
+                  insights: !isOLT ? insightsSection : undefined,
               }
 
         // Split into multiple messages if needed (respects Telegram's 4096 char limit)
