@@ -2,7 +2,7 @@
  * Customer Location Flow
  *
  * Handles the location button click from the customer action menu.
- * Looks up the customer's stored location and returns a Google Maps link.
+ * Fetches the latest customer location from ISP API and returns a Google Maps link.
  *
  * Access: Admin and Worker roles only
  */
@@ -13,13 +13,14 @@ import type { PostgreSQLAdapter as Database } from '@builderbot/database-postgre
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
-import { getCustomerLocation } from '~/database/repositories/customerLocationRepository'
 
 const logger = createFlowLogger('customer-location')
 
 /**
  * Handle location button click
  * Button format: customer_location:{identifier}
+ *
+ * Always fetches fresh data from ISP API (no caching)
  */
 export const customerLocationFlow = addKeyword<TelegramProvider, Database>('BUTTON_CUSTOMER_LOCATION')
     .addAction(async (ctx, { extensions, provider, endFlow }) => {
@@ -38,10 +39,10 @@ export const customerLocationFlow = addKeyword<TelegramProvider, Database>('BUTT
         logger.info({ from: ctx.from, identifier }, 'Customer location lookup initiated')
 
         // Show loading indicator
-        const loadingMsg = await LoadingIndicator.show(provider, ctx.from, '📍 Looking up location...')
+        const loadingMsg = await LoadingIndicator.show(provider, ctx.from, '📍 Fetching location from ISP...')
 
         try {
-            // First, search for the customer to get their username
+            // Fetch fresh customer data from ISP API (includes latest location)
             const users = await ispService.searchCustomer(identifier)
 
             if (!users || users.length === 0) {
@@ -55,16 +56,14 @@ export const customerLocationFlow = addKeyword<TelegramProvider, Database>('BUTT
                 return endFlow()
             }
 
-            // Get the first user's username (usually there's only one match)
+            // Get the first user (usually there's only one match)
             const user = users[0]
             const username = user.userName
 
-            // Look up the location from customer_locations table
-            const location = await getCustomerLocation(username)
-
             await LoadingIndicator.hide(provider, loadingMsg)
 
-            if (!location) {
+            // Check if location data exists in API response
+            if (!user.latitude || !user.longitude) {
                 await provider.vendor.telegram.sendMessage(
                     ctx.from,
                     '📍 <b>Location Not Found</b>\n\n' +
@@ -76,35 +75,23 @@ export const customerLocationFlow = addKeyword<TelegramProvider, Database>('BUTT
             }
 
             // Build Google Maps link
-            const mapsUrl = `https://www.google.com/maps?q=${location.latitude},${location.longitude}`
-
-            // Format the last update time
-            const updatedAt = location.updated_at
-                ? new Date(location.updated_at).toLocaleString('en-US', {
-                      dateStyle: 'medium',
-                      timeStyle: 'short',
-                  })
-                : 'Unknown'
-
-            const updatedBy = location.updated_by_name || location.updated_by_telegram_id || 'Unknown'
+            const mapsUrl = `https://www.google.com/maps?q=${user.latitude},${user.longitude}`
 
             await provider.vendor.telegram.sendMessage(
                 ctx.from,
                 `📍 <b>Customer Location</b>\n\n` +
                     `<b>Customer:</b> <code>${html.escape(username)}</code>\n` +
-                    `<b>Coordinates:</b> <code>${location.latitude}, ${location.longitude}</code>\n` +
-                    `<b>Last Updated:</b> ${html.escape(updatedAt)}\n` +
-                    `<b>Updated By:</b> ${html.escape(updatedBy)}\n\n` +
+                    `<b>Coordinates:</b> <code>${user.latitude}, ${user.longitude}</code>\n\n` +
                     `🗺️ <a href="${mapsUrl}">Open in Google Maps</a>`,
                 {
                     parse_mode: 'HTML',
-                    // Disable link preview so it doesn't show a map thumbnail (cleaner look)
+                    // Enable link preview to show map thumbnail
                     disable_web_page_preview: false,
                 }
             )
 
             logger.info(
-                { from: ctx.from, identifier, username, hasLocation: true },
+                { from: ctx.from, identifier, username, latitude: user.latitude, longitude: user.longitude },
                 'Customer location lookup completed'
             )
         } catch (error) {

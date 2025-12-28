@@ -98,6 +98,8 @@ export class MockISPService {
             collectorMobile: customer.collectorMobile || '',
             userSessions: customer.userSessions || [],
             pingResult: customer.pingResult || null,
+            latitude: customer.latitude ?? null,
+            longitude: customer.longitude ?? null,
         }
         this.customCustomers.push(fullCustomer)
     }

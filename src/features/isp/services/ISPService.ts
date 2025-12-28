@@ -144,6 +144,10 @@ export interface ISPUserInfo {
 
     // Ping results
     pingResult: string[]
+
+    // Location (if set)
+    latitude: number | null
+    longitude: number | null
 }
 
 /**

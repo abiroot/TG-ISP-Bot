@@ -126,6 +126,10 @@ export const onlineCustomer: ISPUserInfo = {
         '--- 10.50.1.45 ping statistics ---',
         '3 packets transmitted, 3 packets received, 0.0% packet loss',
     ],
+
+    // Location
+    latitude: 33.8886,
+    longitude: 35.4955,
 }
 
 /**
@@ -231,6 +235,10 @@ export const offlineCustomer: ISPUserInfo = {
     pingResult: [
         'PING 10.60.1.45: Host unreachable',
     ],
+
+    // Location (offline customer may not have location)
+    latitude: null,
+    longitude: null,
 }
 
 /**
@@ -333,6 +341,10 @@ export const expiredCustomer: ISPUserInfo = {
     pingResult: [
         'PING 10.70.1.45: Request timeout',
     ],
+
+    // Location
+    latitude: 33.9000,
+    longitude: 35.5000,
 }
 
 /**

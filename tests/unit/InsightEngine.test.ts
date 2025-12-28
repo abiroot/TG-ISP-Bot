@@ -112,6 +112,8 @@ describe('InsightEngine', () => {
             },
         ],
         pingResult: ['PING 8.8.8.8: 64 bytes from 8.8.8.8: icmp_seq=1 ttl=57 time=10.5 ms'],
+        latitude: null,
+        longitude: null,
         ...overrides,
     })
 
