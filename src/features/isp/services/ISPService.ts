@@ -1164,7 +1164,8 @@ ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 📍 <b>Address:</b> ${esc(userInfo.address)}
 📱 <b>Mobile:</b> ${esc(userInfo.mobile)}
 ${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
-📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}`.trim(),
+📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
+⚡ <b>Electrical:</b> ${userInfo.accessPointElectrical ? 'Yes' : 'No'}`.trim(),
 
                   stationInfo: stationSection.trim() || undefined,
 
