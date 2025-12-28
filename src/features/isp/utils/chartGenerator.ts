@@ -18,6 +18,8 @@ interface ChartOptions {
     height?: number
     title?: string
     backgroundColor?: string
+    /** Show percentages instead of actual speeds (for workers) */
+    percentageMode?: boolean
 }
 
 /**
@@ -66,12 +68,21 @@ export function calculateStats(data: UserStatDataPoint[]): {
 /**
  * Generate bandwidth usage chart using QuickChart.io
  * Returns image buffer for Telegram
+ *
+ * @param data - Array of bandwidth data points
+ * @param options - Chart options including percentageMode for workers
  */
 export async function generateBandwidthChart(
     data: UserStatDataPoint[],
     options: ChartOptions = {}
 ): Promise<Buffer> {
-    const { width = 800, height = 400, title = 'Bandwidth Usage', backgroundColor = '#ffffff' } = options
+    const {
+        width = 800,
+        height = 400,
+        title = 'Bandwidth Usage',
+        backgroundColor = '#ffffff',
+        percentageMode = false,
+    } = options
 
     if (data.length === 0) {
         throw new Error('No data points provided for chart generation')
@@ -79,54 +90,97 @@ export async function generateBandwidthChart(
 
     // Prepare data for chart
     const labels = data.map((d) => formatTimeLabel(d.date))
-    const uploadData = data.map((d) => d.currentUp)
-    const downloadData = data.map((d) => d.currentDown)
-    const limitUp = data[0]?.limitUp || 0
-    const limitDown = data[0]?.limitDown || 0
+    const limitUp = data[0]?.limitUp || 1 // Avoid division by zero
+    const limitDown = data[0]?.limitDown || 1
+
+    // Calculate data based on mode
+    let uploadData: number[]
+    let downloadData: number[]
+    let yAxisTitle: string
+    let yAxisMax: number | undefined
+    let downloadLabel: string
+    let uploadLabel: string
+
+    if (percentageMode) {
+        // Convert to percentages for workers
+        uploadData = data.map((d) => Math.round((d.currentUp / limitUp) * 100))
+        downloadData = data.map((d) => Math.round((d.currentDown / limitDown) * 100))
+        yAxisTitle = 'Usage (%)'
+        yAxisMax = 100
+        downloadLabel = 'Download (%)'
+        uploadLabel = 'Upload (%)'
+    } else {
+        // Show actual speeds for admins
+        uploadData = data.map((d) => d.currentUp)
+        downloadData = data.map((d) => d.currentDown)
+        yAxisTitle = 'Speed (kbps)'
+        yAxisMax = undefined
+        downloadLabel = 'Download (kbps)'
+        uploadLabel = 'Upload (kbps)'
+    }
+
+    // Build datasets
+    const datasets: any[] = [
+        {
+            label: downloadLabel,
+            data: downloadData,
+            borderColor: '#3498db',
+            backgroundColor: 'rgba(52, 152, 219, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#3498db',
+        },
+        {
+            label: uploadLabel,
+            data: uploadData,
+            borderColor: '#e74c3c',
+            backgroundColor: 'rgba(231, 76, 60, 0.1)',
+            fill: true,
+            tension: 0.3,
+            pointRadius: 3,
+            pointBackgroundColor: '#e74c3c',
+        },
+    ]
+
+    // Add limit lines only for admin mode (not percentage)
+    if (!percentageMode) {
+        datasets.push(
+            {
+                label: `Download Limit (${limitDown} kbps)`,
+                data: new Array(data.length).fill(limitDown),
+                borderColor: 'rgba(52, 152, 219, 0.4)',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0,
+            },
+            {
+                label: `Upload Limit (${limitUp} kbps)`,
+                data: new Array(data.length).fill(limitUp),
+                borderColor: 'rgba(231, 76, 60, 0.4)',
+                borderDash: [5, 5],
+                fill: false,
+                pointRadius: 0,
+            }
+        )
+    } else {
+        // Add 100% reference line for percentage mode
+        datasets.push({
+            label: 'Limit (100%)',
+            data: new Array(data.length).fill(100),
+            borderColor: 'rgba(46, 204, 113, 0.5)',
+            borderDash: [5, 5],
+            fill: false,
+            pointRadius: 0,
+        })
+    }
 
     // Chart.js configuration for QuickChart
     const chartConfig = {
         type: 'line',
         data: {
             labels,
-            datasets: [
-                {
-                    label: 'Download (kbps)',
-                    data: downloadData,
-                    borderColor: '#3498db',
-                    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#3498db',
-                },
-                {
-                    label: 'Upload (kbps)',
-                    data: uploadData,
-                    borderColor: '#e74c3c',
-                    backgroundColor: 'rgba(231, 76, 60, 0.1)',
-                    fill: true,
-                    tension: 0.3,
-                    pointRadius: 3,
-                    pointBackgroundColor: '#e74c3c',
-                },
-                {
-                    label: `Download Limit (${limitDown} kbps)`,
-                    data: new Array(data.length).fill(limitDown),
-                    borderColor: 'rgba(52, 152, 219, 0.4)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0,
-                },
-                {
-                    label: `Upload Limit (${limitUp} kbps)`,
-                    data: new Array(data.length).fill(limitUp),
-                    borderColor: 'rgba(231, 76, 60, 0.4)',
-                    borderDash: [5, 5],
-                    fill: false,
-                    pointRadius: 0,
-                },
-            ],
+            datasets,
         },
         options: {
             responsive: true,
@@ -147,8 +201,9 @@ export async function generateBandwidthChart(
                     ticks: { maxRotation: 45 },
                 },
                 y: {
-                    title: { display: true, text: 'Speed (kbps)' },
+                    title: { display: true, text: yAxisTitle },
                     beginAtZero: true,
+                    ...(yAxisMax ? { max: yAxisMax } : {}),
                 },
             },
         },
@@ -187,11 +242,35 @@ export async function generateBandwidthChart(
 
 /**
  * Format statistics for display in Telegram message
+ *
+ * @param stats - Calculated statistics
+ * @param identifier - Customer identifier
+ * @param percentageMode - Show percentages instead of actual speeds (for workers)
  */
 export function formatStatsMessage(
     stats: ReturnType<typeof calculateStats>,
-    identifier: string
+    identifier: string,
+    percentageMode: boolean = false
 ): string {
+    if (percentageMode) {
+        // Calculate percentages for workers
+        const avgDownPct = stats.limitDown > 0 ? Math.round((stats.avgDown / stats.limitDown) * 100) : 0
+        const avgUpPct = stats.limitUp > 0 ? Math.round((stats.avgUp / stats.limitUp) * 100) : 0
+        const peakDownPct = stats.limitDown > 0 ? Math.round((stats.maxDown / stats.limitDown) * 100) : 0
+        const peakUpPct = stats.limitUp > 0 ? Math.round((stats.maxUp / stats.limitUp) * 100) : 0
+
+        return `📊 <b>Bandwidth Usage</b>
+
+<b>User:</b> <code>${identifier}</code>
+
+<b>Current Usage:</b>
+↓ Download: Avg <b>${avgDownPct}%</b> | Peak <b>${peakDownPct}%</b>
+↑ Upload: Avg <b>${avgUpPct}%</b> | Peak <b>${peakUpPct}%</b>
+
+<i>Percentages relative to account limits</i>`
+    }
+
+    // Full details for admins
     return `📊 <b>Bandwidth Statistics</b>
 
 <b>User:</b> <code>${identifier}</code>

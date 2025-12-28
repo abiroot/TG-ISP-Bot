@@ -28,8 +28,9 @@ const logger = createFlowLogger('customer-statistics')
  */
 export const customerStatisticsFlow = addKeyword<TelegramProvider, Database>('BUTTON_CUSTOMER_STATS')
     .addAction(async (ctx, { extensions, provider, endFlow }) => {
-        const { ispService } = extensions!
+        const { ispService, roleService } = extensions!
         const identifier = ctx._button_data as string
+        const userId = String(ctx.from)
 
         if (!identifier) {
             await provider.vendor.telegram.sendMessage(
@@ -40,7 +41,14 @@ export const customerStatisticsFlow = addKeyword<TelegramProvider, Database>('BU
             return endFlow()
         }
 
-        logger.info({ from: ctx.from, identifier }, 'Customer statistics requested')
+        // Check user role - workers see percentages only
+        const userRoles = await roleService.getUserRoles(userId)
+        const isWorker = userRoles.includes('worker') && !userRoles.includes('admin')
+
+        logger.info(
+            { from: ctx.from, identifier, isWorker },
+            'Customer statistics requested'
+        )
 
         // Show loading indicator
         const loadingMsg = await LoadingIndicator.show(
@@ -69,17 +77,18 @@ export const customerStatisticsFlow = addKeyword<TelegramProvider, Database>('BU
             // Calculate statistics summary
             const stats = calculateStats(statsData)
 
-            // Generate chart image
+            // Generate chart image - workers see percentages only
             const chartBuffer = await generateBandwidthChart(statsData, {
                 title: `Bandwidth Usage - ${identifier}`,
                 width: 800,
                 height: 400,
+                percentageMode: isWorker,
             })
 
             await LoadingIndicator.hide(provider, loadingMsg)
 
-            // Send chart image with caption
-            const caption = formatStatsMessage(stats, identifier)
+            // Send chart image with caption - workers see percentages only
+            const caption = formatStatsMessage(stats, identifier, isWorker)
 
             // Use InputFile for buffer - Telegram expects specific format
             await provider.vendor.telegram.sendPhoto(
