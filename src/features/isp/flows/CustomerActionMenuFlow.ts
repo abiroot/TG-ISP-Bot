@@ -86,7 +86,7 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
                 await LoadingIndicator.hide(provider, loadingMsg)
             } else {
                 // Extract customer usernames for tracking
-                const customerUsernames = users.map((u) => u.username).filter(Boolean)
+                const customerUsernames = users.map((u) => u.userName).filter(Boolean)
 
                 // Record search activity (found)
                 await searchActivityService.recordSearch({

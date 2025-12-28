@@ -1455,7 +1455,26 @@ ${allSessions}`.trim()
                         'searchCustomer tool called'
                     )
 
+                    // Track search timing
+                    const searchStartTime = Date.now()
                     const users = await this.searchCustomer(args.identifier)
+                    const responseTimeMs = Date.now() - searchStartTime
+
+                    // Determine identifier type (phone or username)
+                    const cleaned = args.identifier.replace(/[\s\-+()]/g, '')
+                    const identifierType: 'phone' | 'username' = /^\d{6,}$/.test(cleaned) || /^(961|00961|[+]961)?\d+$/.test(args.identifier) ? 'phone' : 'username'
+
+                    // Record search activity (import at top of file)
+                    const { searchActivityService } = await import('~/features/admin/services/SearchActivityService')
+                    await searchActivityService.recordSearch({
+                        userTelegramId: userTelegramId || 'unknown',
+                        searchIdentifier: args.identifier,
+                        identifierType,
+                        resultsCount: users.length,
+                        searchSuccessful: users.length > 0,
+                        customerUsernames: users.map(u => u.userName).filter(Boolean),
+                        responseTimeMs,
+                    })
 
                     if (users.length === 0) {
                         return {
