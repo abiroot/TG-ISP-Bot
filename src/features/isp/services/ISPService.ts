@@ -1258,10 +1258,6 @@ ${apUsersResult.formatted || '• None'}`.trim(),
                   billing: `
 💰 <b>Account Price:</b> $${userInfo.accountPrice}`.trim(),
 
-                  pingDiagnostics: `
-🔍 <b>Ping Diagnostics:</b>
-${this.formatPingResults(userInfo.pingResult)}`.trim(),
-
                   insights: !isOLT ? insightsSection : undefined,
               }
             : {
