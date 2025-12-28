@@ -47,6 +47,7 @@ import {
 } from '~/features/isp/flows/CustomerActionMenuFlow'
 import { customerPingFlow } from '~/features/isp/flows/CustomerPingFlow'
 import { customerStatisticsFlow } from '~/features/isp/flows/CustomerStatisticsFlow'
+import { customerLocationFlow } from '~/features/isp/flows/CustomerLocationFlow'
 import {
     customerTaskFlow,
     taskTypeSelectionFlow,
@@ -230,6 +231,7 @@ async function main() {
         customerSearchFlow, // Search customer button handler
         customerPingFlow, // Ping customer button handler (calls ISP API /user-ping)
         customerStatisticsFlow, // Statistics chart button handler (calls ISP API /user-stat)
+        customerLocationFlow, // Location button handler (shows Google Maps link)
         customerCancelFlow, // Cancel button handler
         // Task creation wizard flows
         customerTaskFlow, // Task creation entry (verifies customer)
