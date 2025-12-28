@@ -1320,10 +1320,6 @@ ${allSessions}`.trim()
 🕐 <b>Session History:</b>
 • No sessions`.trim(),
 
-                  pingDiagnostics: `
-🔍 <b>Ping Diagnostics:</b>
-${this.formatPingResults(userInfo.pingResult)}`.trim(),
-
                   insights: !isOLT ? insightsSection : undefined,
               }
 
