@@ -15,8 +15,21 @@ import type { PostgreSQLAdapter as Database } from '@builderbot/database-postgre
 import { createFlowLogger } from '~/core/utils/logger'
 import { html } from '~/core/utils/telegramFormatting'
 import { LoadingIndicator } from '~/core/utils/loadingIndicator'
+import { searchActivityService } from '~/features/admin/services/SearchActivityService'
 
 const logger = createFlowLogger('customer-action-menu')
+
+/**
+ * Determine identifier type based on format
+ * Phone numbers contain digits only (after cleaning)
+ * Usernames contain letters
+ */
+function getIdentifierType(identifier: string): 'phone' | 'username' {
+    // Remove common phone prefixes and check if mostly digits
+    const cleaned = identifier.replace(/[\s\-+()]/g, '')
+    const isPhone = /^\d{6,}$/.test(cleaned) || /^(961|00961|[+]961)?\d+$/.test(identifier)
+    return isPhone ? 'phone' : 'username'
+}
 
 /**
  * Handle search customer button click
@@ -42,11 +55,26 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
         // Show loading indicator
         const loadingMsg = await LoadingIndicator.show(provider, ctx.from, '🔍 Searching...')
 
+        // Track search timing
+        const searchStartTime = Date.now()
+        const identifierType = getIdentifierType(identifier)
+
         try {
             // Search for customer
             const users = await ispService.searchCustomer(identifier)
+            const responseTimeMs = Date.now() - searchStartTime
 
             if (!users || users.length === 0) {
+                // Record search activity (not found)
+                await searchActivityService.recordSearch({
+                    userTelegramId: userId,
+                    searchIdentifier: identifier,
+                    identifierType,
+                    resultsCount: 0,
+                    searchSuccessful: false,
+                    responseTimeMs,
+                })
+
                 await provider.vendor.telegram.sendMessage(
                     ctx.from,
                     '❌ <b>Customer not found</b>\n\n' +
@@ -57,6 +85,20 @@ export const customerSearchFlow = addKeyword<TelegramProvider, Database>('BUTTON
                 // Hide loading indicator after sending "not found" message
                 await LoadingIndicator.hide(provider, loadingMsg)
             } else {
+                // Extract customer usernames for tracking
+                const customerUsernames = users.map((u) => u.username).filter(Boolean)
+
+                // Record search activity (found)
+                await searchActivityService.recordSearch({
+                    userTelegramId: userId,
+                    searchIdentifier: identifier,
+                    identifierType,
+                    resultsCount: users.length,
+                    searchSuccessful: true,
+                    customerUsernames,
+                    responseTimeMs,
+                })
+
                 // Get user's role for formatting
                 const { roleService } = extensions!
                 const userRoles = await roleService.getUserRoles(userId)

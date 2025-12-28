@@ -527,6 +527,9 @@ Admin-only commands (Telegram user IDs in `src/config/admins.ts`):
 **Location Management:**
 - `/unfulfilled` - List location update requests from last 7 days that were never fulfilled (webhook sent but no location record exists)
 
+**Search Activity:**
+- `/searches` or `searches` - Show 7-day search activity report (who searched for which customers)
+
 ### Creating New Admin Commands
 
 When creating admin-only commands, follow this checklist to ensure proper security:
