@@ -1211,7 +1211,8 @@ export class ISPService {
 ${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
 `
                 : `
-📡 <b>Station:</b> ${esc(userInfo.stationName)} (${userInfo.stationOnline ? 'Online' : 'Offline'})
+📡 <b>Station:</b> ${esc(userInfo.stationName)}
+- <b>Status:</b> ${userInfo.stationOnline ? '🟢 Online' : '🔴 Offline'}
 - <b>Uptime:</b> ${esc(userInfo.stationUpTime)}
 ${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
 `
@@ -1233,9 +1234,11 @@ ${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
 ${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
 `
                 : `
-📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} - ${esc(userInfo.accessPointBoardName)} (${userInfo.accessPointOnline ? 'Online' : 'Offline'})
+📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} - ${esc(userInfo.accessPointBoardName)}
+- <b>Status:</b> ${userInfo.accessPointOnline ? '🟢 Online' : '🔴 Offline'}
 - <b>Uptime:</b> ${esc(userInfo.accessPointUpTime)}
 - <b>Signal:</b> ${esc(userInfo.accessPointSignal)}
+- <b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}
 ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 `
             : ''
@@ -1253,7 +1256,7 @@ ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 ${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
 🚪 <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}
 📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
-⚡ <b>Electrical:</b> ${userInfo.accessPointElectrical ? 'Yes' : 'No'}
+<b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}
 📡 <b>Router:</b> ${esc(userInfo.routerBrand, 'Unknown')}`.trim(),
 
                   stationInfo: stationSection.trim() || undefined,
