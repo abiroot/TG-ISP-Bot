@@ -51,9 +51,24 @@ const BILLING_WORKERS = [
  */
 export const customerTaskFlow = addKeyword<TelegramProvider, Database>('BUTTON_CUSTOMER_TASK')
     .addAction(async (ctx, { state, extensions, provider, endFlow }) => {
-        const { ispService, taskCreationStore } = extensions!
+        const { ispService, taskCreationStore, roleService } = extensions!
         const userId = String(ctx.from) // Normalize to string for consistent store keys
         const identifier = ctx._button_data as string
+
+        // Check if user is a worker - workers cannot create tasks
+        const userRoles = await roleService.getUserRoles(userId)
+        const isWorker = userRoles.includes('worker') && !userRoles.includes('admin')
+
+        if (isWorker) {
+            logger.warn({ from: ctx.from }, 'Worker attempted to create task - access denied')
+            await provider.vendor.telegram.sendMessage(
+                ctx.from,
+                '❌ <b>Access Denied</b>\n\n' +
+                    'Workers are not allowed to create tasks. Please contact an administrator.',
+                { parse_mode: 'HTML' }
+            )
+            return endFlow()
+        }
 
         if (!identifier) {
             await provider.vendor.telegram.sendMessage(

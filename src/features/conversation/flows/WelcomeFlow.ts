@@ -218,6 +218,16 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 const { createCallbackButton } = await import('~/core/utils/telegramButtons')
                 const { html } = await import('~/core/utils/telegramFormatting')
 
+                // Build button menu - workers cannot create tasks
+                const isWorkerOnly = userRoles.includes('worker') && !userRoles.includes('admin')
+                const actionButtons = [
+                    [createCallbackButton('🔍 Search Customer Info', `customer_search:${identifier.value}`)],
+                    [createCallbackButton('📡 PING User', `customer_ping:${identifier.value}`)],
+                    // Only show Create Task button for non-workers (admins, collectors)
+                    ...(!isWorkerOnly ? [[createCallbackButton('📋 Create Task', `customer_task:${identifier.value}`)]] : []),
+                    [createCallbackButton('❌ Cancel', 'customer_cancel')],
+                ]
+
                 await sendWithInlineButtons(
                     ctx,
                     utils,
@@ -225,12 +235,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                         `<b>Identifier:</b> <code>${html.escape(identifier.value)}</code>\n` +
                         `<b>Type:</b> ${identifier.type}\n\n` +
                         `What would you like to do?`,
-                    [
-                        [createCallbackButton('🔍 Search Customer Info', `customer_search:${identifier.value}`)],
-                        [createCallbackButton('📡 PING User', `customer_ping:${identifier.value}`)],
-                        [createCallbackButton('📋 Create Task', `customer_task:${identifier.value}`)],
-                        [createCallbackButton('❌ Cancel', 'customer_cancel')],
-                    ],
+                    actionButtons,
                     { parseMode: 'HTML' }
                 )
 
