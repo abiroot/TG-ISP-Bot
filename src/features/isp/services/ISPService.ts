@@ -1250,7 +1250,8 @@ ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 👤 <b>User:</b> ${esc(userInfo.userName)}
 📍 <b>Address:</b> ${esc(userInfo.address)}
 📱 <b>Mobile:</b> ${esc(userInfo.mobile)}
-${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
+${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
+🚪 <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}
 📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
 ⚡ <b>Electrical:</b> ${userInfo.accessPointElectrical ? 'Yes' : 'No'}
 📡 <b>Router:</b> ${esc(userInfo.routerBrand, 'Unknown')}`.trim(),
