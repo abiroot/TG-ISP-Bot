@@ -1208,6 +1208,7 @@ ${this.formatInterfaceStats(userInfo.stationInterfaceStats)}
 `
                 : `
 📡 <b>Station:</b> ${esc(userInfo.stationName)} (${userInfo.stationOnline ? 'Online' : 'Offline'})
+- <b>Uptime:</b> ${esc(userInfo.stationUpTime)}
 ${this.formatInterfaceStatsWorker(userInfo.stationInterfaceStats)}
 `
             : ''
@@ -1229,6 +1230,8 @@ ${this.formatInterfaceStats(userInfo.accessPointInterfaceStats)}
 `
                 : `
 📶 <b>Access Point:</b> ${esc(userInfo.accessPointName)} - ${esc(userInfo.accessPointBoardName)} (${userInfo.accessPointOnline ? 'Online' : 'Offline'})
+- <b>Uptime:</b> ${esc(userInfo.accessPointUpTime)}
+- <b>Signal:</b> ${esc(userInfo.accessPointSignal)}
 ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 `
             : ''
@@ -1245,7 +1248,8 @@ ${this.formatInterfaceStatsWorker(userInfo.accessPointInterfaceStats)}
 📱 <b>Mobile:</b> ${esc(userInfo.mobile)}
 ${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'} | ${userInfo.active ? '✅ Active' : '❌ Inactive'}
 📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
-⚡ <b>Electrical:</b> ${userInfo.accessPointElectrical ? 'Yes' : 'No'}`.trim(),
+⚡ <b>Electrical:</b> ${userInfo.accessPointElectrical ? 'Yes' : 'No'}
+📡 <b>Router:</b> ${esc(userInfo.routerBrand, 'Unknown')}`.trim(),
 
                   stationInfo: stationSection.trim() || undefined,
 
@@ -1257,6 +1261,14 @@ ${apUsersResult.formatted || '• None'}`.trim(),
 
                   billing: `
 💰 <b>Account Price:</b> $${userInfo.accountPrice}`.trim(),
+
+                  sessionHistory: allSessions
+                      ? `
+🕐 <b>Session History:</b>
+${allSessions}`.trim()
+                      : `
+🕐 <b>Session History:</b>
+• No sessions`.trim(),
 
                   insights: !isOLT ? insightsSection : undefined,
               }
