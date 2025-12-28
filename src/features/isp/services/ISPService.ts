@@ -147,6 +147,18 @@ export interface ISPUserInfo {
 }
 
 /**
+ * User Statistics Data Point (from user-stat API)
+ * Used for bandwidth usage graphs
+ */
+export interface UserStatDataPoint {
+    date: string // "2025-12-28 19:36:02"
+    limitUp: number // Upload limit in kbps
+    limitDown: number // Download limit in kbps
+    currentUp: number // Current upload in kbps
+    currentDown: number // Current download in kbps
+}
+
+/**
  * ISP API credentials and configuration
  */
 interface ISPConfig {
@@ -396,6 +408,74 @@ export class ISPService {
             throw new ISPServiceError(
                 'Customer search failed with network error',
                 'SEARCH_NETWORK_ERROR',
+                error,
+                true // Network errors are retryable
+            )
+        }
+    }
+
+    /**
+     * Get user bandwidth statistics for graphing
+     * Returns time-series data of upload/download speeds
+     */
+    async getUserStatistics(identifier: string): Promise<UserStatDataPoint[]> {
+        if (!this.config.enabled) {
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
+        }
+
+        try {
+            const token = await this.authenticate()
+
+            // Clean phone number before API call
+            const cleanedIdentifier = this.cleanPhoneNumber(identifier)
+
+            const response = await fetch(
+                `${this.config.baseUrl}/user-stat?mobile=${encodeURIComponent(cleanedIdentifier)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                if (response.status === 404) {
+                    // Not found - return empty array
+                    return []
+                }
+
+                throw new ISPServiceError(
+                    `User statistics fetch failed: ${response.statusText}`,
+                    'STATS_FAILED',
+                    undefined,
+                    response.status >= 500 // Retry on server errors
+                )
+            }
+
+            const data = await response.json()
+            const stats: UserStatDataPoint[] = Array.isArray(data) ? data : []
+
+            ispLogger.info(
+                { identifier, dataPoints: stats.length },
+                'User statistics fetched'
+            )
+
+            return stats
+        } catch (error) {
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
+            ispLogger.error({ err: error, identifier }, 'User statistics fetch failed')
+            throw new ISPServiceError(
+                'User statistics fetch failed with network error',
+                'STATS_NETWORK_ERROR',
                 error,
                 true // Network errors are retryable
             )

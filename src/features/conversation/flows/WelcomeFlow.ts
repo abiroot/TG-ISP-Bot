@@ -223,6 +223,7 @@ export const welcomeFlow = addKeyword<TelegramProvider, Database>(EVENTS.WELCOME
                 const actionButtons = [
                     [createCallbackButton('🔍 Search Customer Info', `customer_search:${identifier.value}`)],
                     [createCallbackButton('📡 PING User', `customer_ping:${identifier.value}`)],
+                    [createCallbackButton('📊 Statistics', `customer_stats:${identifier.value}`)],
                     // Only show Create Task button for non-workers (admins, collectors)
                     ...(!isWorkerOnly ? [[createCallbackButton('📋 Create Task', `customer_task:${identifier.value}`)]] : []),
                     [createCallbackButton('❌ Cancel', 'customer_cancel')],

@@ -46,6 +46,7 @@ import {
     customerCancelFlow,
 } from '~/features/isp/flows/CustomerActionMenuFlow'
 import { customerPingFlow } from '~/features/isp/flows/CustomerPingFlow'
+import { customerStatisticsFlow } from '~/features/isp/flows/CustomerStatisticsFlow'
 import {
     customerTaskFlow,
     taskTypeSelectionFlow,
@@ -228,6 +229,7 @@ async function main() {
         // Button handlers for menu interaction (menu is displayed directly from WelcomeFlow)
         customerSearchFlow, // Search customer button handler
         customerPingFlow, // Ping customer button handler (calls ISP API /user-ping)
+        customerStatisticsFlow, // Statistics chart button handler (calls ISP API /user-stat)
         customerCancelFlow, // Cancel button handler
         // Task creation wizard flows
         customerTaskFlow, // Task creation entry (verifies customer)
