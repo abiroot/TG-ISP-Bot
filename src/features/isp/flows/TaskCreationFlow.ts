@@ -41,7 +41,7 @@ const BILLING_WORKERS = [
     { id: 17, name: 'wchristelle' },
     { id: 22, name: 'hugilo' },
     { id: 23, name: 'hueddy' },
-    { id: 26, name: 'collmohamadalhamad' },
+    { id: 26, name: 'wmohamadalhamad' },
 ] as const
 
 /**

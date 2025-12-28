@@ -841,24 +841,26 @@ export class ISPService {
      * @param currentUserName - Current user's username to exclude from the list
      * @param provider - Optional provider for progress updates
      * @param loadingMsg - Optional loading message to update with progress
-     * @returns Formatted string with detailed AP user information
+     * @returns Object with formatted string and online/offline counts
      */
     private async fetchAPUserDetails(
         apUsers: Array<{ userName: string; online: boolean }>,
         currentUserName: string,
         provider?: any,
         loadingMsg?: LoadingMessage | null
-    ): Promise<string> {
+    ): Promise<{ formatted: string; onlineCount: number; offlineCount: number }> {
         // Exclude current user from the list
         const otherUsers = apUsers.filter((u) => u.userName !== currentUserName)
 
         if (otherUsers.length === 0) {
-            return '• No other users on this AP'
+            return { formatted: '• No other users on this AP', onlineCount: 0, offlineCount: 0 }
         }
 
         const userDetails: string[] = []
         let successCount = 0
         let failureCount = 0
+        let onlineCount = 0
+        let offlineCount = 0
 
         // Determine batch size dynamically
         const batchSize = this.getBatchSize(otherUsers.length)
@@ -929,10 +931,14 @@ export class ISPService {
                             ? `\n    - Last Logout: ${this.formatDateBeirut(userInfo.lastLogOut)}`
                             : ''
 
+                        // Session count
+                        const sessionCount = userInfo.userSessions?.length ?? 0
+
                         return {
                             success: true,
                             userName: apUser.userName,
-                            formatted: `• ${html.escape(apUser.userName)}:\n    - ${onlineStatus}\n    - Electrical: ${electricalStatus}\n    - Uptime: ${uptime}${lastLogoutLine}`
+                            isOnline: userInfo.online,
+                            formatted: `• ${html.escape(apUser.userName)}:\n    - ${onlineStatus}\n    - Electrical: ${electricalStatus}\n    - Uptime: ${uptime}\n    - Sessions: ${sessionCount}${lastLogoutLine}`
                         }
                     } catch (error) {
                         ispLogger.error(
@@ -942,6 +948,7 @@ export class ISPService {
                         return {
                             success: false,
                             userName: apUser.userName,
+                            isOnline: null,
                             formatted: `• ${html.escape(apUser.userName)}:\n    - ⚠️ Data unavailable`
                         }
                     }
@@ -953,6 +960,12 @@ export class ISPService {
                 userDetails.push(result.formatted)
                 if (result.success) {
                     successCount++
+                    // Track online/offline counts
+                    if (result.isOnline === true) {
+                        onlineCount++
+                    } else if (result.isOnline === false) {
+                        offlineCount++
+                    }
                 } else {
                     failureCount++
                 }
@@ -985,6 +998,8 @@ export class ISPService {
                 totalUsers: otherUsers.length,
                 successful: successCount,
                 failed: failureCount,
+                onlineCount,
+                offlineCount,
                 batchSize,
                 totalBatches: batches.length,
                 durationSeconds,
@@ -992,7 +1007,7 @@ export class ISPService {
             'AP user details fetch completed (parallel)'
         )
 
-        return userDetails.join('\n')
+        return { formatted: userDetails.join('\n'), onlineCount, offlineCount }
     }
 
     /**
@@ -1050,16 +1065,16 @@ export class ISPService {
             .join('\n')
 
         // Access point users - fetch detailed information for each user
-        let apUsers: string
+        let apUsersResult: { formatted: string; onlineCount: number; offlineCount: number }
         if (isOLT && userInfo.mikrotikInterface) {
             // For OLT interfaces, fetch users from getMikrotikUsers
             try {
                 const mikrotikUsers = await this.getMikrotikUsers(userInfo.mikrotikInterface)
                 if (mikrotikUsers.length === 0) {
-                    apUsers = '• No users found on this interface'
+                    apUsersResult = { formatted: '• No users found on this interface', onlineCount: 0, offlineCount: 0 }
                 } else {
                     // Fetch detailed information for each Mikrotik user (with progress updates)
-                    apUsers = await this.fetchAPUserDetails(
+                    apUsersResult = await this.fetchAPUserDetails(
                         mikrotikUsers,
                         userInfo.userName,
                         provider,
@@ -1068,12 +1083,12 @@ export class ISPService {
                 }
             } catch (error) {
                 ispLogger.error({ err: error, mikrotikInterface: userInfo.mikrotikInterface }, 'Failed to fetch Mikrotik users for OLT interface')
-                apUsers = '• Unable to fetch user list'
+                apUsersResult = { formatted: '• Unable to fetch user list', onlineCount: 0, offlineCount: 0 }
             }
         } else {
             // For non-OLT interfaces, fetch detailed information for accessPointUsers (with progress updates)
             try {
-                apUsers = await this.fetchAPUserDetails(
+                apUsersResult = await this.fetchAPUserDetails(
                     userInfo.accessPointUsers,
                     userInfo.userName,
                     provider,
@@ -1081,9 +1096,14 @@ export class ISPService {
                 )
             } catch (error) {
                 ispLogger.error({ err: error }, 'Failed to fetch AP user details')
-                apUsers = '• Unable to fetch AP user details'
+                apUsersResult = { formatted: '• Unable to fetch AP user details', onlineCount: 0, offlineCount: 0 }
             }
         }
+
+        // Format AP users header with online/offline counts
+        const apUsersHeader = apUsersResult.onlineCount > 0 || apUsersResult.offlineCount > 0
+            ? `👥 <b>Users on Same AP:</b> (🟢 ${apUsersResult.onlineCount} online, 🔴 ${apUsersResult.offlineCount} offline)`
+            : '👥 <b>Users on Same AP:</b>'
 
         // Determine if user is admin or worker
         const isAdmin = userRole === 'admin'
@@ -1151,8 +1171,8 @@ ${statusEmoji} ${userInfo.online ? 'Online' : 'Offline'} | ${userInfo.active ? '
                   accessPointInfo: accessPointSection.trim() || undefined,
 
                   apUsers: `
-👥 <b>Users on Same AP:</b>
-${apUsers || '• None'}`.trim(),
+${apUsersHeader}
+${apUsersResult.formatted || '• None'}`.trim(),
 
                   billing: `
 💰 <b>Account Price:</b> $${userInfo.accountPrice}`.trim(),
@@ -1199,8 +1219,8 @@ ${this.formatPingResults(userInfo.pingResult)}`.trim(),
                   accessPointInfo: accessPointSection.trim() || undefined,
 
                   apUsers: `
-👥 <b>Users on Same AP:</b>
-${apUsers || '• None'}`.trim(),
+${apUsersHeader}
+${apUsersResult.formatted || '• None'}`.trim(),
 
                   billing: `
 💰 <b>Billing Information:</b>
