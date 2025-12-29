@@ -78,12 +78,16 @@ export class OLT2Service {
     /**
      * Login to OLT2 and get a session key
      *
+     * The OLT2 system uses session keys embedded in URL query strings.
+     * After login, we fetch a page that contains links with SessionKey=xxxxx
+     *
      * @returns Session key if successful, null otherwise
      */
     private async login(): Promise<string | null> {
         try {
             olt2Logger.info('Logging in to OLT2 system')
 
+            // Step 1: Authenticate
             const formData = new URLSearchParams({
                 user: this.config.username,
                 pass: this.config.password,
@@ -91,7 +95,7 @@ export class OLT2Service {
                 who: '100',
             })
 
-            const response = await undiciFetch(`${this.config.baseUrl}/action/main.html`, {
+            const loginResponse = await undiciFetch(`${this.config.baseUrl}/action/main.html`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -102,65 +106,60 @@ export class OLT2Service {
                 dispatcher: insecureDispatcher,
             })
 
-            if (!response.ok) {
+            if (!loginResponse.ok) {
                 olt2Logger.error(
-                    { status: response.status, statusText: response.statusText },
+                    { status: loginResponse.status, statusText: loginResponse.statusText },
                     'OLT2 login request failed'
                 )
                 return null
             }
 
-            const html = await response.text()
+            // Check for login redirect (means credentials are wrong)
+            const loginHtml = await loginResponse.text()
+            if (loginHtml.includes('login.html') || loginHtml.includes('Login failed')) {
+                olt2Logger.error('OLT2 login failed - invalid credentials')
+                return null
+            }
 
-            // Extract session key from the response
-            // Look for patterns like: SessionKey=xxxxx or sessionkey=xxxxx
-            const sessionKeyMatch = html.match(/[Ss]ession[Kk]ey[=:]?\s*["']?([a-zA-Z0-9]+)["']?/i)
+            // Step 2: Fetch ONU page to get session key from embedded URLs
+            // The session key is in URL query strings like: SessionKey=xxxxx
+            const onuResponse = await undiciFetch(`${this.config.baseUrl}/action/onuauthinfo.html`, {
+                method: 'GET',
+                headers: {
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                },
+                dispatcher: insecureDispatcher,
+            })
+
+            if (!onuResponse.ok) {
+                olt2Logger.error(
+                    { status: onuResponse.status },
+                    'Failed to fetch ONU page after login'
+                )
+                return null
+            }
+
+            const onuHtml = await onuResponse.text()
+
+            // Extract SessionKey from URL patterns like: SessionKey=fgzki
+            const sessionKeyMatch = onuHtml.match(/SessionKey=([a-zA-Z0-9]+)/i)
             if (sessionKeyMatch && sessionKeyMatch[1]) {
                 const newSessionKey = sessionKeyMatch[1]
                 this.sessionKey = newSessionKey
                 this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
 
                 olt2Logger.info(
-                    { sessionKeyLength: newSessionKey.length },
-                    'OLT2 login successful, session key obtained'
-                )
-
-                return newSessionKey
-            }
-
-            // Alternative: Look for hidden input with SessionKey
-            const hiddenInputMatch = html.match(/<input[^>]+name=["']?SessionKey["']?[^>]+value=["']?([a-zA-Z0-9]+)["']?/i)
-            if (hiddenInputMatch && hiddenInputMatch[1]) {
-                const newSessionKey = hiddenInputMatch[1]
-                this.sessionKey = newSessionKey
-                this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
-
-                olt2Logger.info(
-                    { sessionKeyLength: newSessionKey.length },
-                    'OLT2 login successful, session key obtained from hidden input'
-                )
-
-                return newSessionKey
-            }
-
-            // Try reverse pattern: value first, then name
-            const reverseMatch = html.match(/<input[^>]+value=["']?([a-zA-Z0-9]+)["']?[^>]+name=["']?SessionKey["']?/i)
-            if (reverseMatch && reverseMatch[1]) {
-                const newSessionKey = reverseMatch[1]
-                this.sessionKey = newSessionKey
-                this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
-
-                olt2Logger.info(
-                    { sessionKeyLength: newSessionKey.length },
-                    'OLT2 login successful, session key obtained from reverse hidden input'
+                    { sessionKey: newSessionKey },
+                    'OLT2 login successful, session key obtained from URL'
                 )
 
                 return newSessionKey
             }
 
             olt2Logger.error(
-                { htmlPreview: html.substring(0, 500) },
-                'Could not extract session key from OLT2 login response'
+                { htmlPreview: onuHtml.substring(0, 300) },
+                'Could not extract session key from OLT2 ONU page'
             )
             return null
         } catch (error) {
