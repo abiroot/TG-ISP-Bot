@@ -248,11 +248,14 @@ export class OLT2Service {
 
                 olt2Logger.info({ description, attempt }, 'Querying OLT2 for ONU info')
 
+                // OLT2 search is case-sensitive, descriptions are typically lowercase
+                const searchDescription = description.toLowerCase()
+
                 const formData = new URLSearchParams({
                     select: '255', // All ports
                     onutype: '0', // Authentication
                     searchMac: '',
-                    searchDescription: description,
+                    searchDescription: searchDescription,
                     onuid: '0/',
                     select2: '1/',
                     who: '300', // Search by description
