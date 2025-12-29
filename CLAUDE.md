@@ -463,6 +463,14 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `ISP_API_PASSWORD` - API authentication password
 - `ISP_ENABLED` (default: true) - Enable/disable ISP tool calling features
 
+**OLT2 Configuration (Optional):**
+- `OLT2_BASE_URL` (default: https://185.170.131.28) - OLT2 system base URL for ONU status lookup
+- `OLT2_ENABLED` (default: true) - Enable/disable OLT2 ONU status lookup
+- **Features:**
+  - When a customer's Mikrotik Interface contains "OLT2", automatically fetches ONU status
+  - Displays ONU status (Online/Offline), MAC address, ONU ID, RTT under the Mikrotik Interface line
+  - Extracts ONU username from the last segment of the interface name (e.g., `(VM-PPPoe4)-vlan1502-OLT2-PON1-SAIIDKHOUDARJE` → `SAIIDKHOUDARJE`)
+
 **Billing API Configuration (Optional):**
 - `BILLING_API_BASE_URL` - Billing system base URL (task_api.php endpoint)
 - `BILLING_ENABLED` (default: true) - Enable/disable Billing service features

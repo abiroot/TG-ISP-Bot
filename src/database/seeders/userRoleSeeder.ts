@@ -79,9 +79,10 @@ export async function seedUserRoles(): Promise<void> {
         for (const assignment of ROLE_ASSIGNMENTS) {
             try {
                 // Idempotent insert: ON CONFLICT (user_telegram_id, role) DO NOTHING
+                // Use gen_random_uuid() which is built-in to PostgreSQL 13+
                 const result = await pool.query(
-                    `INSERT INTO user_roles (user_telegram_id, role, assigned_by, notes)
-                     VALUES ($1, $2, $3, $4)
+                    `INSERT INTO user_roles (id, user_telegram_id, role, assigned_by, notes)
+                     VALUES (gen_random_uuid(), $1, $2, $3, $4)
                      ON CONFLICT (user_telegram_id, role) DO NOTHING
                      RETURNING id`,
                     [assignment.telegram_id, assignment.role, assignment.assigned_by, assignment.notes]

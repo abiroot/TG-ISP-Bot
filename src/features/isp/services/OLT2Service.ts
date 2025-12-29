@@ -9,9 +9,18 @@
 
 import { env } from '~/config/env'
 import { createFlowLogger } from '~/core/utils/logger'
-import https from 'node:https'
+import { Agent, fetch as undiciFetch } from 'undici'
 
 const olt2Logger = createFlowLogger('olt2-service')
+
+/**
+ * Custom dispatcher that allows self-signed/expired certificates
+ */
+const insecureDispatcher = new Agent({
+    connect: {
+        rejectUnauthorized: false,
+    },
+})
 
 /**
  * ONU (Optical Network Unit) Information
@@ -37,12 +46,6 @@ interface OLT2Config {
     enabled: boolean
 }
 
-/**
- * Custom HTTPS agent that allows self-signed certificates
- */
-const insecureAgent = new https.Agent({
-    rejectUnauthorized: false,
-})
 
 /**
  * OLT2 Service
@@ -122,7 +125,7 @@ export class OLT2Service {
                 SessionKey: this.sessionKey,
             })
 
-            const response = await fetch(`${this.config.baseUrl}/action/onuauthinfo.html`, {
+            const response = await undiciFetch(`${this.config.baseUrl}/action/onuauthinfo.html`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded',
@@ -131,8 +134,7 @@ export class OLT2Service {
                     'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
                 },
                 body: formData.toString(),
-                // @ts-expect-error - Node.js fetch supports agent option
-                agent: insecureAgent,
+                dispatcher: insecureDispatcher,
             })
 
             if (!response.ok) {
