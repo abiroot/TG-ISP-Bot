@@ -48,6 +48,14 @@ const envSchema = z.object({
 
     // Message Sending API Configuration
     API_KEY: z.string().min(1, 'API key is required for message sending endpoint'),
+
+    // OLT2 Configuration (for ONU status lookup)
+    OLT2_BASE_URL: z.string().optional().default('https://185.170.131.28'),
+    OLT2_ENABLED: z
+        .string()
+        .optional()
+        .default('true')
+        .transform((val) => val === 'true'),
 })
 
 export type Env = z.infer<typeof envSchema>

@@ -31,6 +31,7 @@ import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierE
 import type { LoadingMessage } from '~/core/utils/loadingIndicator'
 import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
 import { InsightEngine, type ISPInsight } from './InsightEngine'
+import { olt2Service, type ONUInfo } from './OLT2Service'
 
 const ispLogger = createFlowLogger('isp-service')
 
@@ -802,6 +803,46 @@ export class ISPService {
     }
 
     /**
+     * Check if a Mikrotik interface is specifically an OLT2 interface
+     * OLT2 interfaces contain "OLT2" (case-insensitive)
+     */
+    private isOLT2Interface(mikrotikInterface: string | null | undefined): boolean {
+        if (!mikrotikInterface) return false
+        return mikrotikInterface.toUpperCase().includes('OLT2')
+    }
+
+    /**
+     * Get ONU info from OLT2 system if applicable
+     * Extracts username from Mikrotik Interface and queries OLT2
+     */
+    private async getOLT2ONUInfo(mikrotikInterface: string | null | undefined): Promise<ONUInfo | null> {
+        if (!mikrotikInterface || !this.isOLT2Interface(mikrotikInterface)) {
+            return null
+        }
+
+        if (!olt2Service.isEnabled()) {
+            ispLogger.debug('OLT2 service is disabled, skipping ONU lookup')
+            return null
+        }
+
+        const onuUsername = olt2Service.extractONUUsername(mikrotikInterface)
+        if (!onuUsername) {
+            ispLogger.debug(
+                { mikrotikInterface },
+                'Could not extract ONU username from Mikrotik Interface'
+            )
+            return null
+        }
+
+        ispLogger.info(
+            { mikrotikInterface, onuUsername },
+            'Querying OLT2 for ONU info'
+        )
+
+        return await olt2Service.getONUInfo(onuUsername)
+    }
+
+    /**
      * Helper: Format interface stats for worker view (simplified)
      * Shows only: Speed, Status, Link Downs
      */
@@ -1123,6 +1164,16 @@ export class ISPService {
         // Check if this is an OLT interface
         const isOLT = this.isOLTInterface(userInfo.mikrotikInterface)
 
+        // Get OLT2 ONU info if applicable (for interfaces containing "OLT2")
+        let onuInfo: ONUInfo | null = null
+        if (this.isOLT2Interface(userInfo.mikrotikInterface)) {
+            try {
+                onuInfo = await this.getOLT2ONUInfo(userInfo.mikrotikInterface)
+            } catch (error) {
+                ispLogger.error({ err: error, mikrotikInterface: userInfo.mikrotikInterface }, 'Failed to fetch OLT2 ONU info')
+            }
+        }
+
         // Escape helper - only escape raw user data
         const esc = (str: string | null | undefined, fallback = 'N/A') => {
             return html.escape(str || fallback)
@@ -1305,7 +1356,8 @@ ${allSessions}`.trim()
 - <b>IP Address:</b> <code>${esc(userInfo.ipAddress, 'Not assigned')}</code>
 - <b>Static IP:</b> ${esc(userInfo.staticIP, 'None')}
 - <b>NAS Host:</b> <code>${esc(userInfo.nasHost, 'Not connected')}</code>
-- <b>Mikrotik Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>
+- <b>Mikrotik Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>${onuInfo ? `
+${olt2Service.formatONUInfo(onuInfo)}` : ''}
 - <b>Router Brand:</b> ${esc(userInfo.routerBrand, 'Unknown')}
 - <b>Speed:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
 - <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
