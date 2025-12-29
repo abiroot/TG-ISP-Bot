@@ -5,8 +5,8 @@
 
 -- ============= EXTENSIONS =============
 
--- Enable UUID extension for UUID generation
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Note: Using built-in gen_random_uuid() instead of uuid-ossp extension
+-- gen_random_uuid() is available in PostgreSQL 13+ without extensions
 
 -- Enable pgvector extension for vector similarity search (RAG)
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -35,7 +35,7 @@ $$ LANGUAGE plpgsql;
 
 -- Whitelisted Groups (for group chats)
 CREATE TABLE IF NOT EXISTS whitelisted_groups (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     group_id TEXT UNIQUE NOT NULL,
     whitelisted_by TEXT NOT NULL,
     whitelisted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -56,7 +56,7 @@ CREATE TRIGGER update_whitelisted_groups_updated_at
 
 -- Whitelisted Users for Private Chats (supports Telegram usernames and numeric IDs)
 CREATE TABLE IF NOT EXISTS whitelisted_users (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_identifier TEXT UNIQUE NOT NULL,  -- Telegram username or numeric ID
     whitelisted_by TEXT NOT NULL,
     whitelisted_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -83,7 +83,7 @@ COMMENT ON COLUMN whitelisted_users.user_identifier IS 'Telegram user ID (numeri
 
 -- Personalities (per group or private conversation)
 CREATE TABLE IF NOT EXISTS personalities (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     context_id TEXT UNIQUE NOT NULL,
     context_type TEXT NOT NULL CHECK (context_type IN ('group', 'private')),
     bot_name TEXT NOT NULL,
@@ -137,7 +137,7 @@ COMMENT ON TABLE setup_state_temp IS 'Temporary storage for multi-step personali
 
 -- Messages Table (stores all incoming and outgoing messages)
 CREATE TABLE IF NOT EXISTS messages (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     message_id TEXT UNIQUE NOT NULL, -- External message ID from provider
     context_id TEXT NOT NULL, -- Group ID or Telegram user ID
     context_type TEXT NOT NULL CHECK (context_type IN ('group', 'private')),
@@ -354,7 +354,7 @@ COMMENT ON COLUMN tool_execution_audit.duration_ms IS 'Execution time in millise
 
 -- Telegram User Mapping (for webhook notifications)
 CREATE TABLE IF NOT EXISTS telegram_user_mapping (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     username VARCHAR(255) NOT NULL UNIQUE,
     telegram_id VARCHAR(50) NOT NULL,
     telegram_username VARCHAR(255),
