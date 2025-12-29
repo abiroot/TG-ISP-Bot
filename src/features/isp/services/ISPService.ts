@@ -1166,9 +1166,17 @@ export class ISPService {
 
         // Get OLT2 ONU info if applicable (for interfaces containing "OLT2")
         let onuInfo: ONUInfo | null = null
+        ispLogger.debug(
+            { mikrotikInterface: userInfo.mikrotikInterface, isOLT2: this.isOLT2Interface(userInfo.mikrotikInterface) },
+            'Checking for OLT2 interface'
+        )
         if (this.isOLT2Interface(userInfo.mikrotikInterface)) {
             try {
                 onuInfo = await this.getOLT2ONUInfo(userInfo.mikrotikInterface)
+                ispLogger.info(
+                    { mikrotikInterface: userInfo.mikrotikInterface, onuFound: !!onuInfo, onuStatus: onuInfo?.status },
+                    'OLT2 ONU lookup result'
+                )
             } catch (error) {
                 ispLogger.error({ err: error, mikrotikInterface: userInfo.mikrotikInterface }, 'Failed to fetch OLT2 ONU info')
             }
@@ -1308,7 +1316,9 @@ ${statusEmoji} ${userInfo.online ? `Online (${esc(userInfo.userUpTime)})` : 'Off
 🚪 <b>Last Logout:</b> ${this.formatDateBeirut(userInfo.lastLogOut)}
 📊 <b>FUP:</b> ${esc(userInfo.fupMode)} | <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
 <b>Electrical:</b> ${userInfo.accessPointElectrical ? '⚡ Yes' : '🔌 No'}
-📡 <b>Router:</b> ${esc(userInfo.routerBrand, 'Unknown')}`.trim(),
+📡 <b>Router:</b> ${esc(userInfo.routerBrand, 'Unknown')}
+🌐 <b>Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>${onuInfo ? `
+${olt2Service.formatONUInfo(onuInfo)}` : ''}`.trim(),
 
                   stationInfo: stationSection.trim() || undefined,
 
