@@ -43,6 +43,8 @@ export interface ONUInfo {
  */
 interface OLT2Config {
     baseUrl: string
+    username: string
+    password: string
     enabled: boolean
 }
 
@@ -51,14 +53,19 @@ interface OLT2Config {
  * OLT2 Service
  *
  * Handles ONU status lookups from the OLT2 fiber system.
+ * Manages authentication and session keys for API access.
  */
 export class OLT2Service {
     private config: OLT2Config
-    private sessionKey: string = 'gzxuh' // Default session key
+    private sessionKey: string | null = null
+    private sessionExpiry: number = 0 // Timestamp when session expires
+    private static readonly SESSION_TTL_MS = 10 * 60 * 1000 // 10 minutes
 
     constructor() {
         this.config = {
             baseUrl: env.OLT2_BASE_URL,
+            username: env.OLT2_USERNAME,
+            password: env.OLT2_PASSWORD,
             enabled: env.OLT2_ENABLED,
         }
 
@@ -66,6 +73,125 @@ export class OLT2Service {
             { enabled: this.config.enabled, baseUrl: this.config.baseUrl },
             'OLT2Service initialized'
         )
+    }
+
+    /**
+     * Login to OLT2 and get a session key
+     *
+     * @returns Session key if successful, null otherwise
+     */
+    private async login(): Promise<string | null> {
+        try {
+            olt2Logger.info('Logging in to OLT2 system')
+
+            const formData = new URLSearchParams({
+                user: this.config.username,
+                pass: this.config.password,
+                button: 'Login',
+                who: '100',
+            })
+
+            const response = await undiciFetch(`${this.config.baseUrl}/action/main.html`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                },
+                body: formData.toString(),
+                dispatcher: insecureDispatcher,
+            })
+
+            if (!response.ok) {
+                olt2Logger.error(
+                    { status: response.status, statusText: response.statusText },
+                    'OLT2 login request failed'
+                )
+                return null
+            }
+
+            const html = await response.text()
+
+            // Extract session key from the response
+            // Look for patterns like: SessionKey=xxxxx or sessionkey=xxxxx
+            const sessionKeyMatch = html.match(/[Ss]ession[Kk]ey[=:]?\s*["']?([a-zA-Z0-9]+)["']?/i)
+            if (sessionKeyMatch && sessionKeyMatch[1]) {
+                const newSessionKey = sessionKeyMatch[1]
+                this.sessionKey = newSessionKey
+                this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
+
+                olt2Logger.info(
+                    { sessionKeyLength: newSessionKey.length },
+                    'OLT2 login successful, session key obtained'
+                )
+
+                return newSessionKey
+            }
+
+            // Alternative: Look for hidden input with SessionKey
+            const hiddenInputMatch = html.match(/<input[^>]+name=["']?SessionKey["']?[^>]+value=["']?([a-zA-Z0-9]+)["']?/i)
+            if (hiddenInputMatch && hiddenInputMatch[1]) {
+                const newSessionKey = hiddenInputMatch[1]
+                this.sessionKey = newSessionKey
+                this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
+
+                olt2Logger.info(
+                    { sessionKeyLength: newSessionKey.length },
+                    'OLT2 login successful, session key obtained from hidden input'
+                )
+
+                return newSessionKey
+            }
+
+            // Try reverse pattern: value first, then name
+            const reverseMatch = html.match(/<input[^>]+value=["']?([a-zA-Z0-9]+)["']?[^>]+name=["']?SessionKey["']?/i)
+            if (reverseMatch && reverseMatch[1]) {
+                const newSessionKey = reverseMatch[1]
+                this.sessionKey = newSessionKey
+                this.sessionExpiry = Date.now() + OLT2Service.SESSION_TTL_MS
+
+                olt2Logger.info(
+                    { sessionKeyLength: newSessionKey.length },
+                    'OLT2 login successful, session key obtained from reverse hidden input'
+                )
+
+                return newSessionKey
+            }
+
+            olt2Logger.error(
+                { htmlPreview: html.substring(0, 500) },
+                'Could not extract session key from OLT2 login response'
+            )
+            return null
+        } catch (error) {
+            olt2Logger.error({ err: error }, 'OLT2 login failed with exception')
+            return null
+        }
+    }
+
+    /**
+     * Ensure we have a valid session key, login if needed
+     */
+    private async ensureSession(): Promise<boolean> {
+        // Check if we have a valid session
+        if (this.sessionKey && Date.now() < this.sessionExpiry) {
+            return true
+        }
+
+        // Need to login
+        const sessionKey = await this.login()
+        return sessionKey !== null
+    }
+
+    /**
+     * Check if a response indicates we need to re-authenticate
+     */
+    private needsReauth(html: string): boolean {
+        // Check for login redirect patterns
+        return html.includes('login.html') ||
+               html.includes('window.top.location.href') ||
+               html.includes('Please login') ||
+               html.includes('Session expired')
     }
 
     /**
@@ -111,46 +237,75 @@ export class OLT2Service {
             return null
         }
 
-        try {
-            olt2Logger.info({ description }, 'Querying OLT2 for ONU info')
+        // Try up to 2 times (initial + 1 retry after re-auth)
+        for (let attempt = 0; attempt < 2; attempt++) {
+            try {
+                // Ensure we have a valid session
+                const hasSession = await this.ensureSession()
+                if (!hasSession) {
+                    olt2Logger.error('Failed to obtain OLT2 session')
+                    return null
+                }
 
-            const formData = new URLSearchParams({
-                select: '255', // All ports
-                onutype: '0', // Authentication
-                searchMac: '',
-                searchDescription: description,
-                onuid: '0/',
-                select2: '1/',
-                who: '300', // Search by description
-                SessionKey: this.sessionKey,
-            })
+                olt2Logger.info({ description, attempt }, 'Querying OLT2 for ONU info')
 
-            const response = await undiciFetch(`${this.config.baseUrl}/action/onuauthinfo.html`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Referer': `${this.config.baseUrl}/action/onuauthinfo.html`,
-                    'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-                },
-                body: formData.toString(),
-                dispatcher: insecureDispatcher,
-            })
+                const formData = new URLSearchParams({
+                    select: '255', // All ports
+                    onutype: '0', // Authentication
+                    searchMac: '',
+                    searchDescription: description,
+                    onuid: '0/',
+                    select2: '1/',
+                    who: '300', // Search by description
+                    SessionKey: this.sessionKey!,
+                })
 
-            if (!response.ok) {
-                olt2Logger.error(
-                    { status: response.status, statusText: response.statusText },
-                    'OLT2 request failed'
-                )
+                const response = await undiciFetch(`${this.config.baseUrl}/action/onuauthinfo.html`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                        'Referer': `${this.config.baseUrl}/action/onuauthinfo.html`,
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+                    },
+                    body: formData.toString(),
+                    dispatcher: insecureDispatcher,
+                })
+
+                if (!response.ok) {
+                    olt2Logger.error(
+                        { status: response.status, statusText: response.statusText },
+                        'OLT2 request failed'
+                    )
+                    return null
+                }
+
+                const html = await response.text()
+
+                // Check if we got redirected to login (session expired)
+                if (this.needsReauth(html)) {
+                    olt2Logger.warn({ attempt }, 'OLT2 session expired, re-authenticating')
+                    // Invalidate session and retry
+                    this.sessionKey = null
+                    this.sessionExpiry = 0
+                    continue
+                }
+
+                return this.parseONUInfoFromHTML(html, description)
+            } catch (error) {
+                olt2Logger.error({ err: error, description, attempt }, 'Failed to query OLT2')
+                if (attempt === 0) {
+                    // Invalidate session and try once more
+                    this.sessionKey = null
+                    this.sessionExpiry = 0
+                    continue
+                }
                 return null
             }
-
-            const html = await response.text()
-            return this.parseONUInfoFromHTML(html, description)
-        } catch (error) {
-            olt2Logger.error({ err: error, description }, 'Failed to query OLT2')
-            return null
         }
+
+        olt2Logger.error({ description }, 'Failed to query OLT2 after retries')
+        return null
     }
 
     /**

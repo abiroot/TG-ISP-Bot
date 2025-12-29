@@ -51,6 +51,8 @@ const envSchema = z.object({
 
     // OLT2 Configuration (for ONU status lookup)
     OLT2_BASE_URL: z.string().optional().default('https://185.170.131.28'),
+    OLT2_USERNAME: z.string().optional().default('admin'),
+    OLT2_PASSWORD: z.string().optional().default('Mikrotik1'),
     OLT2_ENABLED: z
         .string()
         .optional()
