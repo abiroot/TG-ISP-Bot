@@ -30,18 +30,6 @@ export interface ONUStatus {
 }
 
 /**
- * ONU Basic Information from `show onu <id> basic-info`
- */
-export interface ONUBasicInfo {
-    vendorId: string        // e.g., "HWTC"
-    modelId: string         // e.g., "310M"
-    onuHwId: string         // e.g., "74a0637ed6a8"
-    hardwareVersion: string // e.g., "6A5.A"
-    softwareVersion: string // e.g., "V3R017C00S100"
-    firmwareVersion: string // e.g., "2010"
-}
-
-/**
  * ONU Optical Module Information from `show onu <id> optical-transceiver-diagnosis`
  */
 export interface ONUOpticalInfo {
@@ -50,19 +38,6 @@ export interface ONUOpticalInfo {
     biasCurrent: string     // e.g., "8.00 mA"
     transmitPower: string   // e.g., "1.67 mW (2.21 dBm)"
     receivePower: string    // e.g., "0.04 mW (-14.56 dBm)"
-}
-
-/**
- * ONU CAP2 Information from `show onu <id> cap2-info`
- */
-export interface ONUCAP2Info {
-    onuType: string         // e.g., "SFU"
-    multiLLID: string       // e.g., "unsupport"
-    protectionType: string  // e.g., "unsupport"
-    ponifCount: number      // e.g., 1
-    slotCount: number       // e.g., 0
-    interfaceTypeCount: number // e.g., 1
-    interfaceTypePorts: string // e.g., "GE(1);"
 }
 
 /**
@@ -87,10 +62,8 @@ export interface ONUInfo {
     lastDeregTime: string   // Last time it went offline
     lastDeregReason: string // Reason for last offline (Power Off, Wire Down, etc.)
     port: string            // EPON port (0/1, 0/2, etc.)
-    // Detailed info (optional - may not always be fetched)
-    basicInfo?: ONUBasicInfo
+    // Detailed info (optional - only optical and port status are fetched)
     opticalInfo?: ONUOpticalInfo
-    cap2Info?: ONUCAP2Info
     portInfo?: ONUPortInfo
 }
 
@@ -137,6 +110,15 @@ export class OLTTelnetService {
     private socket: net.Socket | null = null
     private buffer: string = ''
 
+    // ONU info cache with TTL
+    private onuCache = new Map<string, { data: ONUInfo; timestamp: number }>()
+    private readonly CACHE_TTL_MS = 5 * 60 * 1000 // 5 minutes
+
+    // Connection pooling state
+    private isAuthenticated = false
+    private lastActivity = 0
+    private readonly CONNECTION_TTL_MS = 5 * 60 * 1000 // 5 minutes - close idle connections
+
     constructor(config: Partial<OLTConfig> & { name: string; host: string }) {
         this.config = {
             ...DEFAULT_CONFIG,
@@ -154,6 +136,14 @@ export class OLTTelnetService {
      */
     isEnabled(): boolean {
         return this.config.enabled
+    }
+
+    /**
+     * Clear the ONU info cache
+     */
+    clearCache(): void {
+        this.onuCache.clear()
+        oltLogger.debug({ name: this.config.name }, 'ONU cache cleared')
     }
 
     /**
@@ -275,6 +265,64 @@ export class OLTTelnetService {
             this.socket = null
         }
         this.buffer = ''
+        this.isAuthenticated = false
+        this.lastActivity = 0
+    }
+
+    /**
+     * Force disconnect (for graceful shutdown or explicit cleanup)
+     */
+    forceDisconnect(): void {
+        oltLogger.debug({ name: this.config.name }, 'Force disconnecting pooled connection')
+        this.disconnect()
+    }
+
+    /**
+     * Ensure connection is established and authenticated (connection pooling)
+     *
+     * Reuses existing connection if still valid, otherwise establishes a new one.
+     * Connection is considered valid if:
+     * - Socket is connected
+     * - Already authenticated
+     * - Last activity was within CONNECTION_TTL_MS
+     */
+    private async ensureConnection(): Promise<boolean> {
+        const now = Date.now()
+
+        // Check if existing connection is still valid
+        if (this.socket && this.isAuthenticated) {
+            if (now - this.lastActivity < this.CONNECTION_TTL_MS) {
+                this.lastActivity = now
+                oltLogger.debug(
+                    { name: this.config.name, idleMs: now - this.lastActivity },
+                    'Reusing pooled connection'
+                )
+                return true
+            }
+            // Connection expired, disconnect and reconnect
+            oltLogger.debug(
+                { name: this.config.name, idleMs: now - this.lastActivity },
+                'Pooled connection expired, reconnecting'
+            )
+            this.disconnect()
+        }
+
+        // Establish new connection
+        try {
+            await this.connect()
+            const authenticated = await this.authenticate()
+            if (authenticated) {
+                this.isAuthenticated = true
+                this.lastActivity = now
+                oltLogger.debug({ name: this.config.name }, 'New pooled connection established')
+                return true
+            }
+        } catch (error) {
+            oltLogger.error({ err: error, name: this.config.name }, 'Failed to establish pooled connection')
+            this.disconnect()
+        }
+
+        return false
     }
 
     /**
@@ -329,12 +377,12 @@ export class OLTTelnetService {
     private async selectInterface(port: string): Promise<boolean> {
         try {
             // Enter config mode
-            await this.sendCommand('configure terminal', 600)
-            await this.waitForPrompt(/\(config\)#/, 4000)
+            await this.sendCommand('configure terminal', 300)
+            await this.waitForPrompt(/\(config\)#/, 2000)
 
             // Select EPON interface
-            await this.sendCommand(`interface epon ${port}`, 600)
-            const response = await this.waitForPrompt(/\(config-pon-/, 4000)
+            await this.sendCommand(`interface epon ${port}`, 300)
+            const response = await this.waitForPrompt(/\(config-pon-/, 2000)
 
             return response.includes(`config-pon-${port}`)
         } catch (error) {
@@ -347,8 +395,8 @@ export class OLTTelnetService {
      * Exit interface mode
      */
     private async exitInterface(): Promise<void> {
-        await this.sendCommand('exit', 400)
-        await this.waitForPrompt(/#/, 2000)
+        await this.sendCommand('exit', 200)
+        await this.waitForPrompt(/#/, 1000)
     }
 
     /**
@@ -427,37 +475,6 @@ export class OLTTelnetService {
     }
 
     /**
-     * Parse `show onu <id> ctc onu_sn` output
-     *
-     * Actual Format:
-     * Vendor ID           : HWTC
-     * ONU Model           : 010H
-     * ONU ID              : C0BFC0E976E7
-     * Hardware Version    : AD5.A
-     * Software Version    : V3R017C00S100
-     */
-    private parseBasicInfo(output: string): ONUBasicInfo | null {
-        const vendorMatch = output.match(/Vendor\s*ID\s*:\s*(\S+)/i)
-        const modelMatch = output.match(/ONU\s*Model\s*:\s*(\S+)/i)
-        const onuIdMatch = output.match(/ONU\s*ID\s*:\s*(\S+)/i)
-        const hwVersionMatch = output.match(/Hardware\s*Version\s*:\s*(\S+)/i)
-        const swVersionMatch = output.match(/Software\s*Version\s*:\s*(\S+)/i)
-
-        if (!vendorMatch && !modelMatch) {
-            return null
-        }
-
-        return {
-            vendorId: vendorMatch?.[1] ?? 'N/A',
-            modelId: modelMatch?.[1] ?? 'N/A',
-            onuHwId: onuIdMatch?.[1] ?? 'N/A',
-            hardwareVersion: hwVersionMatch?.[1] ?? 'N/A',
-            softwareVersion: swVersionMatch?.[1] ?? 'N/A',
-            firmwareVersion: 'N/A', // Not in onu_sn output
-        }
-    }
-
-    /**
      * Parse `show onu <id> ctc opm_diag` output
      *
      * Format:
@@ -496,54 +513,6 @@ export class OLTTelnetService {
             biasCurrent: currentMatch ? `${currentMatch[1]} mA` : 'N/A',
             transmitPower: txPower,
             receivePower: rxPower,
-        }
-    }
-
-    /**
-     * Parse `show onu <id> ctc cap_2` output
-     *
-     * Actual Format:
-     * ONU Type            : SFU
-     * MultiLLID           : unsupport
-     * Potection ype       : unsupport   (typo in OLT firmware)
-     * PON If Number       : 1
-     * Slot Number         : 0
-     * Interface Type Number: 1
-     * Interface Type1     : GE
-     * Ports1 Number       : 1
-     */
-    private parseCAP2Info(output: string): ONUCAP2Info | null {
-        const onuTypeMatch = output.match(/ONU\s*Type\s*:\s*(\S+)/i)
-        const multiLLIDMatch = output.match(/MultiLLID\s*:\s*(\S+)/i)
-        // Handle typo "Potection ype" and correct "Protection Type"
-        const protectionMatch = output.match(/(?:Protection\s*Type|Potection\s*ype)\s*:\s*(\S+)/i)
-        const ponifCountMatch = output.match(/PON\s*If\s*Number\s*:\s*(\d+)/i)
-        const slotCountMatch = output.match(/Slot\s*Number\s*:\s*(\d+)/i)
-        const ifTypeCountMatch = output.match(/Interface\s*Type\s*Number\s*:\s*(\d+)/i)
-        // Match "Interface Type1 : GE" and "Ports1 Number : 1"
-        const ifType1Match = output.match(/Interface\s*Type1\s*:\s*(\S+)/i)
-        const ports1Match = output.match(/Ports1\s*Number\s*:\s*(\d+)/i)
-
-        if (!onuTypeMatch) {
-            return null
-        }
-
-        // Build interface type string like "GE(1)"
-        let interfacePorts = 'N/A'
-        if (ifType1Match && ports1Match) {
-            interfacePorts = `${ifType1Match[1]}(${ports1Match[1]})`
-        } else if (ifType1Match) {
-            interfacePorts = ifType1Match[1]
-        }
-
-        return {
-            onuType: onuTypeMatch?.[1] ?? 'N/A',
-            multiLLID: multiLLIDMatch?.[1] ?? 'N/A',
-            protectionType: protectionMatch?.[1] ?? 'N/A',
-            ponifCount: ponifCountMatch ? parseInt(ponifCountMatch[1], 10) : 0,
-            slotCount: slotCountMatch ? parseInt(slotCountMatch[1], 10) : 0,
-            interfaceTypeCount: ifTypeCountMatch ? parseInt(ifTypeCountMatch[1], 10) : 0,
-            interfaceTypePorts: interfacePorts,
         }
     }
 
@@ -593,8 +562,8 @@ export class OLTTelnetService {
         }
 
         // Get ONU status
-        await this.sendCommand('show onu status', 600)
-        const statusOutput = await this.waitForPrompt(/#/, 10000)
+        await this.sendCommand('show onu status', 300)
+        const statusOutput = await this.waitForPrompt(/#/, 5000)
         const onus = this.parseONUStatus(statusOutput)
 
         oltLogger.debug({ port, onuCount: onus.length }, 'Found ONUs on port')
@@ -604,8 +573,8 @@ export class OLTTelnetService {
             const index = this.getONUIndex(onu.onuId)
             if (!index) continue
 
-            await this.sendCommand(`show onu ${index} description`, 400)
-            const descOutput = await this.waitForPrompt(/#/, 4000)
+            await this.sendCommand(`show onu ${index} description`, 200)
+            const descOutput = await this.waitForPrompt(/#/, 2000)
             const description = this.parseONUDescription(descOutput)
 
             if (description) {
@@ -622,47 +591,32 @@ export class OLTTelnetService {
     /**
      * Fetch detailed information for a specific ONU using CTC commands
      * Must be called while already in the interface context
+     * Only fetches optical info and port status (displayed in UI)
      */
     private async fetchDetailedONUInfo(index: string): Promise<{
-        basicInfo?: ONUBasicInfo
         opticalInfo?: ONUOpticalInfo
-        cap2Info?: ONUCAP2Info
         portInfo?: ONUPortInfo
     }> {
         const result: {
-            basicInfo?: ONUBasicInfo
             opticalInfo?: ONUOpticalInfo
-            cap2Info?: ONUCAP2Info
             portInfo?: ONUPortInfo
         } = {}
 
         try {
-            // Fetch basic info using CTC command
-            await this.sendCommand(`show onu ${index} ctc onu_sn`, 600)
-            const basicOutput = await this.waitForPrompt(/#/, 6000)
-            result.basicInfo = this.parseBasicInfo(basicOutput) ?? undefined
-
-            // Fetch optical info using CTC command (needs more time)
-            await this.sendCommand(`show onu ${index} ctc opm_diag`, 600)
-            const opticalOutput = await this.waitForPrompt(/#/, 6000)
+            // Fetch optical info using CTC command
+            await this.sendCommand(`show onu ${index} ctc opm_diag`, 300)
+            const opticalOutput = await this.waitForPrompt(/#/, 3000)
             result.opticalInfo = this.parseOpticalInfo(opticalOutput) ?? undefined
 
-            // Fetch CAP2 info using CTC command
-            await this.sendCommand(`show onu ${index} ctc cap_2`, 600)
-            const cap2Output = await this.waitForPrompt(/#/, 6000)
-            result.cap2Info = this.parseCAP2Info(cap2Output) ?? undefined
-
             // Fetch port link state using CTC eth command
-            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 600)
-            const portOutput = await this.waitForPrompt(/#/, 6000)
+            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 300)
+            const portOutput = await this.waitForPrompt(/#/, 3000)
             result.portInfo = this.parsePortInfo(portOutput) ?? undefined
 
             oltLogger.debug(
                 {
                     index,
-                    hasBasicInfo: !!result.basicInfo,
                     hasOpticalInfo: !!result.opticalInfo,
-                    hasCAP2Info: !!result.cap2Info,
                     hasPortInfo: !!result.portInfo,
                 },
                 'Fetched detailed ONU info'
@@ -687,19 +641,28 @@ export class OLTTelnetService {
         }
 
         const searchDescription = targetDescription.toLowerCase()
+        const cacheKey = `${this.config.name}:${searchDescription}`
+
+        // Check cache first
+        const cached = this.onuCache.get(cacheKey)
+        if (cached && Date.now() - cached.timestamp < this.CACHE_TTL_MS) {
+            oltLogger.debug(
+                { name: this.config.name, description: targetDescription, cacheAge: Date.now() - cached.timestamp },
+                'Returning cached ONU info'
+            )
+            return cached.data
+        }
+
         oltLogger.info(
             { name: this.config.name, description: targetDescription },
             'Searching for ONU'
         )
 
         try {
-            // Connect
-            await this.connect()
-
-            // Authenticate
-            const authenticated = await this.authenticate()
-            if (!authenticated) {
-                oltLogger.error({ name: this.config.name }, 'Authentication failed')
+            // Use pooled connection (reuses existing if valid)
+            const connected = await this.ensureConnection()
+            if (!connected) {
+                oltLogger.error({ name: this.config.name }, 'Failed to establish connection')
                 return null
             }
 
@@ -728,9 +691,7 @@ export class OLTTelnetService {
                     // Re-enter interface to fetch detailed info
                     const index = this.getONUIndex(match.onuId)
                     let detailedInfo: {
-                        basicInfo?: ONUBasicInfo
                         opticalInfo?: ONUOpticalInfo
-                        cap2Info?: ONUCAP2Info
                         portInfo?: ONUPortInfo
                     } = {}
 
@@ -742,7 +703,7 @@ export class OLTTelnetService {
                         }
                     }
 
-                    return {
+                    const result: ONUInfo = {
                         onuId: match.onuId,
                         status: match.status,
                         macAddress: match.macAddress,
@@ -756,6 +717,15 @@ export class OLTTelnetService {
                         port: port,
                         ...detailedInfo,
                     }
+
+                    // Store in cache
+                    this.onuCache.set(cacheKey, { data: result, timestamp: Date.now() })
+                    oltLogger.debug(
+                        { name: this.config.name, description: targetDescription, cacheKey },
+                        'ONU info cached'
+                    )
+
+                    return result
                 }
             }
 
@@ -769,10 +739,11 @@ export class OLTTelnetService {
                 { err: error, name: this.config.name, description: targetDescription },
                 'Failed to query OLT'
             )
-            return null
-        } finally {
+            // Disconnect on error to reset state (next call will reconnect)
             this.disconnect()
+            return null
         }
+        // Note: No finally { disconnect() } - connection stays pooled for reuse
     }
 
     /**
