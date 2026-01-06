@@ -793,7 +793,6 @@ export class OLTTelnetService {
         output += `\n  - <b>ONU ID:</b> <code>${onuInfo.onuId}</code>`
         output += `\n  - <b>MAC:</b> <code>${onuInfo.macAddress}</code>`
         output += `\n  - <b>Distance:</b> ${onuInfo.distanceMeters}m`
-        output += `\n  - <b>RTT:</b> ${onuInfo.rtt} TQ`
         output += `\n  - <b>Uptime:</b> ${onuInfo.aliveTime}`
 
         // Add registration time if available
@@ -809,17 +808,6 @@ export class OLTTelnetService {
             }
         }
 
-        // Basic Device Information
-        if (onuInfo.basicInfo) {
-            const b = onuInfo.basicInfo
-            output += `\n\n<b>📦 Device Info:</b>`
-            output += `\n  - <b>Vendor:</b> ${b.vendorId} | <b>Model:</b> ${b.modelId}`
-            output += `\n  - <b>HW ID:</b> <code>${b.onuHwId}</code>`
-            output += `\n  - <b>HW Ver:</b> ${b.hardwareVersion}`
-            output += `\n  - <b>SW Ver:</b> ${b.softwareVersion}`
-            output += `\n  - <b>FW Ver:</b> ${b.firmwareVersion}`
-        }
-
         // Optical Module Information
         if (onuInfo.opticalInfo) {
             const o = onuInfo.opticalInfo
@@ -829,21 +817,6 @@ export class OLTTelnetService {
             output += `\n  - <b>Bias Current:</b> ${o.biasCurrent}`
             output += `\n  - <b>TX Power:</b> ${o.transmitPower}`
             output += `\n  - <b>RX Power:</b> ${o.receivePower}`
-        }
-
-        // CAP2 Information with Port Status
-        if (onuInfo.cap2Info) {
-            const c = onuInfo.cap2Info
-            output += `\n\n<b>🔧 CAP2 Info:</b>`
-            output += `\n  - <b>ONU Type:</b> ${c.onuType}`
-
-            // Show port with link status
-            if (onuInfo.portInfo?.linkStatus) {
-                const portEmoji = onuInfo.portInfo.linkStatus === 'Up' ? '🟢' : '🔴'
-                output += `\n  - <b>Port 1 (${c.interfaceTypePorts}):</b> ${portEmoji} ${onuInfo.portInfo.linkStatus}`
-            } else {
-                output += `\n  - <b>Ports:</b> ${c.interfaceTypePorts}`
-            }
         }
 
         return output
