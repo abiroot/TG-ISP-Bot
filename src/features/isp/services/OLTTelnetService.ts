@@ -638,28 +638,24 @@ export class OLTTelnetService {
 
         try {
             // Fetch basic info using CTC command
-            await this.sendCommand(`show onu ${index} ctc onu_sn`, 200)
-            const basicOutput = await this.waitForPrompt(/#/, 2000)
+            await this.sendCommand(`show onu ${index} ctc onu_sn`, 300)
+            const basicOutput = await this.waitForPrompt(/#/, 3000)
             result.basicInfo = this.parseBasicInfo(basicOutput) ?? undefined
-            oltLogger.debug({ index, basicOutput: basicOutput.substring(0, 500) }, 'Basic info raw output')
 
-            // Fetch optical info using CTC command
-            await this.sendCommand(`show onu ${index} ctc opm_diag`, 200)
-            const opticalOutput = await this.waitForPrompt(/#/, 2000)
+            // Fetch optical info using CTC command (needs more time)
+            await this.sendCommand(`show onu ${index} ctc opm_diag`, 300)
+            const opticalOutput = await this.waitForPrompt(/#/, 3000)
             result.opticalInfo = this.parseOpticalInfo(opticalOutput) ?? undefined
-            oltLogger.debug({ index, opticalOutput: opticalOutput.substring(0, 500) }, 'Optical info raw output')
 
             // Fetch CAP2 info using CTC command
-            await this.sendCommand(`show onu ${index} ctc cap_2`, 200)
-            const cap2Output = await this.waitForPrompt(/#/, 2000)
+            await this.sendCommand(`show onu ${index} ctc cap_2`, 300)
+            const cap2Output = await this.waitForPrompt(/#/, 3000)
             result.cap2Info = this.parseCAP2Info(cap2Output) ?? undefined
-            oltLogger.debug({ index, cap2Output: cap2Output.substring(0, 500) }, 'CAP2 info raw output')
 
             // Fetch port link state using CTC eth command
-            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 200)
-            const portOutput = await this.waitForPrompt(/#/, 2000)
+            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 300)
+            const portOutput = await this.waitForPrompt(/#/, 3000)
             result.portInfo = this.parsePortInfo(portOutput) ?? undefined
-            oltLogger.debug({ index, portOutput: portOutput.substring(0, 500) }, 'Port link state raw output')
 
             oltLogger.debug(
                 {
@@ -835,12 +831,19 @@ export class OLTTelnetService {
             output += `\n  - <b>RX Power:</b> ${o.receivePower}`
         }
 
-        // CAP2 Information
+        // CAP2 Information with Port Status
         if (onuInfo.cap2Info) {
             const c = onuInfo.cap2Info
             output += `\n\n<b>🔧 CAP2 Info:</b>`
             output += `\n  - <b>ONU Type:</b> ${c.onuType}`
-            output += `\n  - <b>Ports:</b> ${c.interfaceTypePorts}`
+
+            // Show port with link status
+            if (onuInfo.portInfo?.linkStatus) {
+                const portEmoji = onuInfo.portInfo.linkStatus === 'Up' ? '🟢' : '🔴'
+                output += `\n  - <b>Port 1 (${c.interfaceTypePorts}):</b> ${portEmoji} ${onuInfo.portInfo.linkStatus}`
+            } else {
+                output += `\n  - <b>Ports:</b> ${c.interfaceTypePorts}`
+            }
         }
 
         return output
