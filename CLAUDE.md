@@ -464,19 +464,27 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
 - `ISP_ENABLED` (default: true) - Enable/disable ISP tool calling features
 
 **OLT2 Configuration (Optional):**
-- `OLT2_BASE_URL` (default: https://185.170.131.28) - OLT2 system base URL for ONU status lookup
+- `OLT2_BASE_URL` (default: 185.170.131.28) - OLT2 host for ONU status lookup via Telnet
+- `OLT2_USERNAME` (default: admin) - Telnet login username
+- `OLT2_PASSWORD` (default: Mikrotik1) - Telnet login and enable password
 - `OLT2_ENABLED` (default: true) - Enable/disable OLT2 ONU status lookup
+- **Protocol:** Telnet (port 23) - queries EPON OLT platform directly
 - **Features:**
   - When a customer's Mikrotik Interface contains "OLT2", automatically fetches ONU status
-  - Displays ONU status (Online/Offline), MAC address, ONU ID, RTT under the Mikrotik Interface line
+  - Displays ONU status (Online/Offline), MAC address, ONU ID, distance, RTT, uptime
+  - Searches all EPON ports (0/1, 0/2, 0/3, 0/4) for the target ONU
   - Extracts ONU username from the last segment of the interface name (e.g., `(VM-PPPoe4)-vlan1502-OLT2-PON1-SAIIDKHOUDARJE` → `SAIIDKHOUDARJE`)
 
 **OLT1 Configuration (Optional):**
-- `OLT1_BASE_URL` (default: https://185.170.131.29) - OLT1 system base URL for ONU status lookup
+- `OLT1_BASE_URL` (default: 185.170.131.29) - OLT1 host for ONU status lookup via Telnet
+- `OLT1_USERNAME` (default: admin) - Telnet login username
+- `OLT1_PASSWORD` (default: Mikrotik1) - Telnet login and enable password
 - `OLT1_ENABLED` (default: true) - Enable/disable OLT1 ONU status lookup
+- **Protocol:** Telnet (port 23) - queries EPON OLT platform directly
 - **Features:**
   - When a customer's Mikrotik Interface contains "OLT1" (but not "OLT2"), automatically fetches ONU status
-  - Displays ONU status (Online/Offline), MAC address, ONU ID, RTT under the Mikrotik Interface line
+  - Displays ONU status (Online/Offline), MAC address, ONU ID, distance, RTT, uptime
+  - Searches all EPON ports (0/1, 0/2, 0/3, 0/4) for the target ONU
   - Extracts ONU username from the last segment of the interface name (e.g., `(VM-PPPoe4)-vlan1607-zone4-OLT1-eliehajjarb1` → `eliehajjarb1`)
 
 **Billing API Configuration (Optional):**

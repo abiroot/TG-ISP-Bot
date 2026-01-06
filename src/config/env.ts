@@ -49,8 +49,8 @@ const envSchema = z.object({
     // Message Sending API Configuration
     API_KEY: z.string().min(1, 'API key is required for message sending endpoint'),
 
-    // OLT2 Configuration (for ONU status lookup)
-    OLT2_BASE_URL: z.string().optional().default('https://185.170.131.28'),
+    // OLT2 Configuration (for ONU status lookup via Telnet)
+    OLT2_BASE_URL: z.string().optional().default('45.159.187.3'),
     OLT2_USERNAME: z.string().optional().default('admin'),
     OLT2_PASSWORD: z.string().optional().default('Mikrotik1'),
     OLT2_ENABLED: z
@@ -59,8 +59,8 @@ const envSchema = z.object({
         .default('true')
         .transform((val) => val === 'true'),
 
-    // OLT1 Configuration (for ONU status lookup)
-    OLT1_BASE_URL: z.string().optional().default('https://185.170.131.29'),
+    // OLT1 Configuration (for ONU status lookup via Telnet)
+    OLT1_BASE_URL: z.string().optional().default('45.159.187.2'),
     OLT1_USERNAME: z.string().optional().default('admin'),
     OLT1_PASSWORD: z.string().optional().default('Mikrotik1'),
     OLT1_ENABLED: z

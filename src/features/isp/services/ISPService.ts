@@ -31,8 +31,9 @@ import { extractFirstUserIdentifier } from '~/features/isp/utils/userIdentifierE
 import type { LoadingMessage } from '~/core/utils/loadingIndicator'
 import { splitISPMessage, type ISPMessageSections } from '~/utils/telegramMessageSplitter'
 import { InsightEngine, type ISPInsight } from './InsightEngine'
-import { olt2Service, type ONUInfo } from './OLT2Service'
+import { olt2Service } from './OLT2Service'
 import { olt1Service } from './OLT1Service'
+import type { ONUInfo } from './OLTTelnetService'
 
 const ispLogger = createFlowLogger('isp-service')
 
