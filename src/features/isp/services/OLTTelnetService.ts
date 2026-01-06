@@ -118,8 +118,8 @@ const DEFAULT_CONFIG: Partial<OLTConfig> = {
     password: 'Mikrotik1',
     enablePassword: 'Mikrotik1',
     enabled: true,
-    connectionTimeout: 10000,  // 10 seconds
-    commandTimeout: 5000,      // 5 seconds per command
+    connectionTimeout: 20000,  // 20 seconds
+    commandTimeout: 10000,     // 10 seconds per command
 }
 
 /**
@@ -283,15 +283,15 @@ export class OLTTelnetService {
     private async authenticate(): Promise<boolean> {
         try {
             // Wait for login prompt
-            await this.waitForPrompt(/Login:/i, 5000)
+            await this.waitForPrompt(/Login:/i, 10000)
 
             // Send username
-            await this.sendCommand(this.config.username, 200)
-            await this.waitForPrompt(/Password:/i, 3000)
+            await this.sendCommand(this.config.username, 400)
+            await this.waitForPrompt(/Password:/i, 6000)
 
             // Send password (increased delay and timeout for slower connections)
-            await this.sendCommand(this.config.password, 500)
-            const loginResponse = await this.waitForPrompt(/>/, 5000)
+            await this.sendCommand(this.config.password, 1000)
+            const loginResponse = await this.waitForPrompt(/>/, 10000)
 
             if (!loginResponse.includes('>')) {
                 oltLogger.error({ response: loginResponse.substring(0, 200) }, 'Login failed - no user prompt received')
@@ -299,12 +299,12 @@ export class OLTTelnetService {
             }
 
             // Enter enable mode
-            await this.sendCommand('enable', 500)
-            await this.waitForPrompt(/Password:/i, 3000)
+            await this.sendCommand('enable', 1000)
+            await this.waitForPrompt(/Password:/i, 6000)
 
             // Send enable password
-            await this.sendCommand(this.config.enablePassword, 500)
-            const enableResponse = await this.waitForPrompt(/#/, 5000)
+            await this.sendCommand(this.config.enablePassword, 1000)
+            const enableResponse = await this.waitForPrompt(/#/, 10000)
 
             if (!enableResponse.includes('#')) {
                 oltLogger.error({ response: enableResponse.substring(0, 200) }, 'Enable mode failed - no privileged prompt received')
@@ -312,8 +312,8 @@ export class OLTTelnetService {
             }
 
             // Disable pagination
-            await this.sendCommand('terminal length 0', 500)
-            await this.waitForPrompt(/#/, 3000)
+            await this.sendCommand('terminal length 0', 1000)
+            await this.waitForPrompt(/#/, 6000)
 
             oltLogger.debug({ host: this.config.host }, 'Authentication successful')
             return true
@@ -329,12 +329,12 @@ export class OLTTelnetService {
     private async selectInterface(port: string): Promise<boolean> {
         try {
             // Enter config mode
-            await this.sendCommand('configure terminal', 300)
-            await this.waitForPrompt(/\(config\)#/, 2000)
+            await this.sendCommand('configure terminal', 600)
+            await this.waitForPrompt(/\(config\)#/, 4000)
 
             // Select EPON interface
-            await this.sendCommand(`interface epon ${port}`, 300)
-            const response = await this.waitForPrompt(/\(config-pon-/, 2000)
+            await this.sendCommand(`interface epon ${port}`, 600)
+            const response = await this.waitForPrompt(/\(config-pon-/, 4000)
 
             return response.includes(`config-pon-${port}`)
         } catch (error) {
@@ -347,8 +347,8 @@ export class OLTTelnetService {
      * Exit interface mode
      */
     private async exitInterface(): Promise<void> {
-        await this.sendCommand('exit', 200)
-        await this.waitForPrompt(/#/, 1000)
+        await this.sendCommand('exit', 400)
+        await this.waitForPrompt(/#/, 2000)
     }
 
     /**
@@ -593,8 +593,8 @@ export class OLTTelnetService {
         }
 
         // Get ONU status
-        await this.sendCommand('show onu status', 300)
-        const statusOutput = await this.waitForPrompt(/#/, 5000)
+        await this.sendCommand('show onu status', 600)
+        const statusOutput = await this.waitForPrompt(/#/, 10000)
         const onus = this.parseONUStatus(statusOutput)
 
         oltLogger.debug({ port, onuCount: onus.length }, 'Found ONUs on port')
@@ -604,8 +604,8 @@ export class OLTTelnetService {
             const index = this.getONUIndex(onu.onuId)
             if (!index) continue
 
-            await this.sendCommand(`show onu ${index} description`, 200)
-            const descOutput = await this.waitForPrompt(/#/, 2000)
+            await this.sendCommand(`show onu ${index} description`, 400)
+            const descOutput = await this.waitForPrompt(/#/, 4000)
             const description = this.parseONUDescription(descOutput)
 
             if (description) {
@@ -638,23 +638,23 @@ export class OLTTelnetService {
 
         try {
             // Fetch basic info using CTC command
-            await this.sendCommand(`show onu ${index} ctc onu_sn`, 300)
-            const basicOutput = await this.waitForPrompt(/#/, 3000)
+            await this.sendCommand(`show onu ${index} ctc onu_sn`, 600)
+            const basicOutput = await this.waitForPrompt(/#/, 6000)
             result.basicInfo = this.parseBasicInfo(basicOutput) ?? undefined
 
             // Fetch optical info using CTC command (needs more time)
-            await this.sendCommand(`show onu ${index} ctc opm_diag`, 300)
-            const opticalOutput = await this.waitForPrompt(/#/, 3000)
+            await this.sendCommand(`show onu ${index} ctc opm_diag`, 600)
+            const opticalOutput = await this.waitForPrompt(/#/, 6000)
             result.opticalInfo = this.parseOpticalInfo(opticalOutput) ?? undefined
 
             // Fetch CAP2 info using CTC command
-            await this.sendCommand(`show onu ${index} ctc cap_2`, 300)
-            const cap2Output = await this.waitForPrompt(/#/, 3000)
+            await this.sendCommand(`show onu ${index} ctc cap_2`, 600)
+            const cap2Output = await this.waitForPrompt(/#/, 6000)
             result.cap2Info = this.parseCAP2Info(cap2Output) ?? undefined
 
             // Fetch port link state using CTC eth command
-            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 300)
-            const portOutput = await this.waitForPrompt(/#/, 3000)
+            await this.sendCommand(`show onu ${index} ctc eth 1 linkstate`, 600)
+            const portOutput = await this.waitForPrompt(/#/, 6000)
             result.portInfo = this.parsePortInfo(portOutput) ?? undefined
 
             oltLogger.debug(

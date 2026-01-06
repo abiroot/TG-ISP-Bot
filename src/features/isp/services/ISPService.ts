@@ -1429,7 +1429,9 @@ ${allSessions}`.trim()
 - <b>Static IP:</b> ${esc(userInfo.staticIP, 'None')}
 - <b>NAS Host:</b> <code>${esc(userInfo.nasHost, 'Not connected')}</code>
 - <b>Mikrotik Interface:</b> <code>${esc(userInfo.mikrotikInterface, 'Not assigned')}</code>${onuInfo && onuService ? `
-${onuService.formatONUInfo(onuInfo)}` : ''}
+
+${onuService.formatONUInfo(onuInfo)}
+` : ''}
 - <b>Router Brand:</b> ${esc(userInfo.routerBrand, 'Unknown')}
 - <b>Speed:</b> ↑${userInfo.basicSpeedUp} Mbps / ↓${userInfo.basicSpeedDown} Mbps
 - <b>Daily Quota:</b> ${formatQuota(userInfo.dailyQuota)}
