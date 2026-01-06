@@ -769,8 +769,8 @@ export class ISPService {
                 return `
 <b>Interface:</b> <code>${esc(stat.name)}</code> (${esc(stat.type)})
 - <b>MAC:</b> <code>${esc(stat.macAddress)}</code>
-- <b>Speed:</b> ${esc(stat.speed, 'Unknown')}
-- <b>Status:</b> ${stat.running ? '🟢 Running' : '🔴 Down'} ${stat.disabled ? '(Disabled)' : ''}
+- <b>Speed:</b> ${esc(stat.rate, 'Unknown')}
+- <b>Status:</b> ${stat.status === 'link-ok' ? '🟢' : '🔴'} ${esc(stat.status, 'Unknown')} ${stat.disabled ? '(Disabled)' : ''}
 - <b>Link Downs:</b> ${esc(stat.linkDowns)}
 - <b>Last Link Up:</b> ${esc(stat.lastLinkUpTime, 'Unknown')}`.trim()
             })
@@ -854,8 +854,8 @@ export class ISPService {
         const stat = stats[0] // Use first interface only
         const esc = (str: any, fallback = 'N/A') => html.escape(String(str || fallback))
 
-        return `- Speed: ${esc(stat.speed, 'Unknown')}
-- Status: ${stat.running ? 'Running' : 'Down'}
+        return `- Speed: ${esc(stat.rate, 'Unknown')}
+- Status: ${esc(stat.status, 'Unknown')}
 - Link Downs: ${esc(stat.linkDowns)}`
     }
 

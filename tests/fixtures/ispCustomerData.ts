@@ -59,7 +59,7 @@ export const onlineCustomer: ISPUserInfo = {
     stationIpAddress: '10.50.1.1',
     stationUpTime: '45d 12h 30m',
     stationInterfaceStats: [
-        { interface: 'ether1', rxBytes: 1024000000, txBytes: 512000000 },
+        { name: 'ether1', type: 'ether', macAddress: 'B8:69:F4:56:E8:17', rxBytes: 1024000000, txBytes: 512000000, running: true, disabled: false, linkDowns: 0, lastLinkUpTime: 'nov/25/2025 18:46:15', rate: '1Gbps', status: 'link-ok' },
     ],
 
     // Access point info
@@ -71,7 +71,7 @@ export const onlineCustomer: ISPUserInfo = {
     accessPointSignal: '-65 dBm',
     accessPointElectrical: true,
     accessPointInterfaceStats: [
-        { interface: 'wlan1', rxBytes: 512000000, txBytes: 256000000 },
+        { name: 'ether1', type: 'ether', macAddress: 'C4:AD:34:08:18:0B', rxBytes: 512000000, txBytes: 256000000, running: true, disabled: false, linkDowns: 0, lastLinkUpTime: 'mar/09/1974 19:52:37', rate: '100Mbps', status: 'link-ok' },
     ],
     accessPointUsers: [
         { userName: 'josianeyoussef', online: true },
@@ -184,7 +184,7 @@ export const offlineCustomer: ISPUserInfo = {
     stationIpAddress: '10.60.1.1',
     stationUpTime: '20d 5h 10m',
     stationInterfaceStats: [
-        { interface: 'ether1', rxBytes: 512000000, txBytes: 256000000 },
+        { name: 'ether1', type: 'ether', macAddress: 'A1:B2:C3:D4:E5:F6', rxBytes: 512000000, txBytes: 256000000, running: true, disabled: false, linkDowns: 2, lastLinkUpTime: 'oct/15/2025 10:30:00', rate: '100Mbps', status: 'link-ok' },
     ],
 
     // Access point info
@@ -293,7 +293,7 @@ export const expiredCustomer: ISPUserInfo = {
     stationIpAddress: '10.70.1.1',
     stationUpTime: '60d 10h 20m',
     stationInterfaceStats: [
-        { interface: 'ether1', rxBytes: 256000000, txBytes: 128000000 },
+        { name: 'ether1', type: 'ether', macAddress: 'F1:E2:D3:C4:B5:A6', rxBytes: 256000000, txBytes: 128000000, running: true, disabled: false, linkDowns: 0, lastLinkUpTime: 'aug/01/2025 08:00:00', rate: '1Gbps', status: 'link-ok' },
     ],
 
     // Access point info
@@ -305,7 +305,7 @@ export const expiredCustomer: ISPUserInfo = {
     accessPointSignal: 'N/A',
     accessPointElectrical: true,
     accessPointInterfaceStats: [
-        { interface: 'wlan1', rxBytes: 128000000, txBytes: 64000000 },
+        { name: 'ether1', type: 'ether', macAddress: '11:22:33:44:55:66', rxBytes: 128000000, txBytes: 64000000, running: true, disabled: false, linkDowns: 1, lastLinkUpTime: 'sep/20/2025 14:15:00', rate: '100Mbps', status: 'link-ok' },
     ],
     accessPointUsers: [],
 
