@@ -58,6 +58,16 @@ const envSchema = z.object({
         .optional()
         .default('true')
         .transform((val) => val === 'true'),
+
+    // OLT1 Configuration (for ONU status lookup)
+    OLT1_BASE_URL: z.string().optional().default('https://185.170.131.29'),
+    OLT1_USERNAME: z.string().optional().default('admin'),
+    OLT1_PASSWORD: z.string().optional().default('Mikrotik1'),
+    OLT1_ENABLED: z
+        .string()
+        .optional()
+        .default('true')
+        .transform((val) => val === 'true'),
 })
 
 export type Env = z.infer<typeof envSchema>

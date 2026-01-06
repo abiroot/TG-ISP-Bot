@@ -471,6 +471,14 @@ Environment variables are validated via Zod schema in `src/config/env.ts`.
   - Displays ONU status (Online/Offline), MAC address, ONU ID, RTT under the Mikrotik Interface line
   - Extracts ONU username from the last segment of the interface name (e.g., `(VM-PPPoe4)-vlan1502-OLT2-PON1-SAIIDKHOUDARJE` → `SAIIDKHOUDARJE`)
 
+**OLT1 Configuration (Optional):**
+- `OLT1_BASE_URL` (default: https://185.170.131.29) - OLT1 system base URL for ONU status lookup
+- `OLT1_ENABLED` (default: true) - Enable/disable OLT1 ONU status lookup
+- **Features:**
+  - When a customer's Mikrotik Interface contains "OLT1" (but not "OLT2"), automatically fetches ONU status
+  - Displays ONU status (Online/Offline), MAC address, ONU ID, RTT under the Mikrotik Interface line
+  - Extracts ONU username from the last segment of the interface name (e.g., `(VM-PPPoe4)-vlan1607-zone4-OLT1-eliehajjarb1` → `eliehajjarb1`)
+
 **Billing API Configuration (Optional):**
 - `BILLING_API_BASE_URL` - Billing system base URL (task_api.php endpoint)
 - `BILLING_ENABLED` (default: true) - Enable/disable Billing service features
