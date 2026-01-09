@@ -234,9 +234,11 @@ async function main() {
         // Customer action menu flows (Search or Create Task)
         // Button handlers for menu interaction (menu is displayed directly from WelcomeFlow)
         customerSearchFlow, // Search customer button handler
-        customerPingFlow, // Ping customer button handler (calls ISP API /user-ping)
+        // IMPORTANT: More specific ping flows MUST be registered BEFORE customerPingFlow
+        // because BUTTON_CUSTOMER_PING is a prefix of BUTTON_CUSTOMER_PING_AP/STATION
         customerPingAPFlow, // Ping Access Point button handler (calls ISP API /ping with AP IP)
         customerPingStationFlow, // Ping Station button handler (calls ISP API /ping with Station IP)
+        customerPingFlow, // Ping customer button handler (calls ISP API /user-ping)
         customerStatisticsFlow, // Statistics chart button handler (calls ISP API /user-stat)
         customerLocationFlow, // Location button handler (shows Google Maps link)
         customerCancelFlow, // Cancel button handler
