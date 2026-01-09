@@ -616,6 +616,70 @@ export class ISPService {
     }
 
     /**
+     * Ping IP address (network diagnostics)
+     * Calls external ISP API /ping?ipAddress={ip}
+     *
+     * @param ipAddress - IP address to ping
+     * @returns Ping response data from ISP API
+     */
+    async pingIP(ipAddress: string): Promise<any> {
+        if (!this.config.enabled) {
+            throw new ISPServiceError(
+                'ISP service is disabled in configuration',
+                'SERVICE_DISABLED',
+                undefined,
+                false
+            )
+        }
+
+        try {
+            const token = await this.authenticate()
+
+            const response = await fetch(
+                `${this.config.baseUrl}/ping?ipAddress=${encodeURIComponent(ipAddress)}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            )
+
+            if (!response.ok) {
+                if (response.status === 401) {
+                    // Token expired, clear it and retry once
+                    this.authToken = undefined
+                    this.tokenExpiry = undefined
+                    throw new ISPServiceError('Authentication expired', 'AUTH_EXPIRED', undefined, true)
+                }
+
+                throw new ISPServiceError(
+                    `Ping IP request failed: ${response.statusText}`,
+                    'PING_IP_REQUEST_FAILED',
+                    undefined,
+                    response.status >= 500
+                )
+            }
+
+            const data = await response.json()
+            ispLogger.info({ ipAddress }, 'IP ping successful')
+            return data
+        } catch (error) {
+            if (error instanceof ISPServiceError) {
+                throw error
+            }
+
+            ispLogger.error({ err: error, ipAddress }, 'IP ping failed')
+            throw new ISPServiceError(
+                'Ping IP request failed with network error',
+                'PING_IP_NETWORK_ERROR',
+                error,
+                true
+            )
+        }
+    }
+
+    /**
      * Ping customer (network diagnostics)
      * Calls external ISP API /user-ping?mobile={identifier}
      *
